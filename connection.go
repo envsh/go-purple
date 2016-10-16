@@ -1,0 +1,6 @@
+package purple
+
+/*
+
+ */
+import "C"

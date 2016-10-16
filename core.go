@@ -1,0 +1,186 @@
+package purple
+
+/*
+// core.c encapse libpurple's core init
+
+#include <libpurple/purple.h>
+extern void ui_init(void);
+extern void init_libpurple(void);
+extern void connect_to_signalscc(void*);
+*/
+import "C"
+import "unsafe"
+
+import (
+	"flag"
+	"fmt"
+	"log"
+	"os"
+	"runtime"
+
+	"github.com/kitech/colog"
+)
+
+var purple_debug = false
+
+func init() {
+	runtime.GOMAXPROCS(1)
+	runtime.LockOSThread()
+
+	log.SetFlags(log.Flags() | log.Lshortfile)
+	colog.Register()
+
+	flag.BoolVar(&purple_debug, "purple-debug", purple_debug, "enable purple debug.")
+}
+
+type PurpleCore struct {
+	loopUiOps C.PurpleEventLoopUiOps
+
+	accountUiOps C.PurpleAccountUiOps
+
+	connUiOps C.PurpleConnectionUiOps
+
+	convUiOps C.PurpleConversationUiOps
+
+	coreUiOps C.PurpleCoreUiOps
+
+	loop *C.GMainLoop
+}
+
+func NewPurpleCore() *PurpleCore {
+	this := &PurpleCore{}
+	this.loop = C.g_main_loop_new(nil, C.FALSE)
+	return this
+}
+
+func (this *PurpleCore) InitUi() {
+	C.ui_init()
+
+	if false {
+		this.accountUiOps.request_authorize = nil
+	}
+}
+
+func (this *PurpleCore) InitPurple() {
+
+	if true {
+		C.init_libpurple()
+		if purple_debug {
+			C.purple_debug_set_enabled(C.TRUE)
+		} else {
+			C.purple_debug_set_enabled(C.FALSE)
+		}
+		pc := unsafe.Pointer(this)
+		C.connect_to_signalscc(pc)
+	}
+
+	if false {
+		home := fmt.Sprintf("%s/%s", os.Getenv("HOME"), CUSTOM_USER_DIRECTORY)
+		C.purple_util_set_user_dir(C.CString(home))
+		C.purple_debug_set_enabled(C.FALSE)
+		C.purple_core_set_ui_ops(&this.coreUiOps)
+		C.purple_eventloop_set_ui_ops(&this.loopUiOps)
+		C.purple_plugins_add_search_path(C.CString(CUSTOM_PLUGIN_PATH))
+
+		if cok := C.purple_core_init(C.CString(UI_ID)); cok != C.TRUE {
+			log.Println("libpurple initialization failed. Dumping core." +
+				"Please report this!\n")
+			os.Exit(-1)
+		}
+
+		C.purple_set_blist(C.purple_blist_new())
+		C.purple_blist_load()
+		C.purple_prefs_load()
+		C.purple_plugins_load_saved(C.CString(PLUGIN_SAVE_PREF))
+		C.purple_pounces_load()
+	}
+}
+
+func (this *PurpleCore) AccountsFind(account string, protocol string) *Account {
+	acc := C.purple_accounts_find(C.CString(account), C.CString(protocol))
+	if acc == nil {
+		log.Println("not found", account, protocol)
+	} else {
+		log.Println(acc.username, acc.user_info)
+		return newAccountWrapper(acc)
+	}
+
+	return nil
+}
+
+func (this *PurpleCore) Loop() {
+	go func() { C.g_main_loop_run(this.loop) }()
+	log.Println("looped")
+	select {}
+}
+
+// callbacks
+//export gopurple_request_authorize
+func gopurple_request_authorize() { log.Println("hehhe") }
+
+//export gopurple_connect_progress
+func gopurple_connect_progress() { log.Println("hehhe") }
+
+//export gopurple_notice
+func gopurple_notice() { log.Println("hehhe") }
+
+//export gopurple_network_disconnected
+func gopurple_network_disconnected() { log.Println("hehhe") }
+
+//export gopurple_report_disconnect_reason
+func gopurple_report_disconnect_reason() { log.Println("hehhe") }
+
+//export gopurple_signed_on
+func gopurple_signed_on() {
+	log.Println("hehhe")
+}
+
+//export gopurple_buddy_signed_on
+func gopurple_buddy_signed_on() { log.Println("hehhe") }
+
+//export gopurple_buddy_signed_off
+func gopurple_buddy_signed_off() { log.Println("hehhe") }
+
+//export gopurple_buddy_away
+func gopurple_buddy_away() { log.Println("hehhe") }
+
+//export gopurple_buddy_idle
+func gopurple_buddy_idle() { log.Println("hehhe") }
+
+//export gopurple_received_im_msg
+func gopurple_received_im_msg() { log.Println("hehhe") }
+
+//export gopurple_buddy_typing
+func gopurple_buddy_typing() { log.Println("hehhe") }
+
+//export gopurple_buddy_typed
+func gopurple_buddy_typed() { log.Println("hehhe") }
+
+//export gopurple_buddy_typing_stopped
+func gopurple_buddy_typing_stopped() { log.Println("hehhe") }
+
+//export gopurple_account_authorization_requested
+func gopurple_account_authorization_requested() { log.Println("hehhe") }
+
+//export gopurple_dbus_method_called
+func gopurple_dbus_method_called() { log.Println("hehhe") }
+
+//
+func F_core_init(ui string) bool {
+	C.init_libpurple()
+	var pret = C.purple_accounts_find(C.CString("yournicknameu123@irc.freenode.net"),
+		C.CString("prpl-irc"))
+	log.Println(pret)
+	if pret != nil {
+		log.Println(C.GoString(pret.username), C.GoString(pret.alias))
+	}
+
+	/*
+		var bret = C.purple_core_init(C.CString(ui))
+		if bret == C.TRUE {
+			return true
+		}
+	*/
+
+	return false
+}
