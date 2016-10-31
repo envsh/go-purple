@@ -7,6 +7,11 @@ package purple
 extern void ui_init(void);
 extern void init_libpurple(void);
 extern void connect_to_signalscc(void*);
+extern void test_to_room(PurpleAccount *acc);
+typedef GHashTable *(*chat_info_defaults_func)(PurpleConnection *, const char *chat_name);
+
+//
+#include "misc.h"
 */
 import "C"
 import "unsafe"
@@ -114,6 +119,87 @@ func (this *PurpleCore) Loop() {
 	select {}
 }
 
+// send with conv
+func (this *PurpleCore) SendGroupMessage(acc *Account, room string, msg string) {
+
+}
+
+// send with conv
+func (this *PurpleCore) sendGroupMessage1(acc *Account, room string, msg string) {
+	gc := C.purple_account_get_connection(acc.account)
+	hash := this.protoInfo(gc, C.CString(room))
+	C.serv_join_chat(gc, hash)
+
+	conv := C.purple_conversation_new(C.PURPLE_CONV_TYPE_CHAT, acc.account, C.CString(room))
+	if conv != nil {
+	}
+	C.purple_conversation_present(conv) // important
+	chat := C.purple_conversation_get_chat_data(conv)
+	C.purple_conv_chat_send(chat, C.CString(msg))
+
+	if true {
+		chatid := this.convChatId(conv)
+		log.Println(chatid)
+		C.serv_chat_send(gc, chatid, C.CString(msg+" <- raw send"), 0)
+	}
+}
+
+// send with blist
+func (this *PurpleCore) sendGroupMessage2(acc *Account, room string, msg string) {
+	gc := C.purple_account_get_connection(acc.account)
+	hash := this.protoInfo(gc, C.CString(room))
+
+	bchat := C.purple_chat_new(acc.account, C.CString(room), hash)
+	C.serv_join_chat(gc, C.purple_chat_get_components(bchat))
+
+	var chatid C.int = 0
+
+	if true {
+		// wtf bug
+		conv := C.purple_find_conversation_with_account(C.PURPLE_CONV_TYPE_CHAT, C.CString(room), acc.account)
+		if conv == nil {
+			log.Println("not found")
+		} else {
+			chat := C.purple_conversation_get_chat_data(conv)
+			chatid = C.purple_conv_chat_get_id(chat)
+		}
+		log.Println(chatid)
+	}
+
+	C.serv_chat_send(gc, chatid, C.CString(msg), 0)
+}
+
+func (this *PurpleCore) convChatId(conv *C.PurpleConversation) C.int {
+	return C.purple_conv_chat_get_id(C.purple_conversation_get_chat_data(conv))
+}
+
+func (this *PurpleCore) protoInfo(conn *C.PurpleConnection, name *C.char) *C.GHashTable {
+	prpl := C.purple_connection_get_prpl(conn)
+	info := (*C.PurplePluginProtocolInfo)(prpl.info.extra_info)
+	if info.chat_info_defaults != nil {
+		fnptr := (C.chat_info_defaults_func)(info.chat_info_defaults)
+		if fnptr != nil {
+		}
+		// cannot call non-function fnptr (type C.chat_info_defaults_func)
+		// fnptr(conn, C.CString("aaa"))
+	}
+
+	hash := C.gopurple_connection_get_chat_info_defaults(conn, name)
+	return hash
+}
+
+func (this *PurpleCore) ToRoom(acc *Account) {
+	if true {
+		// room := "#tox-cn123"
+		room2 := "#tox-cn12345"
+
+		msg := "aifaioefjaiewfjwaeif"
+		this.sendGroupMessage1(acc, room2, msg)
+		// this.sendGroupMessage2(acc, room2, msg)
+		this.sendGroupMessage1(acc, room2, msg)
+	}
+}
+
 // callbacks
 //export gopurple_request_authorize
 func gopurple_request_authorize() { log.Println("hehhe") }
@@ -130,9 +216,14 @@ func gopurple_network_disconnected() { log.Println("hehhe") }
 //export gopurple_report_disconnect_reason
 func gopurple_report_disconnect_reason() { log.Println("hehhe") }
 
+var TmpAccount *Account = nil
+var TmpCore *PurpleCore = nil
+
 //export gopurple_signed_on
 func gopurple_signed_on() {
 	log.Println("hehhe")
+	log.Println(TmpCore, TmpAccount)
+	TmpCore.ToRoom(TmpAccount)
 }
 
 //export gopurple_buddy_signed_on
@@ -164,6 +255,9 @@ func gopurple_account_authorization_requested() { log.Println("hehhe") }
 
 //export gopurple_dbus_method_called
 func gopurple_dbus_method_called() { log.Println("hehhe") }
+
+//export gopurple_received_chat_msg
+func gopurple_received_chat_msg() { log.Println("hehhe") }
 
 //
 func F_core_init(ui string) bool {

@@ -384,6 +384,14 @@ static int account_authorization_requested(PurpleAccount *account, const char *u
 	// return TRUE;
 // }
 
+static void
+received_chat_msg(PurpleAccount *account, char *sender, char *buffer,
+                  PurpleConversation *chat, PurpleMessageFlags flags, void *data)
+{
+    printf("received chat msg: %s / %s \n", sender, buffer);
+    gopurple_received_chat_msg();
+}
+
 static void connect_to_signals(void)
 {
 	static int handle;
@@ -420,6 +428,9 @@ static void connect_to_signals(void)
 
 	// purple_signal_connect(purple_accounts_get_handle(), "dbus-method-called", &handle,
 				// PURPLE_CALLBACK(dbus_method_called), NULL);
+
+	purple_signal_connect(purple_conversations_get_handle(), "received-chat-msg", &handle,
+                          PURPLE_CALLBACK(received_chat_msg), NULL);
 }
 
 void connect_to_signalscc(void *pc)

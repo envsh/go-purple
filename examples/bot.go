@@ -23,10 +23,12 @@ func main() {
 		acc = purple.NewAccountCreate(username, "prpl-irc", "")
 		log.Println(acc)
 	}
+	purple.TmpCore = pc
+	purple.TmpAccount = acc
 	acc.SetEnabled(true)
 	acc.Connect()
+	// pc.ToRoom(acc)
 
 	pc.Loop()
-
 	// purple.F_core_init("abcdefg")
 }
