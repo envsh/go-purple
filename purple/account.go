@@ -41,3 +41,19 @@ func (this *Account) Connect() {
 func (this *Account) SetEnabled(enable bool) {
 	C.purple_account_set_enabled(this.account, C.CString(UI_ID), C.TRUE)
 }
+
+func (this *Account) GetString(name string) string {
+	cstr := C.purple_account_get_string(this.account, C.CString(name), nil)
+	if cstr == nil {
+		return ""
+	}
+	return C.GoString(cstr)
+}
+
+func (this *Account) GetConnection() *Connection {
+	cgc := C.purple_account_get_connection(this.account)
+	if cgc == nil {
+		return nil
+	}
+	return newConnectWrapper(cgc)
+}

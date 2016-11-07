@@ -1,4 +1,4 @@
-package plugin
+package purple
 
 /*
 #include <glib.h>
@@ -76,8 +76,8 @@ type PluginInfo struct {
 type PluginProtocolInfo struct {
 	// must
 	BlistIcon func() string
-	Login     func()
-	Close     func()
+	Login     func(*Account)
+	Close     func(*Connection)
 
 	// optional
 
@@ -173,13 +173,13 @@ func goprpl_blist_icon(a *C.PurpleAccount, b *C.PurpleBuddy) *C.char {
 //export goprpl_login
 func goprpl_login(a *C.PurpleAccount) {
 	var this = _plugin_instance
-	this.ppi.Login()
+	this.ppi.Login(newAccountWrapper(a))
 }
 
 //export goprpl_close
 func goprpl_close(gc *C.PurpleConnection) {
 	var this = _plugin_instance
-	this.ppi.Close()
+	this.ppi.Close(newConnectWrapper(gc))
 }
 
 //export goprpl_status_types
