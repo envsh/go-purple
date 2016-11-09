@@ -21,6 +21,7 @@ extern char* goprpl_blist_icon(PurpleAccount *a, PurpleBuddy *b);
 extern void goprpl_login(PurpleAccount *account);
 extern void goprpl_close(PurpleConnection *gc);
 extern GList* goprpl_status_types(PurpleAccount *a);
+extern int goprpl_send_im(PurpleConnection *gc, char *who, char *msg, PurpleMessageFlags flags);
 
 static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pppi) {
     pi->load = goprpl_plugin_load;
@@ -37,6 +38,7 @@ static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pp
     pppi->close = goprpl_close;
     pppi->status_types = goprpl_status_types;
     pppi->struct_size = sizeof(PurplePluginProtocolInfo);
+    pppi->send_im = (int(*)(PurpleConnection *gc, const char*, const char*, PurpleMessageFlags))goprpl_send_im;
 }
 */
 import "C"
@@ -51,6 +53,7 @@ import (
 
 func init() {
 	runtime.GOMAXPROCS(1)
+	runtime.LockOSThread()
 
 	colog.Register()
 	colog.SetFlags(log.LstdFlags | log.Lshortfile | colog.Flags())
@@ -81,7 +84,7 @@ type PluginProtocolInfo struct {
 	Close     func(*Connection)
 
 	// optional
-
+	SendIM func(*Connection, string, string) int
 }
 
 type Plugin struct {
@@ -174,13 +177,17 @@ func goprpl_blist_icon(a *C.PurpleAccount, b *C.PurpleBuddy) *C.char {
 //export goprpl_login
 func goprpl_login(a *C.PurpleAccount) {
 	var this = _plugin_instance
-	this.ppi.Login(newAccountWrapper(a))
+	if this.ppi.Login != nil {
+		this.ppi.Login(newAccountWrapper(a))
+	}
 }
 
 //export goprpl_close
 func goprpl_close(gc *C.PurpleConnection) {
 	var this = _plugin_instance
-	this.ppi.Close(newConnectWrapper(gc))
+	if this.ppi.Close != nil {
+		this.ppi.Close(newConnectWrapper(gc))
+	}
 }
 
 //export goprpl_status_types
@@ -188,19 +195,33 @@ func goprpl_status_types(a *C.PurpleAccount) *C.GList {
 	var stype *C.PurpleStatusType
 	var types *C.GList
 
-	stype = C.purple_status_type_new(C.PURPLE_STATUS_AVAILABLE, nil, nil, C.TRUE)
+	stype = C.purple_status_type_new(C.PURPLE_STATUS_AVAILABLE,
+		C.CString("tox_online"), C.CString("Online"), C.TRUE)
 	types = C.g_list_append(types, stype)
 
-	stype = C.purple_status_type_new_full(C.PURPLE_STATUS_AWAY, nil, nil, C.TRUE, C.TRUE, C.FALSE)
+	stype = C.purple_status_type_new_full(C.PURPLE_STATUS_AWAY,
+		C.CString("tox_away"), C.CString("Away"), C.TRUE, C.TRUE, C.FALSE)
 	types = C.g_list_append(types, stype)
 
-	stype = C.purple_status_type_new_full(C.PURPLE_STATUS_UNAVAILABLE, C.CString("ToxBusy"), C.CString("Busy"), C.TRUE, C.TRUE, C.FALSE)
+	stype = C.purple_status_type_new_full(C.PURPLE_STATUS_UNAVAILABLE,
+		C.CString("tox_busy"), C.CString("Busy"), C.TRUE, C.TRUE, C.FALSE)
 	types = C.g_list_append(types, stype)
 
-	stype = C.purple_status_type_new(C.PURPLE_STATUS_OFFLINE, nil, nil, C.TRUE)
+	stype = C.purple_status_type_new(C.PURPLE_STATUS_OFFLINE,
+		C.CString("tox_offline"), C.CString("Offline"), C.TRUE)
 	types = C.g_list_append(types, stype)
 
 	return types
+}
+
+//export goprpl_send_im
+func goprpl_send_im(gc *C.PurpleConnection, who *C.char, msg *C.char, flags C.PurpleMessageFlags) C.int {
+	var this = _plugin_instance
+	if this.ppi.SendIM != nil {
+		ret := this.ppi.SendIM(newConnectWrapper(gc), C.GoString(who), C.GoString(msg))
+		return C.int(ret)
+	}
+	return C.int(-1)
 }
 
 var _plugin_instance *Plugin = nil
@@ -208,7 +229,8 @@ var _plugin_instance *Plugin = nil
 // when call go's init() and purple's purple_init_plugin
 //export purple_init_plugin
 func purple_init_plugin(plugin *C.PurplePlugin) C.gboolean {
-	log.Println(plugin)
+	log.Println(plugin, MyTid2())
+	runtime.LockOSThread()
 
 	// _plugin_instance = NewPlugin()
 	if _plugin_instance == nil {

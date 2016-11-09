@@ -24,6 +24,8 @@ type ToxPlugin struct {
 	_toxav   *tox.ToxAV
 	_toxopts *tox.ToxOptions
 	stopch   chan struct{}
+
+	iterTimerHandler int
 }
 
 // plugin functions
@@ -49,7 +51,6 @@ func (this *ToxPlugin) destroy_tox(p *purple.Plugin) {
 
 // protocol functions
 func (this *ToxPlugin) tox_blist_icon() string {
-	log.Println("called")
 	return "gotox"
 }
 
@@ -104,11 +105,13 @@ func (this *ToxPlugin) tox_login(ac *purple.Account) {
 		buddy.BlistAdd(group)
 	}
 
-	go this.Iterate()
+	// go this.Iterate()
+	this.iterTimerHandler = purple.TimeoutAdd(100, this, this.itercb)
 }
 
 func (this *ToxPlugin) tox_close(gc *purple.Connection) {
-	this.stopch <- struct{}{}
+	// this.stopch <- struct{}{}
+	purple.TimeoutRemove(this.iterTimerHandler)
 	this.save_account()
 	this._tox.Kill()
 	this._tox = nil
@@ -120,9 +123,15 @@ func (this *ToxPlugin) tox_status_types() {
 }
 
 ////////
+func (this *ToxPlugin) itercb(d interface{}) {
+	this._tox.Iterate()
+}
+
+// should block and new thread
 func (this *ToxPlugin) Iterate() {
 	stopped := false
 	tick := time.Tick(100 * time.Millisecond)
+	id := this._tox.SelfGetAddress()
 	for !stopped {
 		select {
 		case <-tick:
@@ -131,7 +140,7 @@ func (this *ToxPlugin) Iterate() {
 			stopped = true
 		}
 	}
-	log.Println("stopped", this._tox.SelfGetAddress())
+	log.Println("stopped", id)
 }
 
 var data_file = "/tmp/gotox.dat"
@@ -177,6 +186,7 @@ func NewToxPlugin() *ToxPlugin {
 		BlistIcon: this.tox_blist_icon,
 		Login:     this.tox_login,
 		Close:     this.tox_close,
+		SendIM:    this.send_im,
 	}
 	this.p = purple.NewPlugin(&pi, &ppi, this.init_tox)
 

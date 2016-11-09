@@ -7,12 +7,17 @@ import "C"
 
 import (
 	"log"
+	"time"
 )
 
 const (
 	DISCONNECTED = int(C.PURPLE_DISCONNECTED)
 	CONNECTED    = int(C.PURPLE_CONNECTED)
 	CONNECTING   = int(C.PURPLE_CONNECTING)
+
+	MESSAGE_SEND   = int(C.PURPLE_MESSAGE_SEND)
+	MESSAGE_RECV   = int(C.PURPLE_MESSAGE_RECV)
+	MESSAGE_SYSTEM = int(C.PURPLE_MESSAGE_SYSTEM)
 )
 
 type Connection struct {
@@ -35,4 +40,10 @@ func (this *Connection) SetState(state int) {
 	default:
 		log.Panicln("not supported", state)
 	}
+}
+
+func (this *Connection) GotIM(who string, msg string, mtype int) {
+	samsg := C.strdup(C.CString(msg))
+	C.serv_got_im(this.conn, C.CString(who), samsg,
+		C.PurpleMessageFlags(mtype), C.time_t(time.Now().Unix()))
 }

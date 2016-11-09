@@ -34,6 +34,16 @@ func (this *Buddy) SetProtocolData(data interface{}) {
 	C.purple_buddy_set_protocol_data(this.buddy, C.CString("hehhehee"))
 }
 
+func (this *Buddy) GetName() string {
+	cstr := C.purple_buddy_get_name(this.buddy)
+	return C.GoString(cstr)
+}
+
+func (this *Buddy) GetAliasOnly() string {
+	cstr := C.purple_buddy_get_alias_only(this.buddy)
+	return C.GoString(cstr)
+}
+
 type Group struct {
 	group *C.PurpleGroup
 }
