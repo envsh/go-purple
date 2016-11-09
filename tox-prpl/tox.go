@@ -1,3 +1,6 @@
+/*
+   tox-prpl core code, minimal must implemention code.
+*/
 package main
 
 import (
@@ -56,17 +59,24 @@ var bsnodes = []string{
 	"205.185.116.116", "33445", "A179B09749AC826FF01F37A9613F6B57118AE014D4196A0E1105A98F93A54702",
 }
 
-func (this *ToxPlugin) tox_login(acc *purple.Account) {
+func (this *ToxPlugin) tox_login(ac *purple.Account) {
 	this.stopch = make(chan struct{}, 0)
 	this._toxopts = tox.NewToxOptions()
 	this._toxopts.Tcp_port = uint16(rand.Uint32()%55536) + 10000
 	this.load_account()
 
-	this._tox = tox.NewTox(this._toxopts)
+	// retry 50 times
+	for port := 0; port < 50; port++ {
+		this._toxopts.Tcp_port = uint16(rand.Uint32()%55536) + 10000
+		this._tox = tox.NewTox(this._toxopts)
+		if this._tox != nil {
+			log.Println("TOXID:", this._tox.SelfGetAddress())
+			break
+		}
+	}
 	if this._tox == nil {
 		log.Panicln("null")
 	}
-	log.Println("TOXID:", this._tox.SelfGetAddress())
 
 	for i := 0; i < len(bsnodes); i += 3 {
 		port, _ := strconv.Atoi(bsnodes[i+1])
@@ -77,19 +87,22 @@ func (this *ToxPlugin) tox_login(acc *purple.Account) {
 		}
 	}
 
-	this._tox.CallbackSelfConnectionStatus(func(t *tox.Tox, status uint32, d interface{}) {
-		log.Println("hehhe", status)
-	}, acc)
+	// little state setup
+	if true {
+		conn := ac.GetConnection()
+		conn.SetState(purple.CONNECTING)
+	}
 
-	this._tox.CallbackFriendRequest(func(t *tox.Tox, pubkey, msg string, d interface{}) {
-		log.Println("hehhe", pubkey, msg)
-		this._tox.FriendAddNorequest(pubkey)
-		this.save_account()
-	}, acc)
+	this.setupSelfInfo(ac)
+	this.setupCallbacks(ac)
+	this.loadFriends(ac)
 
-	this._tox.CallbackFriendMessage(func(t *tox.Tox, friendNumber uint32, msg string, d interface{}) {
-		log.Println(friendNumber, msg)
-	}, acc)
+	if false {
+		buddy := purple.NewBuddy(ac, "onlyyou-id", "onlyyou-nick")
+		ac.AddBuddy(buddy)
+		group := purple.NewGroup("GOTOX")
+		buddy.BlistAdd(group)
+	}
 
 	go this.Iterate()
 }
@@ -97,6 +110,9 @@ func (this *ToxPlugin) tox_login(acc *purple.Account) {
 func (this *ToxPlugin) tox_close(gc *purple.Connection) {
 	this.stopch <- struct{}{}
 	this.save_account()
+	this._tox.Kill()
+	this._tox = nil
+	this._toxopts = nil
 }
 
 func (this *ToxPlugin) tox_status_types() {

@@ -36,6 +36,7 @@ static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pp
     pppi->login = goprpl_login;
     pppi->close = goprpl_close;
     pppi->status_types = goprpl_status_types;
+    pppi->struct_size = sizeof(PurplePluginProtocolInfo);
 }
 */
 import "C"

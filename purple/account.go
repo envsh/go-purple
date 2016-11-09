@@ -57,3 +57,29 @@ func (this *Account) GetConnection() *Connection {
 	}
 	return newConnectWrapper(cgc)
 }
+
+func (this *Account) GetUserName() string {
+	cstr := C.purple_account_get_username(this.account)
+	return C.GoString(cstr)
+}
+
+func (this *Account) GetAlias() string {
+	cstr := C.purple_account_get_alias(this.account)
+	return C.GoString(cstr)
+}
+
+func (this *Account) AddBuddy(b *Buddy) {
+	C.purple_account_add_buddy(this.account, b.buddy)
+}
+
+func (this *Account) FindBuddy(name string) *Buddy {
+	buddy := C.purple_find_buddy(this.account, C.CString(name))
+	if buddy == nil {
+		return nil
+	}
+	return newBuddyWrapper(buddy)
+}
+
+func (this *Account) RequestAdd(name string) {
+	C.purple_account_request_add(this.account, C.CString(name), nil, nil, nil)
+}
