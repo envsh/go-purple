@@ -8,5 +8,5 @@ tox:
 toxb:
 	go build -v -o toxb.so ./tox-prpl
 
-tox-install:
+toxi:
 	sudo install -v ./libtox.so /usr/lib/purple-2/libtox.so

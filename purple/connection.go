@@ -7,7 +7,6 @@ import "C"
 
 import (
 	"log"
-	"time"
 )
 
 const (
@@ -29,7 +28,7 @@ func newConnectWrapper(conn *C.PurpleConnection) *Connection {
 	return this
 }
 
-func (this *Connection) SetState(state int) {
+func (this *Connection) ConnSetState(state int) {
 	switch state {
 	case DISCONNECTED:
 		C.purple_connection_set_state(this.conn, C.PURPLE_DISCONNECTED)
@@ -42,8 +41,15 @@ func (this *Connection) SetState(state int) {
 	}
 }
 
-func (this *Connection) GotIM(who string, msg string, mtype int) {
-	samsg := C.strdup(C.CString(msg))
-	C.serv_got_im(this.conn, C.CString(who), samsg,
-		C.PurpleMessageFlags(mtype), C.time_t(time.Now().Unix()))
+func (this *Connection) ConnGetState() int {
+	state := C.purple_connection_get_state(this.conn)
+	return int(state)
+}
+
+func (this *Connection) ConnSetAccount(ac *Account) {
+	C.purple_connection_set_account(this.conn, ac.account)
+}
+
+func (this *Connection) ConnSetDisplayName(name string) {
+	C.purple_connection_set_display_name(this.conn, C.CString(name))
 }

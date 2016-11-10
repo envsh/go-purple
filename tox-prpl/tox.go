@@ -91,7 +91,7 @@ func (this *ToxPlugin) tox_login(ac *purple.Account) {
 	// little state setup
 	if true {
 		conn := ac.GetConnection()
-		conn.SetState(purple.CONNECTING)
+		conn.ConnSetState(purple.CONNECTING)
 	}
 
 	this.setupSelfInfo(ac)
@@ -186,7 +186,17 @@ func NewToxPlugin() *ToxPlugin {
 		BlistIcon: this.tox_blist_icon,
 		Login:     this.tox_login,
 		Close:     this.tox_close,
-		SendIM:    this.send_im,
+		SendIM:    this.SendIM,
+		// group chat
+		ChatInfo:         this.ChatInfo,
+		ChatInfoDefaults: this.ChatInfoDefaults,
+		JoinChat:         this.JoinChat,
+		RejectChat:       this.RejectChat,
+		GetChatName:      this.GetChatName,
+		ChatInvite:       this.ChatInvite,
+		ChatLeave:        this.ChatLeave,
+		ChatWhisper:      this.ChatWhisper,
+		ChatSend:         this.ChatSend,
 	}
 	this.p = purple.NewPlugin(&pi, &ppi, this.init_tox)
 

@@ -17,11 +17,22 @@ static void _set_plugin_type(PurplePluginInfo *pi) {
 extern gboolean goprpl_plugin_load(PurplePlugin *p);
 extern gboolean goprpl_plugin_unload(PurplePlugin *p);
 extern void goprpl_plugin_destroy(PurplePlugin *p);
-extern char* goprpl_blist_icon(PurpleAccount *a, PurpleBuddy *b);
+extern char* goprpl_blist_icon(PurpleAccount *ac, PurpleBuddy *b);
 extern void goprpl_login(PurpleAccount *account);
 extern void goprpl_close(PurpleConnection *gc);
-extern GList* goprpl_status_types(PurpleAccount *a);
+extern GList* goprpl_status_types(PurpleAccount *ac);
+extern GList *goprpl_chat_info(PurpleConnection *gc);
+extern GHashTable *goprpl_chat_info_defaults(PurpleConnection *, char *chat_name);
+
 extern int goprpl_send_im(PurpleConnection *gc, char *who, char *msg, PurpleMessageFlags flags);
+// === group chat ===
+extern void goprpl_join_chat(PurpleConnection *gc, GHashTable *comp);
+extern void goprpl_reject_chat(PurpleConnection *gc, GHashTable *comp);
+extern char *goprpl_get_chat_name(GHashTable *comp);
+extern void goprpl_chat_invite(PurpleConnection *gc, int id, char *message, char *who);
+extern void goprpl_chat_leave(PurpleConnection *gc, int id);
+extern void goprpl_chat_whisper(PurpleConnection *gc, int id, char *who, char *message);
+extern int  goprpl_chat_send(PurpleConnection *gc, int id, char *message, PurpleMessageFlags flags);
 
 static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pppi) {
     pi->load = goprpl_plugin_load;
@@ -38,13 +49,30 @@ static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pp
     pppi->close = goprpl_close;
     pppi->status_types = goprpl_status_types;
     pppi->struct_size = sizeof(PurplePluginProtocolInfo);
+    // optional callbacks
+    pppi->chat_info = goprpl_chat_info;
+    pppi->chat_info_defaults = goprpl_chat_info_defaults;
     pppi->send_im = (int(*)(PurpleConnection *gc, const char*, const char*, PurpleMessageFlags))goprpl_send_im;
+    pppi->join_chat = goprpl_join_chat;
+    pppi->reject_chat = goprpl_reject_chat;
+    pppi->get_chat_name = goprpl_get_chat_name;
+    pppi->chat_invite = goprpl_chat_invite;
+    pppi->chat_leave = goprpl_chat_leave;
+    pppi->chat_whisper = goprpl_chat_whisper;
+    pppi->chat_send = goprpl_chat_send;
+    // TODO fix compile warnings
+}
+
+// utils
+static GHashTable *goprpl_hash_table_new_full() {
+    return g_hash_table_new_full(g_str_hash, g_str_equal, NULL, g_free);
 }
 */
 import "C"
 import "unsafe"
 
 import (
+	"fmt"
 	"log"
 	"runtime"
 
@@ -84,7 +112,16 @@ type PluginProtocolInfo struct {
 	Close     func(*Connection)
 
 	// optional
-	SendIM func(*Connection, string, string) int
+	ChatInfo         func(gc *Connection) []string
+	ChatInfoDefaults func(gc *Connection, chat_name string) map[string]string
+	SendIM           func(gc *Connection, who string, message string) int
+	JoinChat         func(gc *Connection, comp interface{})
+	RejectChat       func(gc *Connection, comp interface{})
+	GetChatName      func(comp interface{}) string
+	ChatInvite       func(gc *Connection, id int, message string, who string)
+	ChatLeave        func(gc *Connection, id int)
+	ChatWhisper      func(gc *Connection, id int, who string, message string)
+	ChatSend         func(gc *Connection, id int, message string, flags int) int
 }
 
 type Plugin struct {
@@ -214,6 +251,49 @@ func goprpl_status_types(a *C.PurpleAccount) *C.GList {
 	return types
 }
 
+// optional callbacks
+//export goprpl_chat_info
+func goprpl_chat_info(gc *C.PurpleConnection) *C.GList {
+	var this = _plugin_instance
+
+	var m *C.GList
+	if this.ppi.ChatInfo != nil {
+		infos := this.ppi.ChatInfo(newConnectWrapper(gc))
+		if infos == nil {
+			log.Panicln("need chat info")
+		}
+
+		var pce *C.struct_proto_chat_entry
+		// pce = new(C.struct_proto_chat_entry)  // crash!!!
+		pce = (*C.struct_proto_chat_entry)(C.calloc(C.size_t(1), C.sizeof_struct_proto_chat_entry))
+		pce.label = C.CString("_GoToxChannel")
+		pce.identifier = C.CString("GoToxChannel")
+		pce.required = C.TRUE
+		pce.label = C.CString(fmt.Sprintf("_%s", infos[0]))
+		pce.identifier = C.CString(infos[0])
+		pce.required = C.TRUE
+		m = C.g_list_append(m, pce)
+	}
+	return m
+}
+
+//export goprpl_chat_info_defaults
+func goprpl_chat_info_defaults(gc *C.PurpleConnection, chatName *C.char) *C.GHashTable {
+	var this = _plugin_instance
+	if this.ppi.ChatInfoDefaults != nil {
+		this.ppi.ChatInfoDefaults(newConnectWrapper(gc), C.GoString(chatName))
+	}
+
+	var defaults *C.GHashTable
+	defaults = C.goprpl_hash_table_new_full()
+	if chatName != nil {
+		dchan := C.g_strdup((*C.gchar)(C.CString("ToxChannel")))
+		C.g_hash_table_insert(defaults, dchan,
+			(*C.gchar)(C.g_strdup((*C.gchar)(chatName))))
+	}
+	return defaults
+}
+
 //export goprpl_send_im
 func goprpl_send_im(gc *C.PurpleConnection, who *C.char, msg *C.char, flags C.PurpleMessageFlags) C.int {
 	var this = _plugin_instance
@@ -221,7 +301,67 @@ func goprpl_send_im(gc *C.PurpleConnection, who *C.char, msg *C.char, flags C.Pu
 		ret := this.ppi.SendIM(newConnectWrapper(gc), C.GoString(who), C.GoString(msg))
 		return C.int(ret)
 	}
+
 	return C.int(-1)
+}
+
+//export goprpl_join_chat
+func goprpl_join_chat(gc *C.PurpleConnection, comp *C.GHashTable) {
+	var this = _plugin_instance
+	if this.ppi.JoinChat != nil {
+		this.ppi.JoinChat(newConnectWrapper(gc), comp)
+	}
+}
+
+//export goprpl_reject_chat
+func goprpl_reject_chat(gc *C.PurpleConnection, comp *C.GHashTable) {
+	var this = _plugin_instance
+	if this.ppi.RejectChat != nil {
+		this.ppi.RejectChat(newConnectWrapper(gc), comp)
+	}
+}
+
+//export goprpl_get_chat_name
+func goprpl_get_chat_name(comp *C.GHashTable) *C.char {
+	var this = _plugin_instance
+	if this.ppi.GetChatName != nil {
+		this.ppi.GetChatName(comp)
+	}
+	return nil
+}
+
+//export goprpl_chat_invite
+func goprpl_chat_invite(gc *C.PurpleConnection, id C.int, message *C.char, who *C.char) {
+	var this = _plugin_instance
+	if this.ppi.ChatInvite != nil {
+		this.ppi.ChatInvite(newConnectWrapper(gc), int(id), C.GoString(message), C.GoString(who))
+	}
+}
+
+//export goprpl_chat_leave
+func goprpl_chat_leave(gc *C.PurpleConnection, id C.int) {
+	var this = _plugin_instance
+	if this.ppi.ChatLeave != nil {
+		this.ppi.ChatLeave(newConnectWrapper(gc), int(id))
+	}
+}
+
+//export goprpl_chat_whisper
+func goprpl_chat_whisper(gc *C.PurpleConnection, id C.int, who *C.char, message *C.char) {
+	var this = _plugin_instance
+	if this.ppi.ChatWhisper != nil {
+		this.ppi.ChatWhisper(newConnectWrapper(gc), int(id), C.GoString(who), C.GoString(message))
+	}
+}
+
+//export goprpl_chat_send
+func goprpl_chat_send(gc *C.PurpleConnection, id C.int, message *C.char, flags C.PurpleMessageFlags) C.int {
+	var this = _plugin_instance
+	if this.ppi.ChatSend != nil {
+		ret := this.ppi.ChatSend(newConnectWrapper(gc), int(id), C.GoString(message), int(flags))
+		return C.int(ret)
+	}
+	return C.int(0)
 }
 
 var _plugin_instance *Plugin = nil

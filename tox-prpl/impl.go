@@ -25,9 +25,9 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 	this._tox.CallbackSelfConnectionStatus(func(t *tox.Tox, status uint32, d interface{}) {
 		log.Println("hehhe", status)
 		if status == 2 {
-			conn.SetState(purple.CONNECTED) // 设置为已连接状态，则好友会显示。
+			conn.ConnSetState(purple.CONNECTED) // 设置为已连接状态，则好友会显示。
 		} else {
-			conn.SetState(purple.DISCONNECTED)
+			conn.ConnSetState(purple.DISCONNECTED)
 		}
 	}, ac)
 
@@ -63,7 +63,7 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 		if err != nil {
 			log.Println(err)
 		} else {
-			conn.GotIM(pubkey, msg, purple.MESSAGE_RECV)
+			conn.ServGotIM(pubkey, msg, purple.MESSAGE_RECV)
 		}
 	}, ac)
 }
@@ -91,7 +91,19 @@ func (this *ToxPlugin) loadFriends(ac *purple.Account) {
 	}
 }
 
-func (this *ToxPlugin) send_im(gc *purple.Connection, who string, msg string) int {
+// optional callbacks
+func (this *ToxPlugin) ChatInfo(gc *purple.Connection) []string {
+	log.Println(gc)
+	infos := []string{"ToxChannel"}
+	return infos
+}
+
+func (this *ToxPlugin) ChatInfoDefaults(gc *purple.Connection, chatName string) map[string]string {
+	log.Println(gc)
+	return nil
+}
+
+func (this *ToxPlugin) SendIM(gc *purple.Connection, who string, msg string) int {
 	log.Println(gc, who, msg)
 	friendNumber, _ := this._tox.FriendByPublicKey(who)
 	len, err := this._tox.FriendSendMessage(friendNumber, msg)
@@ -100,4 +112,28 @@ func (this *ToxPlugin) send_im(gc *purple.Connection, who string, msg string) in
 		return -1
 	}
 	return int(len)
+}
+
+func (this *ToxPlugin) JoinChat(gc *purple.Connection, comp interface{}) {
+	log.Println("herhere")
+}
+func (this *ToxPlugin) RejectChat(gc *purple.Connection, comp interface{}) {
+	log.Println("herhere")
+}
+func (this *ToxPlugin) GetChatName(comp interface{}) string {
+	log.Println("herhere")
+	return ""
+}
+func (this *ToxPlugin) ChatInvite(gc *purple.Connection, id int, message string, who string) {
+	log.Println("herhere")
+}
+func (this *ToxPlugin) ChatLeave(gc *purple.Connection, id int) {
+	log.Println("herhere")
+}
+func (this *ToxPlugin) ChatWhisper(gc *purple.Connection, id int, who string, message string) {
+	log.Println("herhere")
+}
+func (this *ToxPlugin) ChatSend(gc *purple.Connection, id int, message string, flags int) int {
+	log.Println("herhere")
+	return 0
 }
