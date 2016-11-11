@@ -51,17 +51,17 @@ func (this *Connection) ServGotTypingStopped(name string) {
 	C.serv_got_typing_stopped(this.conn, C.CString(name))
 }
 
-func (this *Connection) ServJoinChat(data interface{}) {
-	C.serv_join_chat(this.conn, nil)
+func (this *Connection) ServJoinChat(data *GHashTable) {
+	C.serv_join_chat(this.conn, data.ht)
 }
 
-func (this *Connection) ServRejectChat(data interface{}) {
-	C.serv_reject_chat(this.conn, nil)
+func (this *Connection) ServRejectChat(data *GHashTable) {
+	C.serv_reject_chat(this.conn, data.ht)
 }
 
-func (this *Connection) ServGotChatInvite(name string, who string, msg string, data interface{}) {
+func (this *Connection) ServGotChatInvite(name string, who string, msg string, data *GHashTable) {
 	C.serv_got_chat_invite(this.conn, C.CString(name), C.CString(who),
-		C.CString(msg), nil)
+		C.CString(msg), data.ht)
 }
 
 func (this *Connection) ServGotJoinedChat(id int, name string) *Conversation {
@@ -69,8 +69,8 @@ func (this *Connection) ServGotJoinedChat(id int, name string) *Conversation {
 	return newConversationFrom(conv)
 }
 
-func (this *Connection) ServGotJoinChatFailed(data interface{}) {
-	C.purple_serv_got_join_chat_failed(this.conn, nil)
+func (this *Connection) ServGotJoinChatFailed(data *GHashTable) {
+	C.purple_serv_got_join_chat_failed(this.conn, data.ht)
 }
 
 func (this *Connection) ServGotChatLeft(id int) {

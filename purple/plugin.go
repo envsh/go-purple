@@ -48,7 +48,6 @@ static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pp
     pppi->login = goprpl_login;
     pppi->close = goprpl_close;
     pppi->status_types = goprpl_status_types;
-    pppi->struct_size = sizeof(PurplePluginProtocolInfo);
     // optional callbacks
     pppi->chat_info = goprpl_chat_info;
     pppi->chat_info_defaults = goprpl_chat_info_defaults;
@@ -115,9 +114,9 @@ type PluginProtocolInfo struct {
 	ChatInfo         func(gc *Connection) []string
 	ChatInfoDefaults func(gc *Connection, chat_name string) map[string]string
 	SendIM           func(gc *Connection, who string, message string) int
-	JoinChat         func(gc *Connection, comp interface{})
-	RejectChat       func(gc *Connection, comp interface{})
-	GetChatName      func(comp interface{}) string
+	JoinChat         func(gc *Connection, comp *GHashTable)
+	RejectChat       func(gc *Connection, comp *GHashTable)
+	GetChatName      func(comp *GHashTable) string
 	ChatInvite       func(gc *Connection, id int, message string, who string)
 	ChatLeave        func(gc *Connection, id int)
 	ChatWhisper      func(gc *Connection, id int, who string, message string)
@@ -172,6 +171,7 @@ func (this *Plugin) convertInfo() {
 	this.cppi.extra_info = unsafe.Pointer(this.cpppi)
 	this.cpppi.options = C.OPT_PROTO_CHAT_TOPIC | C.OPT_PROTO_PASSWORD_OPTIONAL |
 		C.OPT_PROTO_INVITE_MESSAGE
+	this.cpppi.struct_size = C.sizeof_PurplePluginProtocolInfo
 }
 
 //func init_plugin(plugin *C.PurplePlugin) {}
@@ -309,7 +309,7 @@ func goprpl_send_im(gc *C.PurpleConnection, who *C.char, msg *C.char, flags C.Pu
 func goprpl_join_chat(gc *C.PurpleConnection, comp *C.GHashTable) {
 	var this = _plugin_instance
 	if this.ppi.JoinChat != nil {
-		this.ppi.JoinChat(newConnectWrapper(gc), comp)
+		this.ppi.JoinChat(newConnectWrapper(gc), newGHashTableFrom(comp))
 	}
 }
 
@@ -317,7 +317,7 @@ func goprpl_join_chat(gc *C.PurpleConnection, comp *C.GHashTable) {
 func goprpl_reject_chat(gc *C.PurpleConnection, comp *C.GHashTable) {
 	var this = _plugin_instance
 	if this.ppi.RejectChat != nil {
-		this.ppi.RejectChat(newConnectWrapper(gc), comp)
+		this.ppi.RejectChat(newConnectWrapper(gc), newGHashTableFrom(comp))
 	}
 }
 
@@ -325,7 +325,7 @@ func goprpl_reject_chat(gc *C.PurpleConnection, comp *C.GHashTable) {
 func goprpl_get_chat_name(comp *C.GHashTable) *C.char {
 	var this = _plugin_instance
 	if this.ppi.GetChatName != nil {
-		this.ppi.GetChatName(comp)
+		this.ppi.GetChatName(newGHashTableFrom(comp))
 	}
 	return nil
 }

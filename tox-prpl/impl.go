@@ -114,14 +114,17 @@ func (this *ToxPlugin) SendIM(gc *purple.Connection, who string, msg string) int
 	return int(len)
 }
 
-func (this *ToxPlugin) JoinChat(gc *purple.Connection, comp interface{}) {
+func (this *ToxPlugin) JoinChat(gc *purple.Connection, comp *purple.GHashTable) {
 	log.Println("herhere")
+	log.Println(comp.ToMap())
 }
-func (this *ToxPlugin) RejectChat(gc *purple.Connection, comp interface{}) {
+func (this *ToxPlugin) RejectChat(gc *purple.Connection, comp *purple.GHashTable) {
 	log.Println("herhere")
+	log.Println(comp.ToMap())
 }
-func (this *ToxPlugin) GetChatName(comp interface{}) string {
+func (this *ToxPlugin) GetChatName(comp *purple.GHashTable) string {
 	log.Println("herhere")
+	log.Println(comp.ToMap())
 	return ""
 }
 func (this *ToxPlugin) ChatInvite(gc *purple.Connection, id int, message string, who string) {

@@ -1,0 +1,133 @@
+// only support string key/value GHashTable
+package purple
+
+/*
+#include <glib.h>
+
+static GHashTable *go_g_hash_table_new_full() {
+    return g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+}
+*/
+import "C"
+
+type GHashTable struct {
+	ht *C.GHashTable
+}
+
+func newGHashTableFrom(ht *C.GHashTable) *GHashTable {
+	this := &GHashTable{}
+	this.ht = ht
+	return this
+}
+
+func NewGHashTable() *GHashTable {
+	this := &GHashTable{}
+	this.ht = C.go_g_hash_table_new_full()
+	return this
+}
+
+func (this *GHashTable) Destroy() {
+	C.g_hash_table_destroy(this.ht)
+}
+
+func (this *GHashTable) Lookup(key string) string {
+	val := C.g_hash_table_lookup(this.ht, C.CString(key))
+	return C.GoString((*C.char)(val))
+}
+
+func (this *GHashTable) Insert(key string, value string) bool {
+	ret := C.g_hash_table_insert(this.ht, C.CString(key), C.CString(value))
+	if ret == C.TRUE {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (this *GHashTable) Replace(key string, value string) bool {
+	ret := C.g_hash_table_replace(this.ht, C.CString(key), C.CString(value))
+	if ret == C.TRUE {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (this *GHashTable) Add(key string) bool {
+	ret := C.g_hash_table_add(this.ht, C.CString(key))
+	if ret == C.TRUE {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (this *GHashTable) Remove(key string) bool {
+	ret := C.g_hash_table_remove(this.ht, C.CString(key))
+	if ret == C.TRUE {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (this *GHashTable) Contains(key string) bool {
+	ret := C.g_hash_table_contains(this.ht, C.CString(key))
+	if ret == C.TRUE {
+		return true
+	} else {
+		return false
+	}
+}
+
+func (this *GHashTable) Size() uint {
+	ret := C.g_hash_table_size(this.ht)
+	return uint(ret)
+}
+
+// need confirm type: string/string
+func (this *GHashTable) GetKeys() []string {
+	lst := C.g_hash_table_get_keys(this.ht)
+	if lst == nil {
+	} else {
+		res := make([]string, 0)
+		len := C.g_list_length(lst)
+		for idx := 0; idx < int(len); idx++ {
+			data := C.g_list_nth_data(lst, C.guint(idx))
+			res = append(res, C.GoString((*C.char)(data)))
+		}
+		return res
+	}
+
+	return nil
+}
+
+func (this *GHashTable) GetValues() []string {
+	lst := C.g_hash_table_get_values(this.ht)
+	if lst == nil {
+	} else {
+		res := make([]string, 0)
+		len := C.g_list_length(lst)
+		for idx := 0; idx < int(len); idx++ {
+			data := C.g_list_nth_data(lst, C.guint(idx))
+			res = append(res, C.GoString((*C.char)(data)))
+		}
+		return res
+	}
+	return nil
+}
+
+func (this *GHashTable) ToMap() map[string]string {
+	res := make(map[string]string, 0)
+	lst := C.g_hash_table_get_keys(this.ht)
+	if lst == nil {
+	} else {
+		len := C.g_list_length(lst)
+		for idx := 0; idx < int(len); idx++ {
+			key := C.g_list_nth_data(lst, C.guint(idx))
+			val := C.g_hash_table_lookup(this.ht, key)
+			res[C.GoString((*C.char)(key))] = C.GoString((*C.char)(val))
+		}
+	}
+	return res
+}
