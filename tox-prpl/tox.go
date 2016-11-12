@@ -197,6 +197,7 @@ func NewToxPlugin() *ToxPlugin {
 		ChatLeave:        this.ChatLeave,
 		ChatWhisper:      this.ChatWhisper,
 		ChatSend:         this.ChatSend,
+		RoomlistGetList:  this.RoomlistGetList,
 	}
 	this.p = purple.NewPlugin(&pi, &ppi, this.init_tox)
 

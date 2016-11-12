@@ -4,6 +4,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"yobot/purple"
@@ -66,6 +67,62 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 			conn.ServGotIM(pubkey, msg, purple.MESSAGE_RECV)
 		}
 	}, ac)
+
+	this._tox.CallbackGroupNameListChange(func(t *tox.Tox, groupNumber int,
+		peerNumber int, change uint8, d interface{}) {
+		log.Println(groupNumber, peerNumber, change)
+		conn := ac.GetConnection()
+		conv := conn.ConnFindChat(groupNumber)
+		chat := conv.GetChatData()
+		peerName, err := t.GroupPeerName(groupNumber, peerNumber)
+		if err != nil {
+			log.Println(err)
+		}
+		peerPubkey, err := t.GroupPeerPubkey(groupNumber, peerNumber)
+		log.Println(peerName, peerPubkey, chat)
+		switch change {
+		case tox.CHAT_CHANGE_PEER_ADD:
+			chat.AddUser(peerName)
+		case tox.CHAT_CHANGE_PEER_DEL:
+			chat.RemoveUser(peerName)
+		case tox.CHAT_CHANGE_PEER_NAME:
+			chat.AddUser(peerName)
+		}
+		// TODO member list diff and clean, so it is member list sync
+		plst := chat.GetUsers()
+		tlst := t.GroupGetNames(groupNumber)
+		peerCount := t.GroupNumberPeers(groupNumber)
+		if len(tlst) != peerCount {
+			log.Println("wtf")
+		}
+		if len(plst) != len(tlst) {
+			log.Println("need sync names...")
+			log.Println("purple list:", plst)
+			log.Println("tox list:", tlst)
+			for _, pname := range plst {
+				found := false
+				for _, tname := range tlst {
+					if tname == pname {
+						found = true
+					}
+				}
+				if found == false {
+					chat.RemoveUser(pname)
+				}
+			}
+		}
+	}, ac)
+
+	this._tox.CallbackGroupMessage(func(t *tox.Tox, groupNumber int,
+		peerNumber int, message string, d interface{}) {
+		conn := ac.GetConnection()
+		pubkey, err := t.GroupPeerPubkey(groupNumber, peerNumber)
+		if err != nil {
+			log.Println(err)
+		} else {
+			conn.ServGotChatIn(groupNumber, pubkey, purple.MESSAGE_RECV, message)
+		}
+	}, ac)
 }
 
 func (this *ToxPlugin) loadFriends(ac *purple.Account) {
@@ -115,8 +172,31 @@ func (this *ToxPlugin) SendIM(gc *purple.Connection, who string, msg string) int
 }
 
 func (this *ToxPlugin) JoinChat(gc *purple.Connection, comp *purple.GHashTable) {
-	log.Println("herhere")
-	log.Println(comp.ToMap())
+	groupNumber, err := this._tox.AddGroupChat()
+	if err != nil {
+		log.Println(err)
+	}
+	title := comp.Lookup("ToxChannel")
+	this._tox.GroupSetTitle(groupNumber, title)
+	comp.Insert("GroupNumber", fmt.Sprintf("%d", groupNumber))
+	conv := gc.ServGotJoinedChat(groupNumber, comp.Lookup("ToxChannel"))
+	if conv != nil {
+	}
+	peerCount := this._tox.GroupNumberPeers(groupNumber)
+	if peerCount != 1 {
+	}
+	peerNumber := 0 // i create the groupchat and the 0th peer
+	peerName, err := this._tox.GroupPeerName(groupNumber, peerNumber)
+	if err != nil {
+		log.Println(err)
+	}
+	chat := conv.GetChatData()
+	chat.AddUser(peerName)
+	selfName, err := this._tox.SelfGetName()
+	if selfName != peerName {
+		log.Println(selfName, peerName, selfName == peerName)
+		log.Panicln("wtf")
+	}
 }
 func (this *ToxPlugin) RejectChat(gc *purple.Connection, comp *purple.GHashTable) {
 	log.Println("herhere")
@@ -129,6 +209,15 @@ func (this *ToxPlugin) GetChatName(comp *purple.GHashTable) string {
 }
 func (this *ToxPlugin) ChatInvite(gc *purple.Connection, id int, message string, who string) {
 	log.Println("herhere")
+	log.Println("herhere", id, message, who)
+	friendNumber, err := this._tox.FriendByPublicKey(who)
+	if err != nil {
+		log.Println(err)
+	}
+	rc, err := this._tox.InviteFriend(friendNumber, id)
+	if err != nil {
+		log.Println(rc, err)
+	}
 }
 func (this *ToxPlugin) ChatLeave(gc *purple.Connection, id int) {
 	log.Println("herhere")
@@ -138,5 +227,17 @@ func (this *ToxPlugin) ChatWhisper(gc *purple.Connection, id int, who string, me
 }
 func (this *ToxPlugin) ChatSend(gc *purple.Connection, id int, message string, flags int) int {
 	log.Println("herhere")
-	return 0
+	n, err := this._tox.GroupMessageSend(id, message)
+	if err != nil {
+		log.Println(err)
+	}
+	if n == -1 {
+		// log.Println("still send ok, wtf")
+	}
+	log.Println(n, id, message, flags)
+	return len(message)
+}
+
+func (this *ToxPlugin) RoomlistGetList(gc *purple.Connection) {
+	log.Println("herere")
 }

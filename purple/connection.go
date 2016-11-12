@@ -53,3 +53,8 @@ func (this *Connection) ConnSetAccount(ac *Account) {
 func (this *Connection) ConnSetDisplayName(name string) {
 	C.purple_connection_set_display_name(this.conn, C.CString(name))
 }
+
+func (this *Connection) ConnFindChat(id int) *Conversation {
+	conv := C.purple_find_chat(this.conn, C.int(id))
+	return newConversationFrom(conv)
+}

@@ -33,6 +33,7 @@ extern void goprpl_chat_invite(PurpleConnection *gc, int id, char *message, char
 extern void goprpl_chat_leave(PurpleConnection *gc, int id);
 extern void goprpl_chat_whisper(PurpleConnection *gc, int id, char *who, char *message);
 extern int  goprpl_chat_send(PurpleConnection *gc, int id, char *message, PurpleMessageFlags flags);
+extern PurpleRoomlist *goprpl_roomlist_get_list(PurpleConnection *gc);
 
 static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pppi) {
     pi->load = goprpl_plugin_load;
@@ -59,6 +60,7 @@ static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pp
     pppi->chat_leave = goprpl_chat_leave;
     pppi->chat_whisper = goprpl_chat_whisper;
     pppi->chat_send = goprpl_chat_send;
+    pppi->roomlist_get_list = goprpl_roomlist_get_list;
     // TODO fix compile warnings
 }
 
@@ -121,6 +123,7 @@ type PluginProtocolInfo struct {
 	ChatLeave        func(gc *Connection, id int)
 	ChatWhisper      func(gc *Connection, id int, who string, message string)
 	ChatSend         func(gc *Connection, id int, message string, flags int) int
+	RoomlistGetList  func(gc *Connection)
 }
 
 type Plugin struct {
@@ -273,6 +276,13 @@ func goprpl_chat_info(gc *C.PurpleConnection) *C.GList {
 		pce.identifier = C.CString(infos[0])
 		pce.required = C.TRUE
 		m = C.g_list_append(m, pce)
+
+		// another for storage
+		pce = (*C.struct_proto_chat_entry)(C.calloc(C.size_t(1), C.sizeof_struct_proto_chat_entry))
+		pce.label = C.CString("GroupNumber")
+		pce.identifier = C.CString("GroupNumber")
+		pce.required = C.FALSE
+		m = C.g_list_append(m, pce)
 	}
 	return m
 }
@@ -362,6 +372,15 @@ func goprpl_chat_send(gc *C.PurpleConnection, id C.int, message *C.char, flags C
 		return C.int(ret)
 	}
 	return C.int(0)
+}
+
+//export goprpl_roomlist_get_list
+func goprpl_roomlist_get_list(gc *C.PurpleConnection) *C.PurpleRoomlist {
+	var this = _plugin_instance
+	if this.ppi.RoomlistGetList != nil {
+		this.ppi.RoomlistGetList(newConnectWrapper(gc))
+	}
+	return nil
 }
 
 var _plugin_instance *Plugin = nil
