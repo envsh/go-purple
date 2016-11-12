@@ -74,10 +74,30 @@ func (this *ConvChat) GetUsers() []string {
 	return res
 }
 
+func (this *ConvChat) FindBuddy(name string) *ConvChatBuddy {
+	cbbudy := C.purple_conv_chat_cb_find(this.chat, C.CString(name))
+	return newConvChatBuddyFrom(cbbudy)
+}
+
 func (this *ConvChatBuddy) GetName() string {
 	return C.GoString(this.buddy.name)
 }
 
 func (this *ConvChatBuddy) GetAlias() string {
 	return C.GoString(this.buddy.alias)
+}
+
+func (this *ConvChatBuddy) SetAlias(alias string) {
+	if this.buddy != nil {
+		if this.buddy.alias != nil {
+			// TODO free it first
+		}
+		this.buddy.alias = C.CString(alias)
+	}
+}
+
+func (this *ConvChatBuddy) Destroy() {
+	buddy := this.buddy
+	this.buddy = nil
+	C.purple_conv_chat_cb_destroy(buddy)
 }

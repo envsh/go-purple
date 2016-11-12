@@ -21,6 +21,10 @@ func NewBuddy(a *Account, name string, alias string) *Buddy {
 	return this
 }
 
+func (this *Buddy) SetAlias(alias string) {
+	C.purple_blist_alias_buddy(this.buddy, C.CString(alias))
+}
+
 // @param g can be nil
 func (this *Buddy) BlistAdd(g *Group) {
 	if g == nil {

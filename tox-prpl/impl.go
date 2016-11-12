@@ -73,54 +73,27 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 		log.Println(groupNumber, peerNumber, change)
 		conn := ac.GetConnection()
 		conv := conn.ConnFindChat(groupNumber)
-		chat := conv.GetChatData()
-		peerName, err := t.GroupPeerName(groupNumber, peerNumber)
-		if err != nil {
-			log.Println(err)
-		}
-		peerPubkey, err := t.GroupPeerPubkey(groupNumber, peerNumber)
-		log.Println(peerName, peerPubkey, chat)
 		switch change {
 		case tox.CHAT_CHANGE_PEER_ADD:
-			chat.AddUser(peerName)
 		case tox.CHAT_CHANGE_PEER_DEL:
-			chat.RemoveUser(peerName)
 		case tox.CHAT_CHANGE_PEER_NAME:
-			chat.AddUser(peerName)
 		}
 		// TODO member list diff and clean, so it is member list sync
-		plst := chat.GetUsers()
-		tlst := t.GroupGetNames(groupNumber)
-		peerCount := t.GroupNumberPeers(groupNumber)
-		if len(tlst) != peerCount {
-			log.Println("wtf")
-		}
-		if len(plst) != len(tlst) {
-			log.Println("need sync names...")
-			log.Println("purple list:", plst)
-			log.Println("tox list:", tlst)
-			for _, pname := range plst {
-				found := false
-				for _, tname := range tlst {
-					if tname == pname {
-						found = true
-					}
-				}
-				if found == false {
-					chat.RemoveUser(pname)
-				}
-			}
-		}
+		this.UpdateMembers(groupNumber, conv)
 	}, ac)
 
 	this._tox.CallbackGroupMessage(func(t *tox.Tox, groupNumber int,
 		peerNumber int, message string, d interface{}) {
 		conn := ac.GetConnection()
 		pubkey, err := t.GroupPeerPubkey(groupNumber, peerNumber)
+		peerName, err := t.GroupPeerName(groupNumber, peerNumber)
 		if err != nil {
 			log.Println(err)
 		} else {
-			conn.ServGotChatIn(groupNumber, pubkey, purple.MESSAGE_RECV, message)
+			if false {
+				conn.ServGotChatIn(groupNumber, pubkey, purple.MESSAGE_RECV, message)
+			}
+			conn.ServGotChatIn(groupNumber, peerName, purple.MESSAGE_RECV, message)
 		}
 	}, ac)
 }
@@ -142,6 +115,10 @@ func (this *ToxPlugin) loadFriends(ac *purple.Account) {
 			buddy = purple.NewBuddy(ac, pubkey, name)
 			ac.AddBuddy(buddy)
 			buddy.BlistAdd(nil)
+		} else {
+			if buddy.GetAliasOnly() != name {
+				buddy.SetAlias(name)
+			}
 		}
 		// purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_ONLINE_STR)
 		log.Println("adding...", name, pubkey, purple.MyTid2())
@@ -182,21 +159,7 @@ func (this *ToxPlugin) JoinChat(gc *purple.Connection, comp *purple.GHashTable) 
 	conv := gc.ServGotJoinedChat(groupNumber, comp.Lookup("ToxChannel"))
 	if conv != nil {
 	}
-	peerCount := this._tox.GroupNumberPeers(groupNumber)
-	if peerCount != 1 {
-	}
-	peerNumber := 0 // i create the groupchat and the 0th peer
-	peerName, err := this._tox.GroupPeerName(groupNumber, peerNumber)
-	if err != nil {
-		log.Println(err)
-	}
-	chat := conv.GetChatData()
-	chat.AddUser(peerName)
-	selfName, err := this._tox.SelfGetName()
-	if selfName != peerName {
-		log.Println(selfName, peerName, selfName == peerName)
-		log.Panicln("wtf")
-	}
+	this.UpdateMembers(groupNumber, conv)
 }
 func (this *ToxPlugin) RejectChat(gc *purple.Connection, comp *purple.GHashTable) {
 	log.Println("herhere")
@@ -240,4 +203,66 @@ func (this *ToxPlugin) ChatSend(gc *purple.Connection, id int, message string, f
 
 func (this *ToxPlugin) RoomlistGetList(gc *purple.Connection) {
 	log.Println("herere")
+}
+
+// utils
+func (this *ToxPlugin) UpdateMembers(groupNumber int, conv *purple.Conversation) {
+	chat := conv.GetChatData()
+	// TODO member list diff and clean, so it is member list sync
+	t := this._tox
+	plst := chat.GetUsers()
+	tlst := t.GroupGetNames(groupNumber)
+	klst := t.GroupGetPeerPubkeys(groupNumber)
+	mlst := t.GroupGetPeers(groupNumber)
+	peerCount := t.GroupNumberPeers(groupNumber)
+	if len(tlst) != peerCount {
+		log.Println("wtf")
+	}
+
+	if true {
+		log.Println("need sync names...")
+		log.Println("purple list:", plst)
+		log.Println("tox list:", tlst)
+		log.Println("pubkey list:", klst)
+		log.Println("peer list:", mlst)
+
+		// remove not existed
+		for _, pname := range plst {
+			found := false
+			for _, tname := range tlst {
+				if tname == pname {
+					found = true
+				}
+			}
+			if found == false {
+				chat.RemoveUser(pname) // should already destroy the ConvChatBuddy here
+				cbbuddy := chat.FindBuddy(pname)
+				cbbuddy.Destroy()
+			}
+		}
+
+		// add new
+		for peerNumber, pubkey := range mlst {
+			found := false
+			peerName, err := t.GroupPeerName(groupNumber, peerNumber)
+			if err != nil {
+			}
+			for _, pname := range plst {
+				if pname == peerName {
+					found = true
+				}
+			}
+			if found == false {
+				isours := t.GroupPeerNumberIsOurs(groupNumber, peerNumber)
+				if isours == true {
+				}
+				if true {
+					chat.AddUser(peerName)
+					cbbudy := chat.FindBuddy(peerName)
+					cbbudy.SetAlias(pubkey)
+				}
+			}
+		}
+	}
+
 }
