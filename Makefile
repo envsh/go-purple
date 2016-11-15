@@ -10,3 +10,7 @@ toxb:
 
 toxi:
 	sudo install -v ./libtox.so /usr/lib/purple-2/libtox.so
+
+pld:
+	go build -v -o prpld yobot/purpled
+

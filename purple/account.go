@@ -83,3 +83,25 @@ func (this *Account) FindBuddy(name string) *Buddy {
 func (this *Account) RequestAdd(name string) {
 	C.purple_account_request_add(this.account, C.CString(name), nil, nil, nil)
 }
+
+// accounts
+func (this *Account) AccountsAdd() {
+}
+func (this *Account) AccountsRemove() {
+}
+func (this *Account) AccountsDelete() {
+}
+func (this *Account) AccountsReorder(newIndex int) {
+}
+func AccountsGetAll() []*Account {
+	return nil
+}
+func AccountsGetAllActive() []*Account {
+	return nil
+}
+func AccountsFind(name, protocol string) *Account {
+	return nil
+}
+func AccountsRestoreCurrentStatues() {
+	C.purple_accounts_restore_current_statuses()
+}

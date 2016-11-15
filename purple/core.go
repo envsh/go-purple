@@ -7,7 +7,6 @@ package purple
 extern void ui_init(void);
 extern void init_libpurple(void);
 extern void connect_to_signalscc(void*);
-extern void test_to_room(PurpleAccount *acc);
 typedef GHashTable *(*chat_info_defaults_func)(PurpleConnection *, const char *chat_name);
 
 //
@@ -101,6 +100,28 @@ func (this *PurpleCore) InitPurple() {
 	}
 }
 
+func (this *PurpleCore) Loop() {
+	go func() { C.g_main_loop_run(this.loop) }()
+	log.Println("looped")
+	select {}
+}
+
+// get all accout
+func (this *PurpleCore) AvaliableAccounts() []*Account {
+
+	return nil
+}
+
+func (this *PurpleCore) AccountsGetAll() []*Account {
+	acs := make([]*Account, 0)
+	lst := C.purple_accounts_get_all()
+	newGListFrom(lst).Each(func(item C.gpointer) {
+		ac := newAccountWrapper((*C.PurpleAccount)(item))
+		acs = append(acs, ac)
+	})
+	return acs
+}
+
 func (this *PurpleCore) AccountsFind(account string, protocol string) *Account {
 	acc := C.purple_accounts_find(C.CString(account), C.CString(protocol))
 	if acc == nil {
@@ -111,12 +132,6 @@ func (this *PurpleCore) AccountsFind(account string, protocol string) *Account {
 	}
 
 	return nil
-}
-
-func (this *PurpleCore) Loop() {
-	go func() { C.g_main_loop_run(this.loop) }()
-	log.Println("looped")
-	select {}
 }
 
 // send with conv
@@ -188,18 +203,6 @@ func (this *PurpleCore) protoInfo(conn *C.PurpleConnection, name *C.char) *C.GHa
 	return hash
 }
 
-func (this *PurpleCore) ToRoom(acc *Account) {
-	if true {
-		// room := "#tox-cn123"
-		room2 := "#tox-cn12345"
-
-		msg := "aifaioefjaiewfjwaeif"
-		this.sendGroupMessage1(acc, room2, msg)
-		// this.sendGroupMessage2(acc, room2, msg)
-		this.sendGroupMessage1(acc, room2, msg)
-	}
-}
-
 // callbacks
 //export gopurple_request_authorize
 func gopurple_request_authorize() { log.Println("hehhe") }
@@ -216,14 +219,9 @@ func gopurple_network_disconnected() { log.Println("hehhe") }
 //export gopurple_report_disconnect_reason
 func gopurple_report_disconnect_reason() { log.Println("hehhe") }
 
-var TmpAccount *Account = nil
-var TmpCore *PurpleCore = nil
-
 //export gopurple_signed_on
 func gopurple_signed_on() {
 	log.Println("hehhe")
-	log.Println(TmpCore, TmpAccount)
-	TmpCore.ToRoom(TmpAccount)
 }
 
 //export gopurple_buddy_signed_on

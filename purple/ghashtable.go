@@ -133,17 +133,23 @@ func (this *GHashTable) ToMap() map[string]string {
 	return res
 }
 
-func (this *GHashTable) Each(
-	f func(C.gpointer, C.gpointer) (interface{}, interface{})) map[interface{}]interface{} {
+func (this *GHashTable) Each(functor func(C.gpointer, C.gpointer)) {
+	this.Map(func(k, v C.gpointer) (interface{}, interface{}) {
+		functor(k, v)
+		return nil, nil
+	})
+}
+
+func (this *GHashTable) Map(
+	functor func(C.gpointer, C.gpointer) (interface{}, interface{})) map[interface{}]interface{} {
 	res := make(map[interface{}]interface{}, 0)
 	lst := C.g_hash_table_get_keys(this.ht)
-	if lst == nil {
-	} else {
+	if lst != nil {
 		len := C.g_list_length(lst)
 		for idx := 0; idx < int(len); idx++ {
 			key := C.g_list_nth_data(lst, C.guint(idx))
 			val := C.g_hash_table_lookup(this.ht, key)
-			gokey, goval := f(key, val)
+			gokey, goval := functor(key, val)
 			res[gokey] = goval
 		}
 	}
@@ -173,12 +179,19 @@ func (this *GList) ToStringArray() []string {
 	return res
 }
 
-func (this *GList) Each(f func(C.gpointer) interface{}) []interface{} {
+func (this *GList) Each(functor func(C.gpointer)) {
+	this.Map(func(item C.gpointer) interface{} {
+		functor(item)
+		return nil
+	})
+}
+
+func (this *GList) Map(functor func(C.gpointer) interface{}) []interface{} {
 	res := make([]interface{}, 0)
 	len := C.g_list_length(this.lst)
 	for idx := 0; idx < int(len); idx++ {
 		item := C.g_list_nth_data(this.lst, C.guint(idx))
-		goitem := f(item)
+		goitem := functor(item)
 		res = append(res, goitem)
 	}
 	return res

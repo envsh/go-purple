@@ -63,12 +63,11 @@ func (this *ConvChat) GetUsers() []string {
 	lst := C.purple_conv_chat_get_users(this.chat)
 
 	res := make([]string, 0)
-	newGListFrom(lst).Each(func(item C.gpointer) interface{} {
+	newGListFrom(lst).Each(func(item C.gpointer) {
 		ccbudy := (*C.PurpleConvChatBuddy)(item)
 		goccbudy := newConvChatBuddyFrom(ccbudy)
 		str := goccbudy.GetName()
 		res = append(res, str)
-		return str
 	})
 
 	return res

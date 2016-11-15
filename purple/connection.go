@@ -58,3 +58,12 @@ func (this *Connection) ConnFindChat(id int) *Conversation {
 	conv := C.purple_find_chat(this.conn, C.int(id))
 	return newConversationFrom(conv)
 }
+
+func (this *Connection) GetPrpl() *Plugin {
+	plugin := C.purple_connection_get_prpl(this.conn)
+	return newPluginFrom((*C.PurplePlugin)(plugin))
+}
+func (this *Connection) GetPrplInfo() *PluginInfo {
+	plugin := C.purple_connection_get_prpl(this.conn)
+	return newPluginInfoFrom((*C.PurplePluginInfo)(plugin.info))
+}
