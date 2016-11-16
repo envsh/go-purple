@@ -11,7 +11,7 @@ type Account struct {
 	account *C.PurpleAccount
 }
 
-func newAccountWrapper(acc *C.PurpleAccount) *Account {
+func newAccountFrom(acc *C.PurpleAccount) *Account {
 	this := &Account{}
 	this.account = acc
 	return this
@@ -38,24 +38,12 @@ func (this *Account) Connect() {
 	C.purple_account_connect(this.account)
 }
 
-func (this *Account) SetEnabled(enable bool) {
-	C.purple_account_set_enabled(this.account, C.CString(UI_ID), C.TRUE)
-}
-
-func (this *Account) GetString(name string) string {
-	cstr := C.purple_account_get_string(this.account, C.CString(name), nil)
-	if cstr == nil {
-		return ""
-	}
-	return C.GoString(cstr)
-}
-
 func (this *Account) GetConnection() *Connection {
 	cgc := C.purple_account_get_connection(this.account)
 	if cgc == nil {
 		return nil
 	}
-	return newConnectWrapper(cgc)
+	return newConnectionFrom(cgc)
 }
 
 func (this *Account) GetUserName() string {
@@ -77,29 +65,93 @@ func (this *Account) FindBuddy(name string) *Buddy {
 	if buddy == nil {
 		return nil
 	}
-	return newBuddyWrapper(buddy)
+	return newBuddyFrom(buddy)
 }
 
 func (this *Account) RequestAdd(name string) {
 	C.purple_account_request_add(this.account, C.CString(name), nil, nil, nil)
 }
 
+func (this *Account) SetEnabled(enable bool) {
+	C.purple_account_set_enabled(this.account, C.CString(UI_ID), C.TRUE)
+}
+func (this *Account) GetEnabled() bool {
+	rc := C.purple_account_get_enabled(this.account, C.CString(UI_ID))
+	if rc == C.TRUE {
+		return true
+	}
+	return false
+}
+func (this *Account) GetString(name string) string {
+	cstr := C.purple_account_get_string(this.account, C.CString(name), nil)
+	if cstr == nil {
+		return ""
+	}
+	return C.GoString(cstr)
+}
+func (this *Account) SetString(name string, value string) {
+	C.purple_account_set_string(this.account, C.CString(name), C.CString(value))
+}
+func (this *Account) SetInt(name string, value int) {
+	C.purple_account_set_int(this.account, C.CString(name), C.int(value))
+}
+func (this *Account) GetInt(name string) int {
+	rc := C.purple_account_get_int(this.account, C.CString(name), C.int(0))
+	return int(rc)
+}
+func (this *Account) SetBool(name string, value bool) {
+	if value {
+		C.purple_account_set_bool(this.account, C.CString(name), C.TRUE)
+	} else {
+		C.purple_account_set_bool(this.account, C.CString(name), C.FALSE)
+	}
+}
+func (this *Account) GetBool(name string) bool {
+	rc := C.purple_account_get_bool(this.account, C.CString(name), C.FALSE)
+	if rc == C.TRUE {
+		return true
+	}
+	return false
+}
+
 // accounts
 func (this *Account) AccountsAdd() {
+	C.purple_accounts_add(this.account)
 }
 func (this *Account) AccountsRemove() {
+	C.purple_accounts_remove(this.account)
 }
 func (this *Account) AccountsDelete() {
+	C.purple_accounts_delete(this.account)
 }
 func (this *Account) AccountsReorder(newIndex int) {
+	C.purple_accounts_reorder(this.account, C.gint(newIndex))
 }
+
 func AccountsGetAll() []*Account {
-	return nil
+	acs := make([]*Account, 0)
+	lst := C.purple_accounts_get_all()
+	newGListFrom(lst).Each(func(item C.gpointer) {
+		ac := newAccountFrom((*C.PurpleAccount)(item))
+		acs = append(acs, ac)
+	})
+	return acs
 }
 func AccountsGetAllActive() []*Account {
-	return nil
+	acs := make([]*Account, 0)
+	lst := C.purple_accounts_get_all_active()
+	newGListFrom(lst).Each(func(item C.gpointer) {
+		ac := newAccountFrom((*C.PurpleAccount)(item))
+		acs = append(acs, ac)
+	})
+	return acs
 }
 func AccountsFind(name, protocol string) *Account {
+	acc := C.purple_accounts_find(C.CString(name), C.CString(protocol))
+	if acc == nil {
+	} else {
+		return newAccountFrom(acc)
+	}
 	return nil
 }
 func AccountsRestoreCurrentStatues() {

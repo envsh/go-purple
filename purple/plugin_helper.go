@@ -37,6 +37,7 @@ extern void goprpl_chat_leave(PurpleConnection *gc, int id);
 extern void goprpl_chat_whisper(PurpleConnection *gc, int id, char *who, char *message);
 extern int  goprpl_chat_send(PurpleConnection *gc, int id, char *message, PurpleMessageFlags flags);
 extern PurpleRoomlist *goprpl_roomlist_get_list(PurpleConnection *gc);
+extern void goprpl_add_buddy_with_invite(PurpleConnection *gc, PurpleBuddy *buddy, PurpleGroup *group, char *message);
 
 static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pppi) {
     pi->load = goprpl_plugin_load;
@@ -64,6 +65,7 @@ static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pp
     pppi->chat_whisper = goprpl_chat_whisper;
     pppi->chat_send = goprpl_chat_send;
     pppi->roomlist_get_list = goprpl_roomlist_get_list;
+    pppi->add_buddy_with_invite = goprpl_add_buddy_with_invite;
     // TODO fix compile warnings
 }
 
@@ -121,17 +123,18 @@ type PluginProtocolInfo struct {
 	Close     func(*Connection)
 
 	// optional
-	ChatInfo         func(gc *Connection) []string
-	ChatInfoDefaults func(gc *Connection, chat_name string) map[string]string
-	SendIM           func(gc *Connection, who string, message string) int
-	JoinChat         func(gc *Connection, comp *GHashTable)
-	RejectChat       func(gc *Connection, comp *GHashTable)
-	GetChatName      func(comp *GHashTable) string
-	ChatInvite       func(gc *Connection, id int, message string, who string)
-	ChatLeave        func(gc *Connection, id int)
-	ChatWhisper      func(gc *Connection, id int, who string, message string)
-	ChatSend         func(gc *Connection, id int, message string, flags int) int
-	RoomlistGetList  func(gc *Connection)
+	ChatInfo           func(gc *Connection) []string
+	ChatInfoDefaults   func(gc *Connection, chat_name string) map[string]string
+	SendIM             func(gc *Connection, who string, message string) int
+	JoinChat           func(gc *Connection, comp *GHashTable)
+	RejectChat         func(gc *Connection, comp *GHashTable)
+	GetChatName        func(comp *GHashTable) string
+	ChatInvite         func(gc *Connection, id int, message string, who string)
+	ChatLeave          func(gc *Connection, id int)
+	ChatWhisper        func(gc *Connection, id int, who string, message string)
+	ChatSend           func(gc *Connection, id int, message string, flags int) int
+	RoomlistGetList    func(gc *Connection)
+	AddBuddyWithInvite func(gc *Connection, buddy *Buddy, group *Group, message string)
 
 	// private
 	ppi   *C.PurplePluginProtocolInfo
@@ -259,7 +262,7 @@ func goprpl_blist_icon(a *C.PurpleAccount, b *C.PurpleBuddy) *C.char {
 func goprpl_login(a *C.PurpleAccount) {
 	var this = _plugin_instance
 	if this.ppi.Login != nil {
-		this.ppi.Login(newAccountWrapper(a))
+		this.ppi.Login(newAccountFrom(a))
 	}
 }
 
@@ -267,7 +270,7 @@ func goprpl_login(a *C.PurpleAccount) {
 func goprpl_close(gc *C.PurpleConnection) {
 	var this = _plugin_instance
 	if this.ppi.Close != nil {
-		this.ppi.Close(newConnectWrapper(gc))
+		this.ppi.Close(newConnectionFrom(gc))
 	}
 }
 
@@ -302,7 +305,7 @@ func goprpl_chat_info(gc *C.PurpleConnection) *C.GList {
 
 	var m *C.GList
 	if this.ppi.ChatInfo != nil {
-		infos := this.ppi.ChatInfo(newConnectWrapper(gc))
+		infos := this.ppi.ChatInfo(newConnectionFrom(gc))
 		if infos == nil {
 			log.Panicln("need chat info")
 		}
@@ -332,7 +335,7 @@ func goprpl_chat_info(gc *C.PurpleConnection) *C.GList {
 func goprpl_chat_info_defaults(gc *C.PurpleConnection, chatName *C.char) *C.GHashTable {
 	var this = _plugin_instance
 	if this.ppi.ChatInfoDefaults != nil {
-		this.ppi.ChatInfoDefaults(newConnectWrapper(gc), C.GoString(chatName))
+		this.ppi.ChatInfoDefaults(newConnectionFrom(gc), C.GoString(chatName))
 	}
 
 	var defaults *C.GHashTable
@@ -349,7 +352,7 @@ func goprpl_chat_info_defaults(gc *C.PurpleConnection, chatName *C.char) *C.GHas
 func goprpl_send_im(gc *C.PurpleConnection, who *C.char, msg *C.char, flags C.PurpleMessageFlags) C.int {
 	var this = _plugin_instance
 	if this.ppi.SendIM != nil {
-		ret := this.ppi.SendIM(newConnectWrapper(gc), C.GoString(who), C.GoString(msg))
+		ret := this.ppi.SendIM(newConnectionFrom(gc), C.GoString(who), C.GoString(msg))
 		return C.int(ret)
 	}
 
@@ -360,7 +363,7 @@ func goprpl_send_im(gc *C.PurpleConnection, who *C.char, msg *C.char, flags C.Pu
 func goprpl_join_chat(gc *C.PurpleConnection, comp *C.GHashTable) {
 	var this = _plugin_instance
 	if this.ppi.JoinChat != nil {
-		this.ppi.JoinChat(newConnectWrapper(gc), newGHashTableFrom(comp))
+		this.ppi.JoinChat(newConnectionFrom(gc), newGHashTableFrom(comp))
 	}
 }
 
@@ -368,7 +371,7 @@ func goprpl_join_chat(gc *C.PurpleConnection, comp *C.GHashTable) {
 func goprpl_reject_chat(gc *C.PurpleConnection, comp *C.GHashTable) {
 	var this = _plugin_instance
 	if this.ppi.RejectChat != nil {
-		this.ppi.RejectChat(newConnectWrapper(gc), newGHashTableFrom(comp))
+		this.ppi.RejectChat(newConnectionFrom(gc), newGHashTableFrom(comp))
 	}
 }
 
@@ -385,7 +388,7 @@ func goprpl_get_chat_name(comp *C.GHashTable) *C.char {
 func goprpl_chat_invite(gc *C.PurpleConnection, id C.int, message *C.char, who *C.char) {
 	var this = _plugin_instance
 	if this.ppi.ChatInvite != nil {
-		this.ppi.ChatInvite(newConnectWrapper(gc), int(id), C.GoString(message), C.GoString(who))
+		this.ppi.ChatInvite(newConnectionFrom(gc), int(id), C.GoString(message), C.GoString(who))
 	}
 }
 
@@ -393,7 +396,7 @@ func goprpl_chat_invite(gc *C.PurpleConnection, id C.int, message *C.char, who *
 func goprpl_chat_leave(gc *C.PurpleConnection, id C.int) {
 	var this = _plugin_instance
 	if this.ppi.ChatLeave != nil {
-		this.ppi.ChatLeave(newConnectWrapper(gc), int(id))
+		this.ppi.ChatLeave(newConnectionFrom(gc), int(id))
 	}
 }
 
@@ -401,7 +404,7 @@ func goprpl_chat_leave(gc *C.PurpleConnection, id C.int) {
 func goprpl_chat_whisper(gc *C.PurpleConnection, id C.int, who *C.char, message *C.char) {
 	var this = _plugin_instance
 	if this.ppi.ChatWhisper != nil {
-		this.ppi.ChatWhisper(newConnectWrapper(gc), int(id), C.GoString(who), C.GoString(message))
+		this.ppi.ChatWhisper(newConnectionFrom(gc), int(id), C.GoString(who), C.GoString(message))
 	}
 }
 
@@ -409,7 +412,7 @@ func goprpl_chat_whisper(gc *C.PurpleConnection, id C.int, who *C.char, message 
 func goprpl_chat_send(gc *C.PurpleConnection, id C.int, message *C.char, flags C.PurpleMessageFlags) C.int {
 	var this = _plugin_instance
 	if this.ppi.ChatSend != nil {
-		ret := this.ppi.ChatSend(newConnectWrapper(gc), int(id), C.GoString(message), int(flags))
+		ret := this.ppi.ChatSend(newConnectionFrom(gc), int(id), C.GoString(message), int(flags))
 		return C.int(ret)
 	}
 	return C.int(0)
@@ -419,9 +422,18 @@ func goprpl_chat_send(gc *C.PurpleConnection, id C.int, message *C.char, flags C
 func goprpl_roomlist_get_list(gc *C.PurpleConnection) *C.PurpleRoomlist {
 	var this = _plugin_instance
 	if this.ppi.RoomlistGetList != nil {
-		this.ppi.RoomlistGetList(newConnectWrapper(gc))
+		this.ppi.RoomlistGetList(newConnectionFrom(gc))
 	}
 	return nil
+}
+
+//export goprpl_add_buddy_with_invite
+func goprpl_add_buddy_with_invite(gc *C.PurpleConnection, buddy *C.PurpleBuddy, group *C.PurpleGroup, message *C.char) {
+	var this = _plugin_instance
+	if this.ppi.AddBuddyWithInvite != nil {
+		this.ppi.AddBuddyWithInvite(newConnectionFrom(gc),
+			newBuddyFrom(buddy), newGroupFrom(group), C.GoString(message))
+	}
 }
 
 var _plugin_instance *Plugin = nil

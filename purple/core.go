@@ -107,31 +107,12 @@ func (this *PurpleCore) Loop() {
 }
 
 // get all accout
-func (this *PurpleCore) AvaliableAccounts() []*Account {
-
-	return nil
-}
-
 func (this *PurpleCore) AccountsGetAll() []*Account {
-	acs := make([]*Account, 0)
-	lst := C.purple_accounts_get_all()
-	newGListFrom(lst).Each(func(item C.gpointer) {
-		ac := newAccountWrapper((*C.PurpleAccount)(item))
-		acs = append(acs, ac)
-	})
-	return acs
+	return AccountsGetAll()
 }
 
-func (this *PurpleCore) AccountsFind(account string, protocol string) *Account {
-	acc := C.purple_accounts_find(C.CString(account), C.CString(protocol))
-	if acc == nil {
-		log.Println("not found", account, protocol)
-	} else {
-		log.Println(acc.username, acc.user_info)
-		return newAccountWrapper(acc)
-	}
-
-	return nil
+func (this *PurpleCore) AccountsFind(name string, protocol string) *Account {
+	return AccountsFind(name, protocol)
 }
 
 // send with conv

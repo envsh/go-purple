@@ -64,7 +64,7 @@ func (this *ToxPlugin) tox_login(ac *purple.Account) {
 	this.stopch = make(chan struct{}, 0)
 	this._toxopts = tox.NewToxOptions()
 	this._toxopts.Tcp_port = uint16(rand.Uint32()%55536) + 10000
-	this.load_account()
+	this.load_account(ac)
 
 	// retry 50 times
 	for port := 0; port < 50; port++ {
@@ -112,7 +112,7 @@ func (this *ToxPlugin) tox_login(ac *purple.Account) {
 func (this *ToxPlugin) tox_close(gc *purple.Connection) {
 	// this.stopch <- struct{}{}
 	purple.TimeoutRemove(this.iterTimerHandler)
-	this.save_account()
+	this.save_account(gc)
 	this._tox.Kill()
 	this._tox = nil
 	this._toxopts = nil
@@ -143,27 +143,22 @@ func (this *ToxPlugin) Iterate() {
 	log.Println("stopped", id)
 }
 
-var data_file = "/tmp/gotox.dat"
-
-func (this *ToxPlugin) load_account() {
-	data, err := tox.LoadSavedata(data_file)
-	if err != nil {
-		log.Println(err)
+func (this *ToxPlugin) load_account(ac *purple.Account) {
+	data64 := ac.GetString("tox_save_data")
+	data, err := base64.StdEncoding.DecodeString(data64)
+	if err != nil || len(data) == 0 {
+		log.Println("load data error:", err, data64)
 	} else {
 		this._toxopts.Savedata_data = data
 		this._toxopts.Savedata_type = tox.SAVEDATA_TYPE_TOX_SAVE
 	}
 }
 
-func (this *ToxPlugin) save_account() {
+func (this *ToxPlugin) save_account(gc *purple.Connection) {
 	data := this._tox.GetSavedata()
 	data64 := base64.StdEncoding.EncodeToString(data)
-
-	err := this._tox.WriteSavedata(data_file)
-	if err != nil {
-		log.Println(len(data64))
-		log.Println(err)
-	}
+	ac := gc.ConnGetAccount()
+	ac.SetString("tox_save_data", data64)
 }
 
 func NewToxPlugin() *ToxPlugin {
@@ -173,10 +168,10 @@ func NewToxPlugin() *ToxPlugin {
 		Id:          "prpl-gotox",
 		Name:        "GoTox",
 		Version:     "1.0",
-		Summary:     "it's summary",
-		Description: "it's description",
+		Summary:     "Tox Protocol Plugin using golang",
+		Description: "Tox Protocol Plugin https://tox.chat/",
 		Author:      "it's gzleo",
-		Homepage:    "https://fixlan.net/",
+		Homepage:    "https://github.com/kitech/go-purple/tox-prpl/",
 
 		Load:    this.load_tox,
 		Unload:  this.unload_tox,
@@ -188,16 +183,17 @@ func NewToxPlugin() *ToxPlugin {
 		Close:     this.tox_close,
 		SendIM:    this.SendIM,
 		// group chat
-		ChatInfo:         this.ChatInfo,
-		ChatInfoDefaults: this.ChatInfoDefaults,
-		JoinChat:         this.JoinChat,
-		RejectChat:       this.RejectChat,
-		GetChatName:      this.GetChatName,
-		ChatInvite:       this.ChatInvite,
-		ChatLeave:        this.ChatLeave,
-		ChatWhisper:      this.ChatWhisper,
-		ChatSend:         this.ChatSend,
-		RoomlistGetList:  this.RoomlistGetList,
+		ChatInfo:           this.ChatInfo,
+		ChatInfoDefaults:   this.ChatInfoDefaults,
+		JoinChat:           this.JoinChat,
+		RejectChat:         this.RejectChat,
+		GetChatName:        this.GetChatName,
+		ChatInvite:         this.ChatInvite,
+		ChatLeave:          this.ChatLeave,
+		ChatWhisper:        this.ChatWhisper,
+		ChatSend:           this.ChatSend,
+		RoomlistGetList:    this.RoomlistGetList,
+		AddBuddyWithInvite: this.AddBuddyWithInvite,
 	}
 	this.p = purple.NewPlugin(&pi, &ppi, this.init_tox)
 

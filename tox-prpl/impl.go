@@ -35,7 +35,7 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 	this._tox.CallbackFriendRequest(func(t *tox.Tox, pubkey, msg string, d interface{}) {
 		log.Println("hehhe", pubkey, msg)
 		this._tox.FriendAddNorequest(pubkey)
-		this.save_account()
+		this.save_account(conn)
 	}, ac)
 
 	this._tox.CallbackFriendConnectionStatus(func(t *tox.Tox, friendNumber uint32, status uint32, d interface{}) {
@@ -203,6 +203,10 @@ func (this *ToxPlugin) ChatSend(gc *purple.Connection, id int, message string, f
 
 func (this *ToxPlugin) RoomlistGetList(gc *purple.Connection) {
 	log.Println("herere")
+}
+
+func (this *ToxPlugin) AddBuddyWithInvite(gc *purple.Connection, buddy *purple.Buddy, group *purple.Group, message string) {
+	log.Println(buddy, group, message)
 }
 
 // utils

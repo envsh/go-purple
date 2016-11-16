@@ -23,7 +23,7 @@ type Connection struct {
 	conn *C.PurpleConnection
 }
 
-func newConnectWrapper(conn *C.PurpleConnection) *Connection {
+func newConnectionFrom(conn *C.PurpleConnection) *Connection {
 	this := &Connection{conn}
 	return this
 }
@@ -48,6 +48,11 @@ func (this *Connection) ConnGetState() int {
 
 func (this *Connection) ConnSetAccount(ac *Account) {
 	C.purple_connection_set_account(this.conn, ac.account)
+}
+
+func (this *Connection) ConnGetAccount() *Account {
+	ac := C.purple_connection_get_account(this.conn)
+	return newAccountFrom(ac)
 }
 
 func (this *Connection) ConnSetDisplayName(name string) {

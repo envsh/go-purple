@@ -9,7 +9,7 @@ type Buddy struct {
 	buddy *C.PurpleBuddy
 }
 
-func newBuddyWrapper(buddy *C.PurpleBuddy) *Buddy {
+func newBuddyFrom(buddy *C.PurpleBuddy) *Buddy {
 	this := &Buddy{buddy}
 	return this
 }
@@ -54,6 +54,12 @@ type Group struct {
 
 func NewGroup(name string) *Group {
 	group := C.purple_group_new(C.CString(name))
+	this := &Group{}
+	this.group = group
+	return this
+}
+
+func newGroupFrom(group *C.PurpleGroup) *Group {
 	this := &Group{}
 	this.group = group
 	return this
