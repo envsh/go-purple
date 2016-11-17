@@ -194,6 +194,7 @@ func NewToxPlugin() *ToxPlugin {
 		ChatSend:           this.ChatSend,
 		RoomlistGetList:    this.RoomlistGetList,
 		AddBuddyWithInvite: this.AddBuddyWithInvite,
+		RemoveBuddy:        this.RemoveBuddy,
 	}
 	this.p = purple.NewPlugin(&pi, &ppi, this.init_tox)
 

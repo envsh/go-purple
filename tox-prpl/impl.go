@@ -6,6 +6,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"yobot/purple"
 
@@ -19,13 +20,19 @@ func (this *ToxPlugin) setupSelfInfo(ac *purple.Account) {
 		this._tox.SelfSetName(ac.GetUserName())
 	}
 	this._tox.SelfSetStatusMessage("It's from gotox-prpl, hoho.")
+
+	conn := ac.GetConnection()
+	purple.RequestYesNo(this, conn, func(ud interface{}) {
+		log.Println("request yes")
+	}, func(ud interface{}) {
+		log.Println("request no")
+	})
 }
 
 func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 	conn := ac.GetConnection()
 	this._tox.CallbackSelfConnectionStatus(func(t *tox.Tox, status uint32, d interface{}) {
-		log.Println("hehhe", status)
-		if status == 2 {
+		if status > tox.CONNECTION_NONE {
 			conn.ConnSetState(purple.CONNECTED) // 设置为已连接状态，则好友会显示。
 		} else {
 			conn.ConnSetState(purple.DISCONNECTED)
@@ -34,6 +41,7 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 
 	this._tox.CallbackFriendRequest(func(t *tox.Tox, pubkey, msg string, d interface{}) {
 		log.Println("hehhe", pubkey, msg)
+		// TODO notice UI and then make desision
 		this._tox.FriendAddNorequest(pubkey)
 		this.save_account(conn)
 	}, ac)
@@ -41,17 +49,18 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 	this._tox.CallbackFriendConnectionStatus(func(t *tox.Tox, friendNumber uint32, status uint32, d interface{}) {
 		log.Println(friendNumber, status)
 		pubkey, _ := t.FriendGetPublicKey(friendNumber)
-		buddy := ac.FindBuddy(pubkey)
+		name, _ := t.FriendGetName(friendNumber)
+
+		buddy := this.findBuddyEx(ac, pubkey)
 		if buddy == nil {
-			n, _ := t.FriendGetName(friendNumber)
-			log.Println("can not find buddy:", n)
+			log.Println("can not find buddy:", name, pubkey)
 		} else {
 			switch status {
-			case 0:
+			case tox.CONNECTION_NONE:
 				purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_OFFLINE_STR)
-			case 1:
+			case tox.CONNECTION_TCP:
 				purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_BUSY_STR)
-			case 2:
+			case tox.CONNECTION_UDP:
 				purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_ONLINE_STR)
 			}
 		}
@@ -64,9 +73,34 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 		if err != nil {
 			log.Println(err)
 		} else {
-			conn.ServGotIM(pubkey, msg, purple.MESSAGE_RECV)
+			buddy := this.findBuddyEx(ac, pubkey)
+			if buddy == nil {
+				log.Println("wtf", friendNumber, pubkey)
+			} else {
+				conn.ServGotIM(buddy.GetName(), msg, purple.MESSAGE_RECV)
+			}
 		}
 	}, ac)
+
+	this._tox.CallbackFriendName(func(t *tox.Tox, friendNumber uint32, name string, d interface{}) {
+		// log.Println(friendNumber, name)
+		pubkey, err := t.FriendGetPublicKey(friendNumber)
+		if err != nil {
+			log.Println(err, pubkey)
+		} else {
+			buddy := this.findBuddyEx(ac, pubkey)
+			if buddy != nil {
+				if buddy.GetAliasOnly() != name {
+					buddy.SetAlias(name)
+				}
+			} else {
+				log.Println("wtf", friendNumber, name, pubkey)
+				// buddy := purple.NewBuddy(ac, pubkey, name)
+				// ac.AddBuddy(buddy)
+				// buddy.BlistAdd(nil)
+			}
+		}
+	}, nil)
 
 	this._tox.CallbackGroupNameListChange(func(t *tox.Tox, groupNumber int,
 		peerNumber int, change uint8, d interface{}) {
@@ -103,6 +137,7 @@ func (this *ToxPlugin) loadFriends(ac *purple.Account) {
 	if fns == nil || len(fns) == 0 {
 		log.Println("oh, you have 0 friends")
 	}
+	buddies := ac.FindBuddies("")
 	for _, fn := range fns {
 		name, err := this._tox.FriendGetName(fn)
 		pubkey, err := this._tox.FriendGetPublicKey(fn)
@@ -112,9 +147,18 @@ func (this *ToxPlugin) loadFriends(ac *purple.Account) {
 
 		buddy := ac.FindBuddy(pubkey)
 		if buddy == nil {
-			buddy = purple.NewBuddy(ac, pubkey, name)
-			ac.AddBuddy(buddy)
-			buddy.BlistAdd(nil)
+			found := false
+			for _, _buddy := range buddies {
+				if strings.HasPrefix(_buddy.GetName(), pubkey) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				buddy = purple.NewBuddy(ac, pubkey, name)
+				ac.AddBuddy(buddy)
+				buddy.BlistAdd(nil)
+			}
 		} else {
 			if buddy.GetAliasOnly() != name {
 				buddy.SetAlias(name)
@@ -123,6 +167,22 @@ func (this *ToxPlugin) loadFriends(ac *purple.Account) {
 		// purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_ONLINE_STR)
 		log.Println("adding...", name, pubkey, purple.MyTid2())
 	}
+}
+
+// 因为存储的name可能是friendId，也可能是pubkey。
+func (this *ToxPlugin) findBuddyEx(ac *purple.Account, pubkeyOrFriendID string) *purple.Buddy {
+	name := pubkeyOrFriendID
+	buddy := ac.FindBuddy(name)
+	if buddy == nil {
+		buddies := ac.FindBuddies("")
+		for _, buddy_ := range buddies {
+			if strings.HasPrefix(buddy_.GetName(), name) {
+				buddy = buddy_
+				break
+			}
+		}
+	}
+	return buddy
 }
 
 // optional callbacks
@@ -205,8 +265,35 @@ func (this *ToxPlugin) RoomlistGetList(gc *purple.Connection) {
 	log.Println("herere")
 }
 
-func (this *ToxPlugin) AddBuddyWithInvite(gc *purple.Connection, buddy *purple.Buddy, group *purple.Group, message string) {
+func (this *ToxPlugin) AddBuddyWithInvite(gc *purple.Connection,
+	buddy *purple.Buddy, group *purple.Group, message string) {
 	log.Println(buddy, group, message)
+	friendId := buddy.GetName()
+	if len(message) == 0 {
+		message = fmt.Sprintf("This is %s", this._tox.SelfGetName())
+	}
+	friendNumber, err := this._tox.FriendAdd(friendId, message)
+	if err != nil {
+		log.Println(err, friendNumber)
+	} else {
+		// gc.ConnGetAccount().AddBuddy(buddy)
+		// buddy.BlistAdd(nil)
+		buddy := gc.ConnGetAccount().FindBuddy(friendId)
+		log.Println(buddy)
+	}
+}
+
+func (this *ToxPlugin) RemoveBuddy(gc *purple.Connection, buddy *purple.Buddy, group *purple.Group) {
+	friendId := buddy.GetName()
+	friendNumber, err := this._tox.FriendByPublicKey(friendId)
+	if err != nil {
+		log.Println(err, friendNumber)
+	} else {
+		_, err = this._tox.FriendDelete(friendNumber)
+		if err != nil {
+			log.Println(err)
+		}
+	}
 }
 
 // utils

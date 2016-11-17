@@ -10,6 +10,7 @@ static void gopurple_prpl_got_user_status(PurpleAccount *account,
 */
 import "C"
 
+// cgo don't support variadic parameter list, so wrapper it
 func PrplGotUserStatus(ac *Account, name, statusId string) {
 	C.gopurple_prpl_got_user_status(ac.account, C.CString(name), C.CString(statusId))
 }

@@ -38,6 +38,11 @@ extern void goprpl_chat_whisper(PurpleConnection *gc, int id, char *who, char *m
 extern int  goprpl_chat_send(PurpleConnection *gc, int id, char *message, PurpleMessageFlags flags);
 extern PurpleRoomlist *goprpl_roomlist_get_list(PurpleConnection *gc);
 extern void goprpl_add_buddy_with_invite(PurpleConnection *gc, PurpleBuddy *buddy, PurpleGroup *group, char *message);
+extern void goprpl_remove_buddy(PurpleConnection *gc, PurpleBuddy *buddy, PurpleGroup *group);
+extern void goprpl_add_permit(PurpleConnection *gc, char *name);
+extern void goprpl_add_deny(PurpleConnection *gc, char *name);
+extern void goprpl_rem_permit(PurpleConnection *gc, char *name);
+extern void goprpl_rem_deny(PurpleConnection *gc, char *name);
 
 static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pppi) {
     pi->load = goprpl_plugin_load;
@@ -66,6 +71,11 @@ static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pp
     pppi->chat_send = goprpl_chat_send;
     pppi->roomlist_get_list = goprpl_roomlist_get_list;
     pppi->add_buddy_with_invite = goprpl_add_buddy_with_invite;
+    pppi->remove_buddy = goprpl_remove_buddy;
+    pppi->add_permit = goprpl_add_permit;
+    pppi->add_deny = goprpl_add_deny;
+    pppi->rem_permit = goprpl_rem_permit;
+    pppi->rem_deny = goprpl_rem_deny;
     // TODO fix compile warnings
 }
 
@@ -135,6 +145,11 @@ type PluginProtocolInfo struct {
 	ChatSend           func(gc *Connection, id int, message string, flags int) int
 	RoomlistGetList    func(gc *Connection)
 	AddBuddyWithInvite func(gc *Connection, buddy *Buddy, group *Group, message string)
+	RemoveBuddy        func(gc *Connection, buddy *Buddy, group *Group)
+	AddPermit          func(gc *Connection, name string)
+	AddDeny            func(gc *Connection, name string)
+	RemPermit          func(gc *Connection, name string)
+	RemDeny            func(gc *Connection, name string)
 
 	// private
 	ppi   *C.PurplePluginProtocolInfo
@@ -433,6 +448,46 @@ func goprpl_add_buddy_with_invite(gc *C.PurpleConnection, buddy *C.PurpleBuddy, 
 	if this.ppi.AddBuddyWithInvite != nil {
 		this.ppi.AddBuddyWithInvite(newConnectionFrom(gc),
 			newBuddyFrom(buddy), newGroupFrom(group), C.GoString(message))
+	}
+}
+
+//export goprpl_remove_buddy
+func goprpl_remove_buddy(gc *C.PurpleConnection, buddy *C.PurpleBuddy, group *C.PurpleGroup) {
+	var this = _plugin_instance
+	if this.ppi.RemoveBuddy != nil {
+		this.ppi.RemoveBuddy(newConnectionFrom(gc), newBuddyFrom(buddy), newGroupFrom(group))
+	}
+}
+
+//export goprpl_add_permit
+func goprpl_add_permit(gc *C.PurpleConnection, name *C.char) {
+	var this = _plugin_instance
+	if this.ppi.AddPermit != nil {
+		this.ppi.AddPermit(newConnectionFrom(gc), C.GoString(name))
+	}
+}
+
+//export goprpl_add_deny
+func goprpl_add_deny(gc *C.PurpleConnection, name *C.char) {
+	var this = _plugin_instance
+	if this.ppi.AddDeny != nil {
+		this.ppi.AddDeny(newConnectionFrom(gc), C.GoString(name))
+	}
+}
+
+//export goprpl_rem_permit
+func goprpl_rem_permit(gc *C.PurpleConnection, name *C.char) {
+	var this = _plugin_instance
+	if this.ppi.RemPermit != nil {
+		this.ppi.RemPermit(newConnectionFrom(gc), C.GoString(name))
+	}
+}
+
+//export goprpl_rem_deny
+func goprpl_rem_deny(gc *C.PurpleConnection, name *C.char) {
+	var this = _plugin_instance
+	if this.ppi.RemDeny != nil {
+		this.ppi.RemDeny(newConnectionFrom(gc), C.GoString(name))
 	}
 }
 

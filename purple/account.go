@@ -68,6 +68,28 @@ func (this *Account) FindBuddy(name string) *Buddy {
 	return newBuddyFrom(buddy)
 }
 
+func (this *Account) FindBuddies(name string) []*Buddy {
+	var slst *C.GSList
+	if name == "" {
+		slst = C.purple_find_buddies(this.account, nil)
+	} else {
+		slst = C.purple_find_buddies(this.account, C.CString(name))
+	}
+
+	if slst != nil {
+		tlen := C.g_slist_length(slst)
+		buddies := make([]*Buddy, tlen)
+		for idx := 0; idx < int(tlen); idx++ {
+			cbuddy := C.g_slist_nth_data(slst, C.guint(idx))
+			buddies[idx] = newBuddyFrom((*C.PurpleBuddy)(cbuddy))
+		}
+		C.g_slist_free(slst)
+		return buddies
+	}
+
+	return nil
+}
+
 func (this *Account) RequestAdd(name string) {
 	C.purple_account_request_add(this.account, C.CString(name), nil, nil, nil)
 }
