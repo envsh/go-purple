@@ -43,6 +43,8 @@ extern void goprpl_add_permit(PurpleConnection *gc, char *name);
 extern void goprpl_add_deny(PurpleConnection *gc, char *name);
 extern void goprpl_rem_permit(PurpleConnection *gc, char *name);
 extern void goprpl_rem_deny(PurpleConnection *gc, char *name);
+extern void goprpl_get_info(PurpleConnection *gc, char *name);
+extern char* goprpl_status_text(PurpleBuddy *buddy);
 
 static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pppi) {
     pi->load = goprpl_plugin_load;
@@ -76,6 +78,8 @@ static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pp
     pppi->add_deny = goprpl_add_deny;
     pppi->rem_permit = goprpl_rem_permit;
     pppi->rem_deny = goprpl_rem_deny;
+    pppi->get_info = goprpl_get_info;
+    pppi->status_text = goprpl_status_text;
     // TODO fix compile warnings
 }
 
@@ -88,7 +92,6 @@ import "C"
 import "unsafe"
 
 import (
-	"fmt"
 	"log"
 	"runtime"
 
@@ -128,11 +131,12 @@ type PluginInfo struct {
 
 type PluginProtocolInfo struct {
 	// must
-	BlistIcon func() string
-	Login     func(*Account)
-	Close     func(*Connection)
+	BlistIcon   func() string
+	StatusTypes func(*Account) []*StatusType
+	Login       func(*Account)
+	Close       func(*Connection)
 
-	// optional
+	// optional, might by Proirity high to low
 	ChatInfo           func(gc *Connection) []string
 	ChatInfoDefaults   func(gc *Connection, chat_name string) map[string]string
 	SendIM             func(gc *Connection, who string, message string) int
@@ -150,6 +154,8 @@ type PluginProtocolInfo struct {
 	AddDeny            func(gc *Connection, name string)
 	RemPermit          func(gc *Connection, name string)
 	RemDeny            func(gc *Connection, name string)
+	GetInfo            func(gc *Connection, name string)
+	StatusText         func(*Buddy) string
 
 	// private
 	ppi   *C.PurplePluginProtocolInfo
@@ -267,17 +273,17 @@ func goprpl_plugin_destroy(plugin *C.PurplePlugin) {
 }
 
 //export goprpl_blist_icon
-func goprpl_blist_icon(a *C.PurpleAccount, b *C.PurpleBuddy) *C.char {
+func goprpl_blist_icon(ac *C.PurpleAccount, b *C.PurpleBuddy) *C.char {
 	var this = _plugin_instance
 	icon := this.ppi.BlistIcon()
 	return C.CString(icon)
 }
 
 //export goprpl_login
-func goprpl_login(a *C.PurpleAccount) {
+func goprpl_login(ac *C.PurpleAccount) {
 	var this = _plugin_instance
 	if this.ppi.Login != nil {
-		this.ppi.Login(newAccountFrom(a))
+		this.ppi.Login(newAccountFrom(ac))
 	}
 }
 
@@ -290,26 +296,31 @@ func goprpl_close(gc *C.PurpleConnection) {
 }
 
 //export goprpl_status_types
-func goprpl_status_types(a *C.PurpleAccount) *C.GList {
-	var stype *C.PurpleStatusType
+func goprpl_status_types(ac *C.PurpleAccount) *C.GList {
+	var this = _plugin_instance
+
 	var types *C.GList
+	if this.ppi.StatusTypes != nil {
+		stys := this.ppi.StatusTypes(newAccountFrom(ac))
+		for _, sty := range stys {
+			types = C.g_list_append(types, sty.sty)
+		}
+	}
+	if types == nil { // add default online status types
+		var stype *C.PurpleStatusType
 
-	stype = C.purple_status_type_new(C.PURPLE_STATUS_AVAILABLE,
-		C.CString("tox_online"), C.CString("Online"), C.TRUE)
-	types = C.g_list_append(types, stype)
+		stype = C.purple_status_type_new(C.PURPLE_STATUS_AVAILABLE,
+			C.CString("tox_online"), C.CString("Online"), C.TRUE)
+		types = C.g_list_append(types, stype)
 
-	stype = C.purple_status_type_new_full(C.PURPLE_STATUS_AWAY,
-		C.CString("tox_away"), C.CString("Away"), C.TRUE, C.TRUE, C.FALSE)
-	types = C.g_list_append(types, stype)
+		stype = C.purple_status_type_new(C.PURPLE_STATUS_OFFLINE,
+			C.CString("tox_offline"), C.CString("Offline"), C.TRUE)
+		types = C.g_list_append(types, stype)
+	}
 
-	stype = C.purple_status_type_new_full(C.PURPLE_STATUS_UNAVAILABLE,
-		C.CString("tox_busy"), C.CString("Busy"), C.TRUE, C.TRUE, C.FALSE)
-	types = C.g_list_append(types, stype)
-
-	stype = C.purple_status_type_new(C.PURPLE_STATUS_OFFLINE,
-		C.CString("tox_offline"), C.CString("Offline"), C.TRUE)
-	types = C.g_list_append(types, stype)
-
+	if types == nil {
+		log.Panicln("wtf")
+	}
 	return types
 }
 
@@ -325,23 +336,17 @@ func goprpl_chat_info(gc *C.PurpleConnection) *C.GList {
 			log.Panicln("need chat info")
 		}
 
-		var pce *C.struct_proto_chat_entry
-		// pce = new(C.struct_proto_chat_entry)  // crash!!!
-		pce = (*C.struct_proto_chat_entry)(C.calloc(C.size_t(1), C.sizeof_struct_proto_chat_entry))
-		pce.label = C.CString("_GoToxChannel")
-		pce.identifier = C.CString("GoToxChannel")
-		pce.required = C.TRUE
-		pce.label = C.CString(fmt.Sprintf("_%s", infos[0]))
-		pce.identifier = C.CString(infos[0])
-		pce.required = C.TRUE
-		m = C.g_list_append(m, pce)
+		var pce *ProtoChatEntry
+		for _, info := range infos {
+			pce = NewProtoChatEntry(info, info, true)
+			m = C.g_list_append(m, pce.get())
+		}
 
 		// another for storage
-		pce = (*C.struct_proto_chat_entry)(C.calloc(C.size_t(1), C.sizeof_struct_proto_chat_entry))
-		pce.label = C.CString("GroupNumber")
-		pce.identifier = C.CString("GroupNumber")
-		pce.required = C.FALSE
-		m = C.g_list_append(m, pce)
+		if false {
+			pce = NewProtoChatEntry("GroupNumber", "GroupNumber", false)
+			m = C.g_list_append(m, pce.get())
+		}
 	}
 	return m
 }
@@ -489,6 +494,24 @@ func goprpl_rem_deny(gc *C.PurpleConnection, name *C.char) {
 	if this.ppi.RemDeny != nil {
 		this.ppi.RemDeny(newConnectionFrom(gc), C.GoString(name))
 	}
+}
+
+//export goprpl_get_info
+func goprpl_get_info(gc *C.PurpleConnection, name *C.char) {
+	var this = _plugin_instance
+	if this.ppi.GetInfo != nil {
+		this.ppi.GetInfo(newConnectionFrom(gc), C.GoString(name))
+	}
+}
+
+//export goprpl_status_text
+func goprpl_status_text(buddy *C.PurpleBuddy) *C.char {
+	var this = _plugin_instance
+	if this.ppi.StatusText != nil {
+		stxt := this.ppi.StatusText(newBuddyFrom(buddy))
+		return C.CString(stxt)
+	}
+	return nil
 }
 
 var _plugin_instance *Plugin = nil

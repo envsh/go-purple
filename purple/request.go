@@ -41,6 +41,8 @@ import (
 	"log"
 )
 
+// 利用操作系统的内存地址作为标识，让OS维护其值，
+// 利用一个内存地址不能同时分配2次及以上的特性
 type Request struct {
 	seq      *C.char
 	userData interface{}
@@ -50,7 +52,7 @@ type Request struct {
 
 var requests = make(map[*C.char]*Request)
 
-func RequestYesNo(userData interface{}, gc *Connection,
+func RequestYesNo(userData interface{}, gc *Connection, title, primary string,
 	yescb func(interface{}), nocb func(interface{})) {
 
 	cseq := (*C.char)(C.calloc(1, 1))
@@ -58,33 +60,24 @@ func RequestYesNo(userData interface{}, gc *Connection,
 	requests[cseq] = req
 
 	handle := unsafe.Pointer(gc.conn)
-	title := "it's title"
-	primary := "it's primary"
-	secondary := "it's secondary"
+	ac := gc.ConnGetAccount()
+	// title := "it's title"
+	// primary := "it's primary"
+	// secondary := "it's secondary"
 	default_action := 0
 	who := "who's"
-	C.gopurple_request_yes_no(handle, C.CString(title), C.CString(primary), C.CString(secondary),
-		C.int(default_action), nil, C.CString(who), nil, cseq)
+	C.gopurple_request_yes_no(handle, C.CString(title), C.CString(primary), nil,
+		C.int(default_action), ac.account, C.CString(who), nil, cseq)
 }
 
-func RequestOkCancel(userData interface{}, gc *Connection,
+func RequestYesNoDemo(userData interface{}, gc *Connection,
 	yescb func(interface{}), nocb func(interface{})) {
-
-	cseq := (*C.char)(C.calloc(1, 1))
-	req := &Request{seq: cseq, userData: userData, yescb: yescb, nocb: nocb}
-	requests[cseq] = req
-
-	handle := unsafe.Pointer(gc.conn)
 	title := "it's title"
 	primary := "it's primary"
-	secondary := "it's secondary"
-	default_action := 0
-	who := "who's"
-	C.gopurple_request_ok_cancel(handle, C.CString(title), C.CString(primary), C.CString(secondary),
-		C.int(default_action), nil, C.CString(who), nil, cseq)
+	RequestYesNo(userData, gc, title, primary, yescb, nocb)
 }
 
-func RequestAcceptCancel(userData interface{}, gc *Connection,
+func RequestOkCancel(userData interface{}, gc *Connection, title, primary string,
 	yescb func(interface{}), nocb func(interface{})) {
 
 	cseq := (*C.char)(C.calloc(1, 1))
@@ -92,13 +85,45 @@ func RequestAcceptCancel(userData interface{}, gc *Connection,
 	requests[cseq] = req
 
 	handle := unsafe.Pointer(gc.conn)
-	title := "it's title"
-	primary := "it's primary"
-	secondary := "it's secondary"
+	ac := gc.ConnGetAccount()
+	// title := "it's title"
+	// primary := "it's primary"
+	// secondary := "it's secondary"
 	default_action := 0
 	who := "who's"
-	C.gopurple_request_accept_cancel(handle, C.CString(title), C.CString(primary), C.CString(secondary),
-		C.int(default_action), nil, C.CString(who), nil, cseq)
+	C.gopurple_request_ok_cancel(handle, C.CString(title), C.CString(primary), nil,
+		C.int(default_action), ac.account, C.CString(who), nil, cseq)
+}
+
+func RequestOkCancelDemo(userData interface{}, gc *Connection,
+	yescb func(interface{}), nocb func(interface{})) {
+	title := "it's title"
+	primary := "it's primary"
+	RequestOkCancel(userData, gc, title, primary, yescb, nocb)
+}
+
+func RequestAcceptCancel(userData interface{}, gc *Connection, title, primary string,
+	yescb func(interface{}), nocb func(interface{})) {
+
+	cseq := (*C.char)(C.calloc(1, 1))
+	req := &Request{seq: cseq, userData: userData, yescb: yescb, nocb: nocb}
+	requests[cseq] = req
+
+	handle := unsafe.Pointer(gc.conn)
+	ac := gc.ConnGetAccount()
+	// title := "it's title"
+	// primary := "it's primary"
+	// secondary := "it's secondary"
+	default_action := 0
+	who := "who's"
+	C.gopurple_request_accept_cancel(handle, C.CString(title), C.CString(primary), nil,
+		C.int(default_action), ac.account, C.CString(who), nil, cseq)
+}
+func RequestAcceptCancelDemo(userData interface{}, gc *Connection,
+	yescb func(interface{}), nocb func(interface{})) {
+	title := "it's title"
+	primary := "it's primary"
+	RequestAcceptCancel(userData, gc, title, primary, yescb, nocb)
 }
 
 //export gopurple_request_action_cb

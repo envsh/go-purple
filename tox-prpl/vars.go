@@ -11,3 +11,7 @@ const (
 	STATUS_BUSY    = 2
 	STATUS_AWAY    = 3
 )
+
+const (
+	DEFAULT_USERNAME = "GoTox User"
+)

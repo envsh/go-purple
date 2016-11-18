@@ -21,12 +21,14 @@ func (this *ToxPlugin) setupSelfInfo(ac *purple.Account) {
 	}
 	this._tox.SelfSetStatusMessage("It's from gotox-prpl, hoho.")
 
-	conn := ac.GetConnection()
-	purple.RequestYesNo(this, conn, func(ud interface{}) {
-		log.Println("request yes")
-	}, func(ud interface{}) {
-		log.Println("request no")
-	})
+	if false {
+		conn := ac.GetConnection()
+		purple.RequestYesNoDemo(this, conn, func(ud interface{}) {
+			log.Println("request yes")
+		}, func(ud interface{}) {
+			log.Println("request no")
+		})
+	}
 }
 
 func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
@@ -42,8 +44,27 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 	this._tox.CallbackFriendRequest(func(t *tox.Tox, pubkey, msg string, d interface{}) {
 		log.Println("hehhe", pubkey, msg)
 		// TODO notice UI and then make desision
-		this._tox.FriendAddNorequest(pubkey)
-		this.save_account(conn)
+		purple.RequestAcceptCancel(this, conn, "New Friend Request", msg,
+			func(ud interface{}) {
+				friendNumber, err := this._tox.FriendAddNorequest(pubkey)
+				if err != nil {
+					log.Println(err, friendNumber)
+				}
+				this.save_account(conn)
+				friendName, err := this._tox.FriendGetName(friendNumber)
+				if len(friendName) == 0 {
+					friendName = "GoTox User"
+				}
+				buddy := this.findBuddyEx(ac, pubkey)
+				// log.Println(buddy, buddy.GetName(), buddy.GetAliasOnly())
+				if buddy == nil {
+					buddy := purple.NewBuddy(ac, pubkey, friendName)
+					ac.AddBuddy(buddy)
+					buddy.BlistAdd(nil)
+				}
+			}, func(ud interface{}) {
+				// reject?
+			})
 	}, ac)
 
 	this._tox.CallbackFriendConnectionStatus(func(t *tox.Tox, friendNumber uint32, status uint32, d interface{}) {
@@ -144,7 +165,9 @@ func (this *ToxPlugin) loadFriends(ac *purple.Account) {
 		if err != nil {
 			log.Println(err)
 		}
-
+		if len(name) == 0 {
+			name = "GoTox User"
+		}
 		buddy := ac.FindBuddy(pubkey)
 		if buddy == nil {
 			found := false
@@ -188,7 +211,7 @@ func (this *ToxPlugin) findBuddyEx(ac *purple.Account, pubkeyOrFriendID string) 
 // optional callbacks
 func (this *ToxPlugin) ChatInfo(gc *purple.Connection) []string {
 	log.Println(gc)
-	infos := []string{"ToxChannel"}
+	infos := []string{"ToxChannel", "GroupNumber"}
 	return infos
 }
 
@@ -292,8 +315,42 @@ func (this *ToxPlugin) RemoveBuddy(gc *purple.Connection, buddy *purple.Buddy, g
 		_, err = this._tox.FriendDelete(friendNumber)
 		if err != nil {
 			log.Println(err)
+		} else {
+			this.save_account(gc)
 		}
 	}
+}
+
+func (this *ToxPlugin) GetInfo(gc *purple.Connection, who string) {
+	friendNumber, err := this._tox.FriendByPublicKey(who)
+	if err != nil {
+		log.Println(err, friendNumber, who)
+	}
+	friendName, err := this._tox.FriendGetName(friendNumber)
+	friendStmsg, err := this._tox.FriendGetStatusMessage(friendNumber)
+	seen, err := this._tox.FriendGetLastOnline(friendNumber)
+
+	uinfo := purple.NewNotifyUserInfo()
+	uinfo.AddPair("nickname", friendName)
+	uinfo.AddPair("status message", friendStmsg)
+	uinfo.AddPair("seen", fmt.Sprintf("%d", seen))
+	uinfo.AddPair("hehehe", "efffff")
+	uinfo.AddPair("hehehe12", "efffff456")
+
+	// can't call this info this callback function?
+	gc.NotifyUserInfo(who, uinfo, func(ud interface{}) {
+		log.Println("closed", ud)
+	}, 123)
+}
+
+func (this *ToxPlugin) StatusText(buddy *purple.Buddy) string {
+	who := buddy.GetName()
+	friendNumber, err := this._tox.FriendByPublicKey(who)
+	if err != nil {
+		log.Println(err, friendNumber, who)
+	}
+	friendStmsg, err := this._tox.FriendGetStatusMessage(friendNumber)
+	return friendStmsg
 }
 
 // utils

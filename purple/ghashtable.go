@@ -133,6 +133,7 @@ func (this *GHashTable) ToMap() map[string]string {
 	return res
 }
 
+// TODO 参数包含C数据类型，应该改为内部使用
 func (this *GHashTable) Each(functor func(C.gpointer, C.gpointer)) {
 	this.Map(func(k, v C.gpointer) (interface{}, interface{}) {
 		functor(k, v)
@@ -156,6 +157,7 @@ func (this *GHashTable) Map(
 	return res
 }
 
+//////////
 type GList struct {
 	lst *C.GList
 }
@@ -191,6 +193,48 @@ func (this *GList) Map(functor func(C.gpointer) interface{}) []interface{} {
 	len := C.g_list_length(this.lst)
 	for idx := 0; idx < int(len); idx++ {
 		item := C.g_list_nth_data(this.lst, C.guint(idx))
+		goitem := functor(item)
+		res = append(res, goitem)
+	}
+	return res
+}
+
+//////////
+type GSList struct {
+	lst *C.GSList
+}
+
+func newGSListFrom(lst *C.GSList) *GSList {
+	this := &GSList{}
+	this.lst = lst
+	return this
+}
+
+func (this *GSList) ToStringArray() []string {
+	res := make([]string, 0)
+
+	len := C.g_slist_length(this.lst)
+	for idx := 0; idx < int(len); idx++ {
+		item := C.g_slist_nth_data(this.lst, C.guint(idx))
+		str := C.GoString((*C.char)(item))
+		res = append(res, str)
+	}
+
+	return res
+}
+
+func (this *GSList) Each(functor func(C.gpointer)) {
+	this.Map(func(item C.gpointer) interface{} {
+		functor(item)
+		return nil
+	})
+}
+
+func (this *GSList) Map(functor func(C.gpointer) interface{}) []interface{} {
+	res := make([]interface{}, 0)
+	len := C.g_slist_length(this.lst)
+	for idx := 0; idx < int(len); idx++ {
+		item := C.g_slist_nth_data(this.lst, C.guint(idx))
 		goitem := functor(item)
 		res = append(res, goitem)
 	}

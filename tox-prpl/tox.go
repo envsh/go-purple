@@ -49,9 +49,19 @@ func (this *ToxPlugin) destroy_tox(p *purple.Plugin) {
 	log.Println("called")
 }
 
-// protocol functions
+// protocol functions, must implemented
 func (this *ToxPlugin) tox_blist_icon() string {
 	return "gotox"
+}
+
+func (this *ToxPlugin) tox_status_types(ac *purple.Account) []*purple.StatusType {
+	stys := []*purple.StatusType{
+		purple.NewStatusType(purple.STATUS_AVAILABLE, "tox_online", "Online", true),
+		purple.NewStatusType(purple.STATUS_AWAY, "tox_away", "Away", true),
+		purple.NewStatusType(purple.STATUS_UNAVAILABLE, "tox_busy", "Busy", true),
+		purple.NewStatusType(purple.STATUS_OFFLINE, "tox_offline", "Offline", true),
+	}
+	return stys
 }
 
 var bsnodes = []string{
@@ -118,10 +128,6 @@ func (this *ToxPlugin) tox_close(gc *purple.Connection) {
 	this._toxopts = nil
 }
 
-func (this *ToxPlugin) tox_status_types() {
-	log.Println("called")
-}
-
 ////////
 func (this *ToxPlugin) itercb(d interface{}) {
 	this._tox.Iterate()
@@ -178,10 +184,11 @@ func NewToxPlugin() *ToxPlugin {
 		Destroy: this.destroy_tox,
 	}
 	ppi := purple.PluginProtocolInfo{
-		BlistIcon: this.tox_blist_icon,
-		Login:     this.tox_login,
-		Close:     this.tox_close,
-		SendIM:    this.SendIM,
+		BlistIcon:   this.tox_blist_icon,
+		Login:       this.tox_login,
+		Close:       this.tox_close,
+		StatusTypes: this.tox_status_types,
+		SendIM:      this.SendIM,
 		// group chat
 		ChatInfo:           this.ChatInfo,
 		ChatInfoDefaults:   this.ChatInfoDefaults,
@@ -195,6 +202,8 @@ func NewToxPlugin() *ToxPlugin {
 		RoomlistGetList:    this.RoomlistGetList,
 		AddBuddyWithInvite: this.AddBuddyWithInvite,
 		RemoveBuddy:        this.RemoveBuddy,
+		GetInfo:            this.GetInfo,
+		StatusText:         this.StatusText,
 	}
 	this.p = purple.NewPlugin(&pi, &ppi, this.init_tox)
 
