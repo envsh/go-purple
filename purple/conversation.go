@@ -64,6 +64,13 @@ func (this *Conversation) GetData(key string) string {
 	return C.GoString((*C.char)(data))
 }
 
+func (this *Conversation) SetLogging(logging bool) {
+	C.purple_conversation_set_logging(this.conv, go2cBool(logging))
+}
+func (this *Conversation) IsLogging() bool {
+	return c2goBool(C.purple_conversation_is_logging(this.conv))
+}
+
 func (this *ConvChat) AddUser(user string) {
 	C.purple_conv_chat_add_user(this.chat, C.CString(user), nil, 0, C.TRUE)
 }

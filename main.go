@@ -22,19 +22,21 @@ func main() {
 	log.Println("good")
 
 	pc := purple.NewPurpleCore()
-	pc.InitPurple()
+	// pc.InitPurple()
 
-	acc := pc.AccountsFind(username, "prpl-irc")
-	if acc == nil {
-		acc = purple.NewAccountCreate(username, "prpl-irc", "")
-		log.Println(acc)
-	}
-	acc.SetEnabled(true)
-	acc.Connect()
+	/*
+		acc := pc.AccountsFind(username, "prpl-irc")
+		if acc == nil {
+			acc = purple.NewAccountCreate(username, "prpl-irc", "")
+			log.Println(acc)
+		}
+		acc.SetEnabled(true)
+		acc.Connect()
+	*/
 	// pc.ToRoom(acc)
 
 	go func() {
-		pc.Loop()
+		pc.MainLoop()
 	}()
 
 	log.Println(pc)

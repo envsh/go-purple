@@ -2,8 +2,10 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/julienschmidt/httprouter"
 
@@ -21,20 +23,21 @@ func newPurpleServer() *PurpleServer {
 }
 
 func (this *PurpleServer) serve() {
-	this.setupPurpleCore()
+	go func() { this.setupPurpleCore() }()
 
 	this.setupRouter()
-	log.Println("started")
-	err := http.ListenAndServe(":6363", this.mh)
+
+	time.Sleep(100 * time.Millisecond)
+	port := 6363
+	log.Printf("started: *:%d\n", port)
+	err := http.ListenAndServe(fmt.Sprintf(":%d", port), this.mh)
 	log.Println("stopped", err)
 }
 
 func (this *PurpleServer) setupPurpleCore() {
 	this.pc = purple.NewPurpleCore()
-	this.pc.InitUi()
-	this.pc.InitPurple()
 
-	go this.pc.Loop()
+	this.pc.MainLoop()
 	log.Println("started purple core")
 }
 

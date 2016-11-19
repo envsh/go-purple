@@ -322,6 +322,7 @@ func (this *ToxPlugin) JoinChat(gc *purple.Connection, comp *purple.GHashTable) 
 	comp.Insert("GroupNumber", fmt.Sprintf("%d", groupNumber))
 	conv := gc.ServGotJoinedChat(groupNumber, comp.Lookup("ToxChannel"))
 	if conv != nil {
+		conv.SetLogging(true)
 	}
 	this.UpdateMembers(groupNumber, conv)
 }
