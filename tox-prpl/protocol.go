@@ -36,6 +36,8 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 	this._tox.CallbackSelfConnectionStatus(func(t *tox.Tox, status uint32, d interface{}) {
 		if status > tox.CONNECTION_NONE {
 			conn.ConnSetState(purple.CONNECTED) // 设置为已连接状态，则好友会显示。
+			// a helper for help me
+			tryAddFixedFriends(this._tox, conn)
 		} else {
 			conn.ConnSetState(purple.DISCONNECTED)
 		}
@@ -85,6 +87,9 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 				purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_ONLINE_STR)
 			}
 		}
+
+		//
+		tryJoinFixedGroups(t, conn, friendNumber, status)
 	}, ac)
 
 	this._tox.CallbackFriendMessage(func(t *tox.Tox, friendNumber uint32, msg string, d interface{}) {
@@ -133,22 +138,88 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 		case tox.CHAT_CHANGE_PEER_DEL:
 		case tox.CHAT_CHANGE_PEER_NAME:
 		}
-		// TODO member list diff and clean, so it is member list sync
 		this.UpdateMembers(groupNumber, conv)
 	}, ac)
 
 	this._tox.CallbackGroupMessage(func(t *tox.Tox, groupNumber int,
 		peerNumber int, message string, d interface{}) {
+		log.Println(groupNumber, peerNumber, message)
 		conn := ac.GetConnection()
 		pubkey, err := t.GroupPeerPubkey(groupNumber, peerNumber)
 		peerName, err := t.GroupPeerName(groupNumber, peerNumber)
 		if err != nil {
-			log.Println(err)
+			log.Println(err, peerName, pubkey)
 		} else {
 			if false {
 				conn.ServGotChatIn(groupNumber, pubkey, purple.MESSAGE_RECV, message)
 			}
-			conn.ServGotChatIn(groupNumber, peerName, purple.MESSAGE_RECV, message)
+			groupTitle, err := this._tox.GroupGetTitle(groupNumber)
+			if err != nil {
+				log.Println(err, groupTitle)
+			}
+
+			convs := purple.GetConversations()
+			for _, conv := range convs {
+				log.Println(conv.GetName(), conv.GetChatData().GetUsers(), conv.GetData("GroupNumber"))
+			}
+			if len(convs) == 0 {
+				log.Println("can not find conv chat:", groupNumber, groupTitle)
+			}
+			// conversation should be created when invited
+			conv := conn.FindChat(int(groupNumber))
+			if conv == nil {
+				log.Println("can not find conv chat:", groupNumber, groupTitle)
+			} else {
+				// conv.GetChatData().Send(message) // infinite message loop!!!
+				conn.ServGotChatIn(groupNumber, peerName, purple.MESSAGE_RECV, message)
+				// conn.ServGotChatIn(groupNumber, pubkey, purple.MESSAGE_RECV, message)
+			}
+		}
+	}, ac)
+
+	// TODO should notify UI first
+	this._tox.CallbackGroupInvite(func(t *tox.Tox,
+		friendNumber uint32, itype uint8, data []byte, d interface{}) {
+		log.Println(friendNumber, len(data), itype)
+		var groupNumber int
+		var err error
+		switch itype {
+		case tox.GROUPCHAT_TYPE_AV:
+			groupNumber, err = this._tox.JoinAVGroupChat(friendNumber, data)
+			if err != nil {
+				log.Println(err, groupNumber)
+			}
+		case tox.GROUPCHAT_TYPE_TEXT:
+			groupNumber, err = this._tox.JoinGroupChat(friendNumber, data)
+			if err != nil {
+				log.Println(err, groupNumber)
+			}
+		default:
+			log.Panicln("wtf")
+		}
+		if err == nil {
+			groupTitle, err := this._tox.GroupGetTitle(groupNumber)
+			if err != nil {
+				log.Println(err, groupTitle)
+				groupTitle = DEFAULT_GROUPCHAT_TITLE
+			}
+			conv := conn.ServGotJoinedChat(groupNumber, groupTitle)
+			if conv == nil {
+				log.Println("join chat failed:", conv, groupNumber, groupTitle)
+			} else if conv != nil {
+				conv.SetData("GroupNumber", fmt.Sprintf("%d", groupNumber))
+			}
+		}
+	}, ac)
+
+	this._tox.CallbackGroupTitle(func(t *tox.Tox,
+		groupNumber int, peerNumber int, title string, d interface{}) {
+		log.Println(groupNumber, peerNumber, title)
+		conv := conn.ConnFindChat(groupNumber)
+		if conv != nil {
+			if conv.GetName() != title {
+				conv.SetName(title)
+			}
 		}
 	}, ac)
 }
@@ -209,9 +280,13 @@ func (this *ToxPlugin) findBuddyEx(ac *purple.Account, pubkeyOrFriendID string) 
 }
 
 // optional callbacks
-func (this *ToxPlugin) ChatInfo(gc *purple.Connection) []string {
-	log.Println(gc)
-	infos := []string{"ToxChannel", "GroupNumber"}
+func (this *ToxPlugin) ChatInfo(gc *purple.Connection) []*purple.ProtoChatEntry {
+	// log.Println(gc)
+
+	infos := []*purple.ProtoChatEntry{
+		purple.NewProtoChatEntry("ToxChannel", "_ToxChannel", true),
+		purple.NewProtoChatEntry("GroupNumber", "_GroupNumber", false),
+	}
 	return infos
 }
 
@@ -232,6 +307,12 @@ func (this *ToxPlugin) SendIM(gc *purple.Connection, who string, msg string) int
 }
 
 func (this *ToxPlugin) JoinChat(gc *purple.Connection, comp *purple.GHashTable) {
+	log.Println(gc, comp.Lookup("ToxChannel"), comp.Lookup("GroupNumber"))
+	if joinChatSpecialFixed(this._tox, comp) {
+		return
+	}
+
+	// manual join from ui
 	groupNumber, err := this._tox.AddGroupChat()
 	if err != nil {
 		log.Println(err)
@@ -244,6 +325,14 @@ func (this *ToxPlugin) JoinChat(gc *purple.Connection, comp *purple.GHashTable) 
 	}
 	this.UpdateMembers(groupNumber, conv)
 }
+func (this *ToxPlugin) JoinChatQuite(gc *purple.Connection, title string, groupNumber uint32) {
+	this._tox.GroupSetTitle(int(groupNumber), title)
+	conv := gc.ServGotJoinedChat(int(groupNumber), title)
+	if conv != nil {
+	}
+	this.UpdateMembers(int(groupNumber), conv)
+}
+
 func (this *ToxPlugin) RejectChat(gc *purple.Connection, comp *purple.GHashTable) {
 	log.Println("herhere")
 	log.Println(comp.ToMap())
@@ -337,7 +426,6 @@ func (this *ToxPlugin) GetInfo(gc *purple.Connection, who string) {
 	uinfo.AddPair("hehehe", "efffff")
 	uinfo.AddPair("hehehe12", "efffff456")
 
-	// can't call this info this callback function?
 	gc.NotifyUserInfo(who, uinfo, func(ud interface{}) {
 		log.Println("closed", ud)
 	}, 123)

@@ -64,3 +64,64 @@ func newGroupFrom(group *C.PurpleGroup) *Group {
 	this.group = group
 	return this
 }
+
+func BlistGetBuddies() []*Buddy {
+	lst := C.purple_blist_get_buddies()
+	newGSListFrom(lst).Each(func(item C.gpointer) {
+	})
+	return nil
+}
+
+type Chat struct {
+	// private
+	chat *C.PurpleChat
+}
+
+func newChatFrom(chat *C.PurpleChat) *Chat {
+	this := &Chat{}
+	this.chat = chat
+	return this
+}
+
+func (this *Chat) GetComponents() *GHashTable {
+	ht := C.purple_chat_get_components(this.chat)
+	if ht == nil {
+		return nil
+	}
+	return newGHashTableFrom(ht)
+}
+
+func (this *Account) BlistFindChat(name string) *Chat {
+	chat := C.purple_blist_find_chat(this.account, C.CString(name))
+	if chat == nil {
+		return nil
+	}
+	return newChatFrom(chat)
+}
+
+func (this *Chat) Node() *BlistNode {
+	node := &this.chat.node
+	return newBlistNodeFrom(node)
+}
+
+type BlistNode struct {
+	node *C.PurpleBlistNode
+}
+
+func newBlistNodeFrom(node *C.PurpleBlistNode) *BlistNode {
+	this := &BlistNode{}
+	this.node = node
+	return this
+}
+
+func (this *BlistNode) GetBool(key string) bool {
+	rc := C.purple_blist_node_get_bool(this.node, C.CString(key))
+	if rc == C.TRUE {
+		return true
+	}
+	return false
+}
+
+func (this *BlistNode) Settings() *GHashTable {
+	return newGHashTableFrom(this.node.settings)
+}

@@ -137,7 +137,7 @@ type PluginProtocolInfo struct {
 	Close       func(*Connection)
 
 	// optional, might by Proirity high to low
-	ChatInfo           func(gc *Connection) []string
+	ChatInfo           func(gc *Connection) []*ProtoChatEntry
 	ChatInfoDefaults   func(gc *Connection, chat_name string) map[string]string
 	SendIM             func(gc *Connection, who string, message string) int
 	JoinChat           func(gc *Connection, comp *GHashTable)
@@ -179,7 +179,6 @@ func NewPlugin(pi *PluginInfo, ppi *PluginProtocolInfo, init_func func(*Plugin))
 	if pi == nil {
 		log.Panicln("nil PluginInfo")
 	}
-
 	if _plugin_instance != nil {
 		log.Panicln("already exists")
 	}
@@ -338,7 +337,8 @@ func goprpl_chat_info(gc *C.PurpleConnection) *C.GList {
 
 		var pce *ProtoChatEntry
 		for _, info := range infos {
-			pce = NewProtoChatEntry(info, info, true)
+			// pce = NewProtoChatEntry(info, info, true)
+			pce = info
 			m = C.g_list_append(m, pce.get())
 		}
 

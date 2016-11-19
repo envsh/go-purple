@@ -13,5 +13,6 @@ const (
 )
 
 const (
-	DEFAULT_USERNAME = "GoTox User"
+	DEFAULT_USERNAME        = "GoTox User"
+	DEFAULT_GROUPCHAT_TITLE = "GoTox GroupChat"
 )
