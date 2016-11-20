@@ -9,7 +9,7 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 
-	"yobot/purple"
+	"go-purple/purple"
 )
 
 type PurpleServer struct {

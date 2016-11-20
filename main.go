@@ -6,7 +6,7 @@ import (
 
 	"github.com/kitech/colog"
 
-	"yobot/purple"
+	"go-purple/purple"
 )
 
 var username string = "yournicknameu@irc.freenode.net"

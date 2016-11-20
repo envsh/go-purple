@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"yobot/purple"
+	"go-purple/purple"
 
 	"github.com/kitech/go-toxcore"
 )

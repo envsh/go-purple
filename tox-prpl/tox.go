@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"time"
 
-	"yobot/purple"
+	"go-purple/purple"
 
 	"github.com/kitech/colog"
 	"github.com/kitech/go-toxcore"

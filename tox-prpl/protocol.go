@@ -8,7 +8,7 @@ import (
 	"log"
 	"strings"
 
-	"yobot/purple"
+	"go-purple/purple"
 
 	"github.com/kitech/go-toxcore"
 )
