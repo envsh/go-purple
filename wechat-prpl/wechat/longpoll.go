@@ -17,13 +17,7 @@ import (
 	"github.com/levigross/grequests"
 )
 
-type longPoll struct {
-	eqch     chan<- *Event
-	rses     *grequests.Session
-	rops     *grequests.RequestOptions
-	reqState int
-
-	//
+type pollState struct {
 	qruuid  string
 	qrpic   []byte
 	logined bool
@@ -45,6 +39,19 @@ type longPoll struct {
 	wxSKey           string
 	wxInitRawData    string
 	wxContactRawData string
+}
+
+// 用于保持连接和接收消息，
+// 如果要发送消息，需要在登陆成功后在另外的线程使用该rses发送请求。
+// 需要考虑的是发送请求是否需要队列，还是并发的呢？
+type longPoll struct {
+	eqch     chan<- *Event
+	rses     *grequests.Session
+	rops     *grequests.RequestOptions
+	reqState int
+
+	//
+	state pollState
 
 	// persistent
 	cookies []*http.Cookie
@@ -53,7 +60,7 @@ type longPoll struct {
 func newLongPoll(eqch chan<- *Event) *longPoll {
 	this := &longPoll{}
 	this.eqch = eqch
-	this.wxdevid = "e669767113868187"
+	this.state.wxdevid = "e669767113868187"
 	this.rses = grequests.NewSession(nil)
 	this.rops = &grequests.RequestOptions{}
 	this.rops.Headers = map[string]string{
@@ -90,10 +97,19 @@ const (
 
 // blocked
 func (this *longPoll) run() {
+	if this.cookies != nil {
+		log.Println("check cookies validation...")
+		if !this.checkLoadedCookiesByPingOrNoop() {
+			log.Println("cookies invalid clean up...")
+			this.resetState()
+		}
+	}
+
 	log.Println("polling...")
 	stopped := false
 	if this.cookies != nil {
 		this.reqState = REQ_SYNC_CHECK
+		this.reqState = REQ_CONTACT
 	} else {
 		this.reqState = REQ_LOGIN
 	}
@@ -117,6 +133,7 @@ func (this *longPoll) run() {
 		case REQ_WEB_SYNC:
 			this.webSync()
 		case REQ_END:
+			this.eqch <- newEvent(EVT_LOGOUT, []string{})
 			stopped = true
 		}
 	}
@@ -127,7 +144,6 @@ func (this *longPoll) run() {
 func parseuuid(str string) (code int, uuid string) {
 	exp := regexp.MustCompile(`window.QRLogin.code = (\d+); window.QRLogin.uuid = "([\w\-=]+)";`)
 	mats := exp.FindAllStringSubmatch(str, -1)
-	log.Println(mats, exp.MatchString(str))
 	if len(mats) > 0 {
 		code, _ = strconv.Atoi(mats[0][1])
 		uuid = mats[0][2]
@@ -142,6 +158,9 @@ func (this *longPoll) saveContent(name string, bcc []byte, resp *grequests.Respo
 	}
 }
 
+var cookies_file = "./cookies.json"
+
+// TODO 检测加载的状态数据是否还能够使用
 func (this *longPoll) loadCookies() {
 	sck, err := ioutil.ReadFile("cookies.txt")
 	if err != nil {
@@ -156,13 +175,13 @@ func (this *longPoll) loadCookies() {
 				log.Println("Invalid json node")
 				return
 			}
-			this.qruuid = jck.Get("qruuid").MustString()
-			this.wxSKey = jck.Get("wxskey").MustString()
-			this.wxPassTicket = jck.Get("pass_ticket").MustString()
-			this.redirUrl = jck.Get("redir_url").MustString()
-			this.urlBase = jck.Get("urlBase").MustString()
-			this.pushUrlBase = jck.Get("pushUrlBase").MustString()
-			this.wxSyncKey = jck.Get("SyncKey")
+			this.state.qruuid = jck.Get("qruuid").MustString()
+			this.state.wxSKey = jck.Get("wxskey").MustString()
+			this.state.wxPassTicket = jck.Get("pass_ticket").MustString()
+			this.state.redirUrl = jck.Get("redir_url").MustString()
+			this.state.urlBase = jck.Get("urlBase").MustString()
+			this.state.pushUrlBase = jck.Get("pushUrlBase").MustString()
+			this.state.wxSyncKey = jck.Get("SyncKey")
 
 			this.cookies = make([]*http.Cookie, 0)
 			for idx, _ := range ckarr {
@@ -177,15 +196,15 @@ func (this *longPoll) loadCookies() {
 					log.Println(idx, hck)
 					this.cookies = append(this.cookies, hck)
 					if hck.Name == "wxuin" {
-						this.wxuin = hck.Value
+						this.state.wxuin = hck.Value
 					} else if hck.Name == "wxsid" {
-						this.wxsid = hck.Value
+						this.state.wxsid = hck.Value
 					} else if hck.Name == "webwx_data_ticket" {
-						this.wxDataTicket = hck.Value
+						this.state.wxDataTicket = hck.Value
 					} else if hck.Name == "webwxuvid" {
-						this.wxuvid = hck.Value
+						this.state.wxuvid = hck.Value
 					} else if hck.Name == "webwx_auth_ticket" {
-						this.wxAuthTicket = hck.Value
+						this.state.wxAuthTicket = hck.Value
 					}
 				}
 			}
@@ -213,7 +232,7 @@ func (this *longPoll) saveCookies(resp *grequests.Response) {
 	}
 
 	if len(resp.RawResponse.Cookies()) > 0 {
-		// 合并cookies：解释，添加
+		// 合并cookies：先解析旧数据，再添加到新数据上
 		ckarr := jck.Get("cookies").MustArray()
 		cookies := make([]*http.Cookie, 0)
 		for idx, _ := range ckarr {
@@ -239,13 +258,13 @@ func (this *longPoll) saveCookies(resp *grequests.Response) {
 		}
 		jck.Set("cookies", newcookies)
 	}
-	jck.Set("qruuid", this.qruuid)
-	jck.Set("wxskey", this.wxSKey)
-	jck.Set("pass_ticket", this.wxPassTicket)
-	jck.Set("redir_url", this.redirUrl)
-	jck.Set("urlBase", this.urlBase)
-	jck.Set("pushUrlBase", this.pushUrlBase)
-	jck.Set("SyncKey", this.wxSyncKey)
+	jck.Set("qruuid", this.state.qruuid)
+	jck.Set("wxskey", this.state.wxSKey)
+	jck.Set("pass_ticket", this.state.wxPassTicket)
+	jck.Set("redir_url", this.state.redirUrl)
+	jck.Set("urlBase", this.state.urlBase)
+	jck.Set("pushUrlBase", this.state.pushUrlBase)
+	jck.Set("SyncKey", this.state.wxSyncKey)
 
 	sck, err := jck.Encode()
 	if err != nil {
@@ -257,7 +276,23 @@ func (this *longPoll) saveCookies(resp *grequests.Response) {
 	}
 }
 
+// 清除状态数据，从扫码开始登陆
+func (this *longPoll) resetState() {
+	this.cookies = nil
+	this.state = pollState{}
+}
+
 var ips = strings.Split("101.226.76.164 101.227.160.102 140.206.160.161 140.207.135.104 117.135.169.34 117.144.242.33 203.205.151.221", " ")
+
+// 在加载完数据，做其他操作之前尝试一下是否cookie过期。
+// 还需要找一个有效的请求，要求请求速度快，并且需要cookie的。
+func (this *longPoll) checkLoadedCookiesByPingOrNoop() bool {
+	this.webSync()
+	if this.reqState == REQ_END {
+		return false
+	}
+	return true
+}
 
 func (this *longPoll) jslogin() {
 	url := "https://login.weixin.qq.com/jslogin?appid=wx782c26e4c19acffb&redirect_uri=https%3A%2F%2Fwx2.qq.com%2Fcgi-bin%2Fmmwebwx-bin%2Fwebwxnewloginpage&fun=new&lang=en_US"
@@ -268,7 +303,7 @@ func (this *longPoll) jslogin() {
 	}
 	log.Println(resp.StatusCode, resp.Header, resp.Ok)
 	bcc := resp.Bytes()
-	this.saveContent("jslogin.html", bcc, resp, url)
+	this.saveContent("jslogin.json", bcc, resp, url)
 	defer resp.Close()
 
 	// # parse hcc: window.QRLogin.code = 200; window.QRLogin.uuid = "gYmgd1grLg==";
@@ -277,7 +312,7 @@ func (this *longPoll) jslogin() {
 		log.Println(resp.String())
 		this.reqState = REQ_END
 	} else {
-		this.qruuid = uuid
+		this.state.qruuid = uuid
 		this.reqState = REQ_QRCODE
 		// this.saveCookies(resp)
 		this.eqch <- newEvent(EVT_GOT_UUID, []string{uuid})
@@ -287,7 +322,7 @@ func (this *longPoll) jslogin() {
 
 func (this *longPoll) getqrcode() {
 	nsurl := "https://login.weixin.qq.com/qrcode/4ZYgra8RHw=="
-	nsurl = "https://login.weixin.qq.com/qrcode/" + this.qruuid
+	nsurl = "https://login.weixin.qq.com/qrcode/" + this.state.qruuid
 	log.Println(nsurl)
 
 	resp, err := this.rses.Get(nsurl, this.rops)
@@ -298,7 +333,7 @@ func (this *longPoll) getqrcode() {
 	bcc := resp.Bytes()
 	this.saveContent("qrcode.jpg", bcc, resp, nsurl)
 	defer resp.Close()
-	this.qrpic = bcc
+	this.state.qrpic = bcc
 
 	if !resp.Ok {
 		this.reqState = REQ_END
@@ -328,7 +363,7 @@ func (this *longPoll) pollScan() {
 	nsurl := "https://login.weixin.qq.com/cgi-bin/mmwebwx-bin/login?loginicon=true&uuid=4eDUw9zdPg==&tip=0&r=-1166218796"
 	// # v2 url: https://login.weixin.qq.com/cgi-bin/mmwebwx-bin/login?loginicon=true&uuid=gfNC8TeiPg==&tip=1&r=-1222670084&lang=en_US
 	nsurl = fmt.Sprintf("https://login.weixin.qq.com/cgi-bin/mmwebwx-bin/login?loginicon=true&uuid=%s&tip=0&r=%d&lang=en_US&_=%d",
-		this.qruuid, this.nowTime(), this.nowTime())
+		this.state.qruuid, this.nowTime(), this.nowTime())
 	log.Println(nsurl)
 
 	resp, err := this.rses.Get(nsurl, this.rops)
@@ -337,7 +372,7 @@ func (this *longPoll) pollScan() {
 	}
 	log.Println(resp.StatusCode, resp.Ok, resp.Header, resp.String())
 	bcc := resp.Bytes()
-	this.saveContent("pollscan.html", bcc, resp, nsurl)
+	this.saveContent("pollscan.json", bcc, resp, nsurl)
 	defer resp.Close()
 
 	if !resp.Ok {
@@ -361,8 +396,8 @@ func (this *longPoll) pollScan() {
 		case 201:
 			time.Sleep(2 * time.Second)
 		case 200:
-			this.logined = true
-			this.redirUrl = strings.Split(resp.String(), "\"")[1]
+			this.state.logined = true
+			this.state.redirUrl = strings.Split(resp.String(), "\"")[1]
 			this.reqState = REQ_REDIR_LOGIN
 		default:
 			log.Println("not impled", code)
@@ -370,7 +405,7 @@ func (this *longPoll) pollScan() {
 		}
 
 		// this.saveCookies(resp)
-		this.eqch <- newEvent(EVT_GOT_QRCODE, []string{fmt.Sprintf("%d", code)})
+		this.eqch <- newEvent(EVT_SCAN_DATA, []string{resp.String()})
 
 	}
 
@@ -388,18 +423,18 @@ func parseTicket(str string) (ret int, skey string, wxsid string,
 		wxuin = mats[0][4]
 		pass_ticket = mats[0][5]
 	}
-	log.Println(mats)
+
 	return
 }
 
 func (this *longPoll) redirLogin() {
-	nsurl := this.redirUrl + "&fun=new&version=v2"
+	nsurl := this.state.redirUrl + "&fun=new&version=v2"
 	if strings.Contains(nsurl, "wx.qq.com") {
-		this.urlBase = "https://wx.qq.com"
-		this.pushUrlBase = "https://webpush.weixin.qq.com"
+		this.state.urlBase = "https://wx.qq.com"
+		this.state.pushUrlBase = "https://webpush.weixin.qq.com"
 	} else {
-		this.urlBase = "https://wx2.qq.com"
-		this.pushUrlBase = "https://webpush2.weixin.qq.com"
+		this.state.urlBase = "https://wx2.qq.com"
+		this.state.pushUrlBase = "https://webpush2.weixin.qq.com"
 	}
 	log.Println(nsurl)
 
@@ -420,7 +455,7 @@ func (this *longPoll) redirLogin() {
 			# <error><ret>0</ret><message>OK</message><skey>@crypt_3ea2fe08_723d1e1bd7b4171657b58c6d2849b367</skey><wxsid>9qxNHGgi9VP4/Tx6</wxsid><wxuin>979270107</wxuin><pass_ticket>%2BEdqKi12tfvM8ZZTdNeh4GLO9LFfwKLQRpqWk8LRYVWFkDE6%2FZJJXurz79ARX%2FIT</pass_ticket><isgrayscale>1</isgrayscale></error>
 		*/
 		var ret int = -1
-		ret, this.wxSKey, this.wxsid, this.wxuin, this.wxPassTicket =
+		ret, this.state.wxSKey, this.state.wxsid, this.state.wxuin, this.state.wxPassTicket =
 			parseTicket(resp.String())
 		if ret != 0 {
 			log.Println("failed")
@@ -443,7 +478,7 @@ func (this *longPoll) wxInit() {
 	// (self.nowTime() - 3600 * 24 * 30, self.wxPassTicket)
 	// qDebug(nsurl)
 	nsurl := fmt.Sprintf("%s/cgi-bin/mmwebwx-bin/webwxinit?r=%d&lang=en_US&pass_ticket=%s",
-		this.urlBase, time.Now().Unix()-3600*24*30, this.wxPassTicket)
+		this.state.urlBase, time.Now().Unix()-3600*24*30, this.state.wxPassTicket)
 
 	/*
 		post_data = '{"BaseRequest":{"Uin":"%s","Sid":"%s","Skey":"","DeviceID":"%s"}}' % \
@@ -453,7 +488,7 @@ func (this *longPoll) wxInit() {
 	*/
 
 	postData := fmt.Sprintf(`{"BaseRequest":{"Uin":"%s","Sid":"%s","Skey":"","DeviceID":"%s"}}`,
-		this.wxuin, this.wxsid, this.wxdevid)
+		this.state.wxuin, this.state.wxsid, this.state.wxdevid)
 	this.rops.JSON = postData
 
 	resp, err := this.rses.Post(nsurl, this.rops)
@@ -463,7 +498,7 @@ func (this *longPoll) wxInit() {
 	}
 	log.Println(resp.StatusCode, resp.Header, resp.Ok)
 	bcc := resp.Bytes()
-	this.saveContent("wxinit.html", bcc, resp, nsurl)
+	this.saveContent("wxinit.json", bcc, resp, nsurl)
 	defer resp.Close()
 
 	if !resp.Ok {
@@ -479,15 +514,17 @@ func (this *longPoll) wxInit() {
 			case 1101:
 				this.reqState = REQ_END
 			default:
-				this.wxSyncKey = jcc.Get("SyncKey")
-				this.wxSKeyOld = this.wxSKey
-				this.wxSKey = jcc.Get("SKey").MustString()
-				if this.wxSKey != this.wxSKeyOld {
-					log.Println("SKey updated:", this.wxSKeyOld, this.wxSKey)
+				this.state.wxSyncKey = jcc.Get("SyncKey")
+				this.state.wxSKeyOld = this.state.wxSKey
+				this.state.wxSKey = jcc.Get("SKey").MustString()
+				if this.state.wxSKey != this.state.wxSKeyOld {
+					log.Println("SKey updated:", this.state.wxSKeyOld, this.state.wxSKey)
 				}
-				this.wxInitRawData = resp.String()
+				this.state.wxInitRawData = resp.String()
 				this.reqState = REQ_SYNC_CHECK
+				this.reqState = REQ_CONTACT
 				this.saveCookies(resp)
+				this.eqch <- newEvent(EVT_GOT_BASEINFO, []string{resp.String()})
 			}
 		}
 	}
@@ -499,7 +536,7 @@ func (this *longPoll) getContact() {
 	// nsurl = 'https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxgetcontact?r=1377482079876'
 	// #nsurl = 'https://wx2.qq.com/cgi-bin/mmwebwx-bin/webwxgetcontact?r='
 	// nsurl = self.urlBase + '/cgi-bin/mmwebwx-bin/webwxgetcontact?r='
-	nsurl := fmt.Sprintf("%s/cgi-bin/mmwebwx-bin/webwxgetcontact?r=", this.urlBase)
+	nsurl := fmt.Sprintf("%s/cgi-bin/mmwebwx-bin/webwxgetcontact?r=", this.state.urlBase)
 
 	/*
 		post_data = '{}'
@@ -514,9 +551,9 @@ func (this *longPoll) getContact() {
 	if err != nil {
 		log.Println(err, nsurl)
 	}
-	log.Println(resp.StatusCode, resp.Header, resp.Ok)
+	log.Println(resp.StatusCode, resp.Header, resp.Ok, len(resp.Bytes()))
 	bcc := resp.Bytes()
-	this.saveContent("wxcontact.html", bcc, resp, nsurl)
+	this.saveContent("wxcontact.json", bcc, resp, nsurl)
 	defer resp.Close()
 
 	if !resp.Ok {
@@ -533,9 +570,10 @@ func (this *longPoll) getContact() {
 			case 1101:
 				this.reqState = REQ_END
 			default:
-				this.wxContactRawData = resp.String()
+				this.state.wxContactRawData = resp.String()
 				this.reqState = REQ_SYNC_CHECK
 				// this.saveCookies(resp)
+				this.eqch <- newEvent(EVT_GOT_CONTACT, []string{resp.String()})
 			}
 		}
 	}
@@ -553,12 +591,12 @@ func (this *longPoll) packSyncKey() string {
 		syncKey = '%7C'.join(syncKey)   # [] => str''
 	*/
 
-	count := this.wxSyncKey.Get("Count").MustInt()
+	count := this.state.wxSyncKey.Get("Count").MustInt()
 	log.Println("count:", count)
 	skarr := make([]string, 0)
 	for idx := 0; idx < count; idx++ {
-		key := this.wxSyncKey.Get("List").GetIndex(idx).Get("Key").MustInt()
-		val := this.wxSyncKey.Get("List").GetIndex(idx).Get("Val").MustInt()
+		key := this.state.wxSyncKey.Get("List").GetIndex(idx).Get("Key").MustInt()
+		val := this.state.wxSyncKey.Get("List").GetIndex(idx).Get("Val").MustInt()
 		skarr = append(skarr, fmt.Sprintf("%d_%d", key, val))
 	}
 	return strings.Join(skarr, "%7C")
@@ -580,35 +618,35 @@ func parsesynccheck(str string) (code int, selector int) {
 
 func (this *longPoll) dumpState() {
 
-	log.Println("qruuid		 ", this.qruuid)
-	log.Println("qrpic		 ", len(this.qrpic))
-	log.Println("logined	 ", this.logined)
-	log.Println("redirUrl	 ", this.redirUrl)
-	log.Println("urlBase	 ", this.urlBase)
-	log.Println("pushUrlBase ", this.pushUrlBase)
-	log.Println("wxdevid	 ", this.wxdevid)
-	log.Println("wxuin		 ", this.wxuin)
-	log.Println("wxsid		 ", this.wxsid)
-	log.Println("wxDataTicket", this.wxDataTicket)
-	log.Println("wxSKeyOld	 ", this.wxSKeyOld)
-	log.Println("wxPassTicket", this.wxPassTicket)
-	log.Println("wxuvid		 ", this.wxuvid)
-	log.Println("wxAuthTicket", this.wxAuthTicket)
-	log.Println("wxSyncKey	 ", this.wxSyncKey)
-	log.Println("wxSKey		 ", this.wxSKey)
-	log.Println("wxInitRawData  ", len(this.wxInitRawData))
-	log.Println("wxContactRawData", len(this.wxContactRawData))
+	log.Println("qruuid		 ", this.state.qruuid)
+	log.Println("qrpic		 ", len(this.state.qrpic))
+	log.Println("logined	 ", this.state.logined)
+	log.Println("redirUrl	 ", this.state.redirUrl)
+	log.Println("urlBase	 ", this.state.urlBase)
+	log.Println("pushUrlBase ", this.state.pushUrlBase)
+	log.Println("wxdevid	 ", this.state.wxdevid)
+	log.Println("wxuin		 ", this.state.wxuin)
+	log.Println("wxsid		 ", this.state.wxsid)
+	log.Println("wxDataTicket", this.state.wxDataTicket)
+	log.Println("wxSKeyOld	 ", this.state.wxSKeyOld)
+	log.Println("wxPassTicket", this.state.wxPassTicket)
+	log.Println("wxuvid		 ", this.state.wxuvid)
+	log.Println("wxAuthTicket", this.state.wxAuthTicket)
+	log.Println("wxSyncKey	 ", this.state.wxSyncKey)
+	log.Println("wxSKey		 ", this.state.wxSKey)
+	log.Println("wxInitRawData  ", len(this.state.wxInitRawData))
+	log.Println("wxContactRawData", len(this.state.wxContactRawData))
 
 }
 
 func (this *longPoll) syncCheck() {
 	syncKey := this.packSyncKey()
-	skey := strings.Replace(this.wxSKey, "@", "%40", -1)
-	log.Println(this.wxSKey, "=>", skey)
-	pass_ticket := strings.Replace(this.wxPassTicket, "%", "%25", -1)
+	skey := strings.Replace(this.state.wxSKey, "@", "%40", -1)
+	log.Println(this.state.wxSKey, "=>", skey)
+	pass_ticket := strings.Replace(this.state.wxPassTicket, "%", "%25", -1)
 	nsurl := fmt.Sprintf("%s/cgi-bin/mmwebwx-bin/synccheck?r=%d&skey=%s&sid=%s&uin=%s&deviceid=%s&synckey=%s&lang=en_US&pass_ticket=%s",
-		this.pushUrlBase, this.nowTime(), skey, this.wxsid, this.wxuin,
-		this.wxdevid, syncKey, pass_ticket)
+		this.state.pushUrlBase, this.nowTime(), skey, this.state.wxsid, this.state.wxuin,
+		this.state.wxdevid, syncKey, pass_ticket)
 	log.Println("requesting...", nsurl)
 
 	resp, err := this.rses.Get(nsurl, this.rops)
@@ -617,7 +655,7 @@ func (this *longPoll) syncCheck() {
 	}
 	log.Println(resp.StatusCode, resp.Header, resp.Ok)
 	bcc := resp.Bytes()
-	this.saveContent("synccheck.html", bcc, resp, nsurl)
+	this.saveContent("synccheck.json", bcc, resp, nsurl)
 	defer resp.Close()
 
 	if !resp.Ok {
@@ -660,18 +698,18 @@ func (this *longPoll) syncCheck() {
 }
 
 func (this *longPoll) webSync() {
-	skey := strings.Replace(this.wxSKey, "@", "%40", -1)
-	log.Println(this.wxSKey, "=>", skey)
-	pass_ticket := strings.Replace(this.wxPassTicket, "%", "%25", -1)
-	nsurl := fmt.Sprintf("%s/cgi-bin/mmwebwx-bin/webwxsync?sid=%s&skey=%s&lang=en_US&pass_ticket=%s", this.urlBase, this.wxsid, skey, pass_ticket)
+	skey := strings.Replace(this.state.wxSKey, "@", "%40", -1)
+	log.Println(this.state.wxSKey, "=>", skey)
+	pass_ticket := strings.Replace(this.state.wxPassTicket, "%", "%25", -1)
+	nsurl := fmt.Sprintf("%s/cgi-bin/mmwebwx-bin/webwxsync?sid=%s&skey=%s&lang=en_US&pass_ticket=%s", this.state.urlBase, this.state.wxsid, skey, pass_ticket)
 	BaseRequest := map[string]string{
-		"Uin":      this.wxuin,
-		"Sid":      this.wxsid,
-		"SKey":     this.wxSKey,
-		"DeviceID": this.wxdevid}
+		"Uin":      this.state.wxuin,
+		"Sid":      this.state.wxsid,
+		"SKey":     this.state.wxSKey,
+		"DeviceID": this.state.wxdevid}
 	post_data_obj := simplejson.New()
 	post_data_obj.Set("BaseRequest", BaseRequest)
-	post_data_obj.Set("SyncKey", this.wxSyncKey)
+	post_data_obj.Set("SyncKey", this.state.wxSyncKey)
 	post_data_obj.Set("rr", this.nowTime())
 
 	post_data_bin, err := post_data_obj.Encode()
@@ -688,9 +726,9 @@ func (this *longPoll) webSync() {
 	if err != nil {
 		log.Println(err, nsurl)
 	}
-	log.Println(resp.StatusCode, resp.Header, resp.Ok)
+	log.Println(resp.StatusCode, resp.Header, resp.Ok, len(resp.Bytes()))
 	bcc := resp.Bytes()
-	this.saveContent("websync.html", bcc, resp, nsurl)
+	this.saveContent("websync.json", bcc, resp, nsurl)
 	defer resp.Close()
 
 	if !resp.Ok {
@@ -706,7 +744,7 @@ func (this *longPoll) webSync() {
 				this.reqState = REQ_END
 			} else {
 				// update SyncKey and SKey
-				this.wxSyncKey = jcc.Get("SyncKey")
+				this.state.wxSyncKey = jcc.Get("SyncKey")
 
 				// check data
 				ret := jcc.GetPath("BaseResponse", "Ret").MustInt()
@@ -726,6 +764,8 @@ func (this *longPoll) webSync() {
 				}
 			}
 		}
+
+		this.eqch <- newEvent(EVT_GOT_MESSAGE, []string{resp.String()})
 	}
 
 }
