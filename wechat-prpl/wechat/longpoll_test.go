@@ -1,6 +1,7 @@
 package wechat
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"log"
 	"testing"
@@ -19,6 +20,8 @@ func TestParser(t *testing.T) {
 		if code != 200 || len(uuid) == 0 {
 			t.Error(code, uuid)
 		}
+		(&Parser{}).parseUUID("")
+
 	})
 	t.Run("ticket", func(t *testing.T) {
 		str := `<error><ret>0</ret><message>OK</message><skey>@crypt_3ea2fe08_723d1e1bd7b4171657b58c6d2849b367</skey><wxsid>9qxNHGgi9VP4/Tx6</wxsid><wxuin>979270107</wxuin><pass_ticket>%2BEdqKi12tfvM8ZZTdNeh4GLO9LFfwKLQRpqWk8LRYVWFkDE6%2FZJJXurz79ARX%2FIT</pass_ticket><isgrayscale>1</isgrayscale></error>`
@@ -41,23 +44,38 @@ func TestParser(t *testing.T) {
 		EVT_GOT_QRCODE.String()
 	})
 	t.Run("parse init data", func(t *testing.T) {
-		bcc, err := ioutil.ReadFile("wxinit_fmt.json")
-		if err != nil {
-			log.Println(err)
-		}
+		bcc, _ := ioutil.ReadFile("wxinit_fmt.json")
 		users := parseWXInitData(string(bcc))
 		if users == nil {
 			t.Error("invalid init data")
 		}
 	})
 	t.Run("parse contact data", func(t *testing.T) {
-		bcc, err := ioutil.ReadFile("wxcontact_fmt.json")
-		if err != nil {
-			log.Println(err)
-		}
+		bcc, _ := ioutil.ReadFile("wxcontact_fmt.json")
 		users := parseContactData(string(bcc))
 		if users == nil {
 			t.Error("invalid init data")
+		}
+	})
+	t.Run("parse contact data", func(t *testing.T) {
+		bcc, _ := ioutil.ReadFile("websync_fmt.json")
+		msgs := parseMessages(string(bcc))
+		if msgs == nil {
+			t.Error("invalid messages data")
+		}
+	})
+	t.Run("st2go", func(t *testing.T) {
+		ps := &pollState{}
+		ps.Logined = true
+		ps.WxSKey = "skey值"
+		ps.Qruuid = "awfeaewf="
+
+		dat, _ := json.Marshal(ps)
+
+		ps2 := &pollState{}
+		err := json.Unmarshal(dat, ps2)
+		if ps2.WxSKey != ps.WxSKey {
+			t.Error(ps, ps2, err)
 		}
 	})
 }

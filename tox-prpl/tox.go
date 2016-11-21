@@ -34,6 +34,8 @@ func (this *ToxPlugin) init_tox(p *purple.Plugin) {
 
 }
 
+// should malloc some resource for use?
+// and what resource here allocated is acceptable
 func (this *ToxPlugin) load_tox(p *purple.Plugin) bool {
 	log.Println("called")
 	rand.Seed(time.Now().UnixNano())

@@ -29,34 +29,11 @@ func parseMessage(msgo *simplejson.Json) *Message {
 	msg.MsgType = msgo.Get("MsgType").MustInt()
 	msg.Content = msgo.Get("Content").MustString()
 	msg.CreateTime = msgo.Get("CreateTime").MustUint64()
+
 	return msg
 }
 
 func parseMessages(data string) (msgs []*Message) {
-	jso, err := simplejson.NewJson([]byte(data))
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	retv := jso.GetPath("BaseResponse", "Ret").MustInt()
-	if retv != 0 {
-		log.Println("Invalid resonse:", retv)
-		return
-	}
-
-	cntv := jso.GetPath("AddMsgCount").MustInt()
-	log.Println("parsering msgs:", cntv)
-	msgs = make([]*Message, cntv)
-	for idx := 0; idx < cntv; idx++ {
-		msgo := jso.Get("AddMsgList").GetIndex(idx)
-		m := parseMessage(msgo)
-		msgs[idx] = m
-	}
-
-	return
-}
-
-func parseMessages2(data string) (msgs []*Message) {
 	p := NewParser(data)
 	if !p.RetOK() {
 		return

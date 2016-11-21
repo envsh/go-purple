@@ -1,6 +1,8 @@
 package wechat
 
-import ()
+import (
+	"fmt"
+)
 
 type EVT_TYPE int
 
@@ -8,13 +10,18 @@ type EVT_TYPE int
 const (
 	EVT_NONE EVT_TYPE = iota
 	EVT_GOT_UUID
-	EVT_GOT_QRCODE
-	EVT_SCAN_DATA
+	EVT_GOT_QRCODE // TODO 存储成链接，再发送一次事件。这样客户端的选择更多样了
+	EVT_GOT_QRLINK // 存储QRCODE数据的http资源
+	EVT_SCANED_DATA
 	EVT_REDIR_URL
 	EVT_LOGIN_STATUS
 	EVT_GOT_BASEINFO
 	EVT_GOT_CONTACT
-	EVT_GOT_MESSAGE
+	EVT_RAW_MESSAGE // 原始消息，没有解析
+	EVT_GOT_MESSAGE // 格式化的消息，一条原始消息可能触发多少
+	EVT_NEW_MPARTICLE
+	EVT_NEW_SUBSCRIBE
+	EVT_FRIEND_REQUEST
 	EVT_LOGOUT
 )
 
@@ -26,8 +33,8 @@ func (this EVT_TYPE) String() (s string) {
 		s = "EVT_GOT_UUID"
 	case EVT_GOT_QRCODE:
 		s = "EVT_GOT_QRCODE"
-	case EVT_SCAN_DATA:
-		s = "EVT_SCAN_DATA"
+	case EVT_SCANED_DATA:
+		s = "EVT_SCANED_DATA"
 	case EVT_REDIR_URL:
 		s = "EVT_REDIR_URL"
 	case EVT_LOGIN_STATUS:
@@ -40,6 +47,8 @@ func (this EVT_TYPE) String() (s string) {
 		s = "EVT_GOT_MESSAGE"
 	case EVT_LOGOUT:
 		s = "EVT_LOGOUT"
+	default:
+		s = fmt.Sprintf("EVT_%d?", this)
 	}
 	return
 }
@@ -50,7 +59,7 @@ type Event struct {
 	Args  []string
 }
 
-func newEvent(evt EVT_TYPE, args []string) *Event {
+func newEvent(evt EVT_TYPE, args ...string) *Event {
 	this := &Event{}
 	this.Type = evt
 	this.Args = args

@@ -13,8 +13,6 @@ import "C"
 
 // import "unsafe"
 
-import ()
-
 func PluginsFindWithName(name string) *Plugin {
 	plugin := C.purple_plugins_find_with_name(C.CString(name))
 	return newPluginFrom(plugin)
