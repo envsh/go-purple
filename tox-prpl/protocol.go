@@ -177,38 +177,57 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 		}
 	}, ac)
 
-	// TODO should notify UI first
+	// TODO should notify UI first and think groupbot's invite also
 	this._tox.CallbackGroupInvite(func(t *tox.Tox,
 		friendNumber uint32, itype uint8, data []byte, d interface{}) {
 		log.Println(friendNumber, len(data), itype)
-		var groupNumber int
-		var err error
-		switch itype {
-		case tox.GROUPCHAT_TYPE_AV:
-			groupNumber, err = this._tox.JoinAVGroupChat(friendNumber, data)
-			if err != nil {
-				log.Println(err, groupNumber)
-			}
-		case tox.GROUPCHAT_TYPE_TEXT:
-			groupNumber, err = this._tox.JoinGroupChat(friendNumber, data)
-			if err != nil {
-				log.Println(err, groupNumber)
-			}
-		default:
-			log.Panicln("wtf")
+		pubkey, err := this._tox.FriendGetPublicKey(friendNumber)
+		if err != nil {
+			log.Println(err)
 		}
-		if err == nil {
-			groupTitle, err := this._tox.GroupGetTitle(groupNumber)
+		acceptInvite := func(interface{}) {
+			var groupNumber int
+			var err error
+			switch itype {
+			case tox.GROUPCHAT_TYPE_AV:
+				groupNumber, err = this._tox.JoinAVGroupChat(friendNumber, data)
+				if err != nil {
+					log.Println(err, groupNumber)
+				}
+			case tox.GROUPCHAT_TYPE_TEXT:
+				groupNumber, err = this._tox.JoinGroupChat(friendNumber, data)
+				if err != nil {
+					log.Println(err, groupNumber)
+				}
+			default:
+				log.Panicln("wtf")
+			}
+			if err == nil {
+				groupTitle, err := this._tox.GroupGetTitle(groupNumber)
+				if err != nil {
+					log.Println(err, groupTitle)
+					groupTitle = DEFAULT_GROUPCHAT_TITLE
+				}
+				conv := conn.ServGotJoinedChat(groupNumber, groupTitle)
+				if conv == nil {
+					log.Println("join chat failed:", conv, groupNumber, groupTitle)
+				} else if conv != nil {
+					conv.SetData("GroupNumber", fmt.Sprintf("%d", groupNumber))
+					conv.SetLogging(true)
+				}
+			}
+		}
+		if strings.HasPrefix(groupbot, pubkey) {
+			// go on without notify UI
+			acceptInvite(nil)
+		} else {
+			friendName, err := this._tox.FriendGetName(friendNumber)
 			if err != nil {
-				log.Println(err, groupTitle)
-				groupTitle = DEFAULT_GROUPCHAT_TITLE
+				log.Println("wtf")
 			}
-			conv := conn.ServGotJoinedChat(groupNumber, groupTitle)
-			if conv == nil {
-				log.Println("join chat failed:", conv, groupNumber, groupTitle)
-			} else if conv != nil {
-				conv.SetData("GroupNumber", fmt.Sprintf("%d", groupNumber))
-			}
+			purple.RequestAcceptCancel(nil, conn, "New Group Invite",
+				fmt.Sprintf("Are you want to join %s's group?", friendName),
+				acceptInvite, nil)
 		}
 	}, ac)
 
@@ -334,10 +353,13 @@ func (this *ToxPlugin) JoinChatQuite(gc *purple.Connection, title string, groupN
 	this.UpdateMembers(int(groupNumber), conv)
 }
 
+// TODO what?
 func (this *ToxPlugin) RejectChat(gc *purple.Connection, comp *purple.GHashTable) {
 	log.Println("herhere")
 	log.Println(comp.ToMap())
 }
+
+// TODO what?
 func (this *ToxPlugin) GetChatName(comp *purple.GHashTable) string {
 	log.Println("herhere")
 	log.Println(comp.ToMap())
@@ -434,12 +456,34 @@ func (this *ToxPlugin) GetInfo(gc *purple.Connection, who string) {
 
 func (this *ToxPlugin) StatusText(buddy *purple.Buddy) string {
 	who := buddy.GetName()
+	if this._tox == nil {
+		log.Println("already closed tox instance")
+		// return ""
+	}
 	friendNumber, err := this._tox.FriendByPublicKey(who)
 	if err != nil {
 		log.Println(err, friendNumber, who)
 	}
 	friendStmsg, err := this._tox.FriendGetStatusMessage(friendNumber)
 	return friendStmsg
+}
+
+func (this *ToxPlugin) SetChatTopic(gc *purple.Connection, id int, topic string) {
+	n, err := this._tox.GroupSetTitle(id, topic)
+	if err != nil {
+		log.Println(err, n)
+	} else {
+		conv := gc.ConnFindChat(id)
+		if conv != nil {
+			if conv.GetName() != topic {
+				conv.SetName(topic)
+			}
+		}
+	}
+}
+
+func (this *ToxPlugin) Normalize(gc *purple.Connection, who string) string {
+	return strings.ToUpper(who)
 }
 
 // utils

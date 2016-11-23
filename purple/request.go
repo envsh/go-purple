@@ -132,9 +132,13 @@ func gopurple_request_action_cb(userData *C.char, choice C.int) {
 
 	if req, ok := requests[userData]; ok {
 		if choice == 0 {
-			req.nocb(req.userData)
+			if req.nocb != nil {
+				req.nocb(req.userData)
+			}
 		} else {
-			req.yescb(req.userData)
+			if req.yescb != nil {
+				req.yescb(req.userData)
+			}
 		}
 	} else {
 		log.Println("wtf", userData, uint64(*userData))

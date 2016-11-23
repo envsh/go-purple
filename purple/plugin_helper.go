@@ -45,13 +45,28 @@ extern void goprpl_rem_permit(PurpleConnection *gc, char *name);
 extern void goprpl_rem_deny(PurpleConnection *gc, char *name);
 extern void goprpl_get_info(PurpleConnection *gc, char *name);
 extern char* goprpl_status_text(PurpleBuddy *buddy);
+extern void goprpl_set_chat_topic(PurpleConnection *gc, int id, char *topic);
+extern char* goprpl_normalize(PurpleConnection *gc, char *who);
+// not tested
+extern char* goprpl_list_emblem(PurpleBuddy *buddy);
+extern void goprpl_tooltip_text(PurpleBuddy *buddy, PurpleNotifyUserInfo *userInfo, gboolean full);
+extern guint goprpl_send_typing(PurpleConnection *gc, char *name, PurpleTypingState state);
+extern void goprpl_keepalive(PurpleConnection *gc);
+extern void goprpl_register_user(PurpleAccount *ac);
+// UnregisterUser func(ac *Account, cb PurpleAccountUnregistrationCb, ...)
+extern gboolean goprpl_offline_message(PurpleBuddy *buddy);
+extern gint goprpl_send_raw(PurpleConnection *gc, char* buf, int len);
+// RoomlistRoomSerialize func(room *RoomlistRoom) string
+extern gboolean goprpl_send_attention(PurpleConnection *gc, char *userName, guint atype);
+extern GList* goprpl_get_attension_types(PurpleAccount *ac);
+
 
 static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pppi) {
     pi->load = goprpl_plugin_load;
     pi->unload = goprpl_plugin_unload;
     pi->destroy = goprpl_plugin_destroy;
 
-    //
+    // TODO can not set call unconditionally. should check the PRPL's real setting
     pi->extra_info = pppi;
     // pppi->icon_spec = NO_BUDDY_ICONS;
     PurpleBuddyIconSpec ispec = {0};
@@ -80,6 +95,20 @@ static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pp
     pppi->rem_deny = goprpl_rem_deny;
     pppi->get_info = goprpl_get_info;
     pppi->status_text = goprpl_status_text;
+    pppi->set_chat_topic = goprpl_set_chat_topic;
+    pppi->normalize = goprpl_normalize;
+    // not tested
+    pppi->list_emblem = goprpl_list_emblem;
+    pppi->tooltip_text = goprpl_tooltip_text;
+    pppi->send_typing = goprpl_send_typing;
+    pppi->keepalive = goprpl_send_typing;
+    pppi->register_user = goprpl_register_user;
+    // UnregisterUser func(ac *Account, cb PurpleAccountUnregistrationCb, ...)
+    pppi->offline_message = goprpl_offline_message;
+    pppi->send_raw = goprpl_send_raw;
+    // RoomlistRoomSerialize func(room *RoomlistRoom) string
+    pppi->send_attention = goprpl_send_attention;
+    pppi->get_attention_types = goprpl_get_attension_types;
     // TODO fix compile warnings
 }
 
@@ -156,6 +185,20 @@ type PluginProtocolInfo struct {
 	RemDeny            func(gc *Connection, name string)
 	GetInfo            func(gc *Connection, name string)
 	StatusText         func(*Buddy) string
+	SetChatTopic       func(gc *Connection, id int, topic string)
+	Normalize          func(gc *Connection, who string) string
+	// not tested
+	ListEmblem   func(buddy *Buddy) string
+	TooltipText  func(buddy *Buddy, userInfo *NotifyUserInfo, full bool)
+	SendTyping   func(gc *Connection, name string, state int) uint
+	KeepAlive    func(gc *Connection)
+	RegisterUser func(ac *Account)
+	// UnregisterUser func(ac *Account, cb PurpleAccountUnregistrationCb, ...)
+	OfflineMessage func(buddy *Buddy) bool
+	SendRaw        func(gc *Connection, buf string, len int) int
+	// RoomlistRoomSerialize func(room *RoomlistRoom) string
+	SendAttention     func(gc *Connection, userName string, atype uint) bool
+	GetAttentionTypes func(ac *Account) *GList
 
 	// private
 	ppi   *C.PurplePluginProtocolInfo
@@ -510,6 +553,113 @@ func goprpl_status_text(buddy *C.PurpleBuddy) *C.char {
 	if this.ppi.StatusText != nil {
 		stxt := this.ppi.StatusText(newBuddyFrom(buddy))
 		return C.CString(stxt)
+	}
+	return nil
+}
+
+//export goprpl_set_chat_topic
+func goprpl_set_chat_topic(gc *C.PurpleConnection, id C.int, topic *C.char) {
+	var this = _plugin_instance
+	if this.ppi.SetChatTopic != nil {
+		this.ppi.SetChatTopic(newConnectionFrom(gc), int(id), C.GoString(topic))
+	}
+}
+
+//export goprpl_normalize
+func goprpl_normalize(gc *C.PurpleConnection, who *C.char) *C.char {
+	var this = _plugin_instance
+	if this.ppi.Normalize != nil {
+		norm := this.ppi.Normalize(newConnectionFrom(gc), C.GoString(who))
+		return C.CString(norm)
+	}
+	return nil
+}
+
+//export goprpl_list_emblem
+func goprpl_list_emblem(buddy *C.PurpleBuddy) *C.char {
+	var this = _plugin_instance
+	if this.ppi.ListEmblem != nil {
+		emblem := this.ppi.ListEmblem(newBuddyFrom(buddy))
+		return C.CString(emblem)
+	}
+	return nil
+}
+
+//export goprpl_tooltip_text
+func goprpl_tooltip_text(buddy *C.PurpleBuddy, userInfo *C.PurpleNotifyUserInfo, full C.gboolean) {
+	var this = _plugin_instance
+	if this.ppi.TooltipText != nil {
+		/*
+			this.ppi.TooltipText(newBuddyFrom(buddy),
+				newNotifyUserInfoFrom(userInfo), c2goBool(full))
+		*/
+	}
+}
+
+//export goprpl_send_typing
+func goprpl_send_typing(gc *C.PurpleConnection, name *C.char, state C.PurpleTypingState) C.guint {
+	var this = _plugin_instance
+	if this.ppi.SendTyping != nil {
+		ret := this.ppi.SendTyping(newConnectionFrom(gc), C.GoString(name), int(state))
+		return C.guint(ret)
+	}
+	return C.guint(0)
+}
+
+//export goprpl_keepalive
+func goprpl_keepalive(gc *C.PurpleConnection) {
+	var this = _plugin_instance
+	if this.ppi.KeepAlive != nil {
+		this.ppi.KeepAlive(newConnectionFrom(gc))
+	}
+}
+
+//export goprpl_register_user
+func goprpl_register_user(ac *C.PurpleAccount) {
+	var this = _plugin_instance
+	if this.ppi.RegisterUser != nil {
+		this.ppi.RegisterUser(newAccountFrom(ac))
+	}
+}
+
+// UnregisterUser func(ac *Account, cb PurpleAccountUnregistrationCb, ...)
+//export goprpl_offline_message
+func goprpl_offline_message(buddy *C.PurpleBuddy) C.gboolean {
+	var this = _plugin_instance
+	if this.ppi.OfflineMessage != nil {
+		ret := this.ppi.OfflineMessage(newBuddyFrom(buddy))
+		return go2cBool(ret)
+	}
+	return C.FALSE
+}
+
+//export goprpl_send_raw
+func goprpl_send_raw(gc *C.PurpleConnection, buf *C.char, len C.int) C.int {
+	var this = _plugin_instance
+	if this.ppi.SendRaw != nil {
+		ret := this.ppi.SendRaw(newConnectionFrom(gc), C.GoString(buf), int(len))
+		return C.int(ret)
+	}
+	return C.int(0)
+}
+
+// RoomlistRoomSerialize func(room *RoomlistRoom) string
+//export goprpl_send_attention
+func goprpl_send_attention(gc *C.PurpleConnection, userName *C.char, atype C.guint) C.gboolean {
+	var this = _plugin_instance
+	if this.ppi.SendAttention != nil {
+		ret := this.ppi.SendAttention(newConnectionFrom(gc), C.GoString(userName), uint(atype))
+		return go2cBool(ret)
+	}
+	return C.FALSE
+}
+
+//export goprpl_get_attension_types
+func goprpl_get_attension_types(ac *C.PurpleAccount) *C.GList {
+	var this = _plugin_instance
+	if this.ppi.GetAttentionTypes != nil {
+		ret := this.ppi.GetAttentionTypes(newAccountFrom(ac))
+		return ret.lst
 	}
 	return nil
 }

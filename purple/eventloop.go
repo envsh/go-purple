@@ -43,6 +43,7 @@ func timer_timeout_callback(d C.int) C.int {
 var timers = make(map[int]*Timer, 0)
 var timer_seq int = 0
 
+// interval is milliseconds
 func TimeoutAdd(interval int, d interface{}, f func(interface{})) int {
 	t := &Timer{d: d, f: f}
 	timer_seq = timer_seq + 1
@@ -62,4 +63,15 @@ func TimeoutRemove(h int) bool {
 	}
 	delete(timers, h)
 	return true
+}
+
+// interval is seconds
+func TimeoutAddSeconds(interval int, d interface{}, f func(interface{})) int {
+	t := &Timer{d: d, f: f}
+	timer_seq = timer_seq + 1
+	timers[timer_seq] = t
+	h := C.gopurple_timeout_add(C.int(interval*1000), C.int(timer_seq))
+	t.h = uint(h)
+
+	return timer_seq
 }

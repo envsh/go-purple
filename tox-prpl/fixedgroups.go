@@ -57,16 +57,14 @@ func tryJoinFixedGroups(t *tox.Tox, gc *purple.Connection, friendNumber uint32, 
 	if err != nil {
 	}
 	if !strings.HasPrefix(groupbot, pubkey) {
-		// t.FriendSendMessage(friendNumber, "help")
-		// t.FriendSendMessage(friendNumber, "info")
-
-		// t.FriendSendMessage(friendNumber, "invite 5")
 		return
 	}
 
-	fixed := map[string]string{"#tox-toxmytest-helper": "invite 5",
-		"#tox-toxen-helper": "invite 0",
-		"#tox-toxcn-helper": "invite 2"}
+	fixed := map[string]string{
+		"#tox-toxen-helper":     "invite 0",
+		"#tox-toxcn-helper":     "invite 2",
+		"#tox-toxmytest-helper": "invite 5",
+	}
 	for name, handler := range fixed {
 		chat := gc.ConnGetAccount().BlistFindChat(name)
 		if chat == nil {

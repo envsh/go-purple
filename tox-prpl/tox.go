@@ -123,8 +123,13 @@ func (this *ToxPlugin) tox_login(ac *purple.Account) {
 
 func (this *ToxPlugin) tox_close(gc *purple.Connection) {
 	// this.stopch <- struct{}{}
-	purple.TimeoutRemove(this.iterTimerHandler)
+	ok := purple.TimeoutRemove(this.iterTimerHandler)
+	if !ok {
+		log.Println("rm timer failed")
+	}
 	this.save_account(gc)
+	// TODO might have pending callback???
+	this.ppi.StatusText = nil
 	this._tox.Kill()
 	this._tox = nil
 	this._toxopts = nil
@@ -206,7 +211,11 @@ func NewToxPlugin() *ToxPlugin {
 		RemoveBuddy:        this.RemoveBuddy,
 		GetInfo:            this.GetInfo,
 		StatusText:         this.StatusText,
+		SetChatTopic:       this.SetChatTopic,
+		Normalize:          this.Normalize,
 	}
+	this.pi = &pi
+	this.ppi = &ppi
 	this.p = purple.NewPlugin(&pi, &ppi, this.init_tox)
 
 	return this
