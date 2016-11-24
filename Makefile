@@ -1,6 +1,5 @@
 all:
 	go install -v go-purple/purple
-	go build -v
 
 tox:
 	go build -v -buildmode=c-shared -o libtox.so  ./tox-prpl
@@ -26,3 +25,6 @@ wxi:
 wxl:
 	go build -v ./wechat-prpl/wechat
 	go install -v ./wechat-prpl/wechat
+
+bot:
+	go build -v -o yobot.bin go-purple/yobot/

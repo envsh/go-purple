@@ -240,6 +240,7 @@ func (this *Plugin) convertInfo() {
 	this.cppi.major_version = C.PURPLE_MAJOR_VERSION
 	this.cppi.minor_version = C.PURPLE_MINOR_VERSION
 
+	// because type is golang's keyword, shit
 	C._set_plugin_type(this.cppi)
 
 	this.cppi.id = C.CString(this.pi.Id)
@@ -249,13 +250,129 @@ func (this *Plugin) convertInfo() {
 	this.cppi.description = C.CString(this.pi.Description)
 	this.cppi.author = C.CString(this.pi.Author)
 
+	// this will set all without check
 	C._set_plugin_funcs(this.cppi, this.cpppi)
+	// this will check and unset nil callback functions
+	this._unset_plugin_funcs()
 
 	// protocol info
 	this.cppi.extra_info = unsafe.Pointer(this.cpppi)
 	this.cpppi.options = C.OPT_PROTO_CHAT_TOPIC | C.OPT_PROTO_PASSWORD_OPTIONAL |
 		C.OPT_PROTO_INVITE_MESSAGE
 	this.cpppi.struct_size = C.sizeof_PurplePluginProtocolInfo
+}
+
+// this will check and unset nil callback functions
+func (this *Plugin) _unset_plugin_funcs() {
+	// must
+	if this.ppi.BlistIcon == nil {
+		this.cpppi.list_icon = nil
+	}
+	if this.ppi.StatusTypes == nil {
+		this.cpppi.status_types = nil
+	}
+	if this.ppi.Login == nil {
+		this.cpppi.login = nil
+	}
+	if this.ppi.Close == nil {
+		this.cpppi.close = nil
+	}
+
+	// optional, might by Proirity high to low
+	if this.ppi.ChatInfo == nil {
+		this.cpppi.chat_info = nil
+	}
+	if this.ppi.ChatInfoDefaults == nil {
+		this.cpppi.chat_info_defaults = nil
+	}
+	if this.ppi.SendIM == nil {
+		this.cpppi.send_im = nil
+	}
+	if this.ppi.JoinChat == nil {
+		this.cpppi.join_chat = nil
+	}
+	if this.ppi.RejectChat == nil {
+		this.cpppi.reject_chat = nil
+	}
+	if this.ppi.GetChatName == nil {
+		this.cpppi.get_chat_name = nil
+	}
+	if this.ppi.ChatInvite == nil {
+		this.cpppi.chat_invite = nil
+	}
+	if this.ppi.ChatLeave == nil {
+		this.cpppi.chat_leave = nil
+	}
+	if this.ppi.ChatWhisper == nil {
+		this.cpppi.chat_whisper = nil
+	}
+	if this.ppi.ChatSend == nil {
+		this.cpppi.chat_send = nil
+	}
+	if this.ppi.RoomlistGetList == nil {
+		this.cpppi.roomlist_get_list = nil
+	}
+	if this.ppi.AddBuddyWithInvite == nil {
+		this.cpppi.add_buddy_with_invite = nil
+	}
+	if this.ppi.RemoveBuddy == nil {
+		this.cpppi.remove_buddy = nil
+	}
+	if this.ppi.AddPermit == nil {
+		this.cpppi.add_permit = nil
+	}
+	if this.ppi.AddDeny == nil {
+		this.cpppi.add_deny = nil
+	}
+	if this.ppi.RemPermit == nil {
+		this.cpppi.rem_permit = nil
+	}
+	if this.ppi.RemDeny == nil {
+		this.cpppi.rem_deny = nil
+	}
+	if this.ppi.GetInfo == nil {
+		this.cpppi.get_info = nil
+	}
+	if this.ppi.StatusText == nil {
+		this.cpppi.status_text = nil
+	}
+	if this.ppi.SetChatTopic == nil {
+		this.cpppi.set_chat_topic = nil
+	}
+	if this.ppi.Normalize == nil {
+		this.cpppi.normalize = nil
+	}
+	// not tested
+	if this.ppi.ListEmblem == nil {
+		this.cpppi.list_emblem = nil
+	}
+	if this.ppi.TooltipText == nil {
+		this.cpppi.tooltip_text = nil
+	}
+	if this.ppi.SendTyping == nil {
+		this.cpppi.send_typing = nil
+	}
+	if this.ppi.KeepAlive == nil {
+		this.cpppi.keepalive = nil
+	}
+	if this.ppi.RegisterUser == nil {
+		this.cpppi.register_user = nil
+	}
+	// UnregisterUser func(ac *Account, cb PurpleAccountUnregistrationCb, ...)
+	if this.ppi.OfflineMessage == nil {
+		this.cpppi.offline_message = nil
+	}
+	if this.ppi.SendRaw == nil {
+		this.cpppi.send_raw = nil
+	}
+	// RoomlistRoomSerialize func(room *RoomlistRoom) string
+	if this.ppi.SendAttention == nil {
+		this.cpppi.send_attention = nil
+	}
+	if this.ppi.GetAttentionTypes == nil {
+		this.cpppi.get_attention_types = nil
+	}
+
 }
 
 func newPluginInfoFrom(plugInfo *C.PurplePluginInfo) *PluginInfo {
@@ -281,6 +398,26 @@ func newPluginFrom(plug *C.PurplePlugin) *Plugin {
 func newPluginProtocolInfoFrom(protoInfo *C.PurplePluginProtocolInfo) *PluginProtocolInfo {
 	this := &PluginProtocolInfo{fromc: true, ppi: protoInfo}
 	return this
+}
+
+var _plugin_instance *Plugin = nil
+
+// when call go's init() and purple's purple_init_plugin
+//export purple_init_plugin
+func purple_init_plugin(plugin *C.PurplePlugin) C.gboolean {
+	log.Println(plugin, MyTid2())
+	runtime.LockOSThread()
+
+	// _plugin_instance = NewPlugin()
+	if _plugin_instance == nil {
+		log.Panicln("failed")
+	}
+	plugin.info = _plugin_instance.cppi
+
+	_plugin_instance.init(plugin)
+	// var init_func = init_plugin
+	// init_func(plugin)
+	return C.purple_plugin_register(plugin)
 }
 
 // callbacks/events
@@ -662,24 +799,4 @@ func goprpl_get_attension_types(ac *C.PurpleAccount) *C.GList {
 		return ret.lst
 	}
 	return nil
-}
-
-var _plugin_instance *Plugin = nil
-
-// when call go's init() and purple's purple_init_plugin
-//export purple_init_plugin
-func purple_init_plugin(plugin *C.PurplePlugin) C.gboolean {
-	log.Println(plugin, MyTid2())
-	runtime.LockOSThread()
-
-	// _plugin_instance = NewPlugin()
-	if _plugin_instance == nil {
-		log.Panicln("failed")
-	}
-	plugin.info = _plugin_instance.cppi
-
-	_plugin_instance.init(plugin)
-	// var init_func = init_plugin
-	// init_func(plugin)
-	return C.purple_plugin_register(plugin)
 }

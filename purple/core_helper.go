@@ -45,7 +45,7 @@ type PurpleCore struct {
 
 func NewPurpleCore() *PurpleCore {
 	this := &PurpleCore{}
-
+	this.setupCore()
 	return this
 }
 
@@ -90,12 +90,16 @@ func (this *PurpleCore) initLibpurple() {
 	C.purple_pounces_load()
 }
 
-func (this *PurpleCore) MainLoop() {
+// 在这个setup之后，才能够调用purple函数。
+func (this *PurpleCore) setupCore() {
 	this.loop = C.g_main_loop_new(nil, C.FALSE)
 
 	this.initUiOps()
 
 	this.initLibpurple()
+}
+
+func (this *PurpleCore) MainLoop() {
 
 	log.Println("hhhh")
 	go func() { C.g_main_loop_run(this.loop) }()

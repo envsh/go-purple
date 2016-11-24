@@ -1,13 +1,33 @@
-yobot 关于IM的bot。
 
-## Features
-* irc 连接
-* title bot
-* tox 连接
-* irc <=> tox 互通
-* 更多 IM 互通
+libpurple's go/golang binding. Now can write pidgin plugin with go/golang.
 
-## Tech
-也许嵌入python脚本来做逻辑
-也许使用独立的python脚本做逻辑
+The go-purple wrapper libpurple API in go/golang. And supplies an OO style API. 
 
+Now implement most API function for write new IM protocol and simple client.
+
+### Install
+
+    go get -u github.com/kitech/go-purple/purple
+    
+### examples
+
+    import "github.com/kitech/go-purple/purple"
+
+### sub projects
+
+* purple the main binding project
+* purpled might be a purple daemon with a web ui interface
+* tox-prpl tox protocol implement with go-purple
+* wechat-prpl wechat web protocol implement with go-purple
+* yobot an IM robot that relay messages between different protocols, and build on go-purple.
+
+### Notes
+
+* using dbus path different as default pidgin
+* using profile directory different as default profile
+
+### TODOs
+
+[ ] full libpurple support
+[ ] improve memory management, avoid memory leaks.
+[ ] add documents.

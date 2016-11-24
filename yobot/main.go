@@ -4,7 +4,7 @@ import (
 	"flag"
 	"log"
 
-	"purple"
+	"go-purple/purple"
 )
 
 var username string = "yournicknameu@irc.freenode.net"
@@ -17,18 +17,13 @@ func main() {
 	flag.Parse()
 
 	pc := purple.NewPurpleCore()
-	pc.InitPurple()
 	acc := pc.AccountsFind(username, "prpl-irc")
 	if acc == nil {
 		acc = purple.NewAccountCreate(username, "prpl-irc", "")
 		log.Println(acc)
 	}
-	purple.TmpCore = pc
-	purple.TmpAccount = acc
 	acc.SetEnabled(true)
 	acc.Connect()
-	// pc.ToRoom(acc)
 
-	pc.Loop()
-	// purple.F_core_init("abcdefg")
+	pc.MainLoop()
 }
