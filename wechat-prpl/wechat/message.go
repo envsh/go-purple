@@ -21,7 +21,16 @@ type Message struct {
 	NewMsgId     uint64 // == uint64(MsgId)
 }
 
-func parseMessage(msgo *simplejson.Json) *Message {
+func ParseMessage(msg string) *Message {
+	jso, err := simplejson.NewJson([]byte(msg))
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+	return parseMessageJson(jso)
+}
+
+func parseMessageJson(msgo *simplejson.Json) *Message {
 	msg := &Message{}
 	msg.MsgId = msgo.Get("MsgId").MustString()
 	msg.FromUserName = msgo.Get("FromUserName").MustString()
@@ -41,7 +50,7 @@ func parseMessages(data string) (msgs []*Message) {
 
 	msgs = make([]*Message, 0)
 	p.Each("AddMsg", func(itemo *simplejson.Json) {
-		m := parseMessage(itemo)
+		m := parseMessageJson(itemo)
 		msgs = append(msgs, m)
 	})
 	log.Println("parsed msgs:", len(msgs))

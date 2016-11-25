@@ -14,8 +14,8 @@ func newBuddyFrom(buddy *C.PurpleBuddy) *Buddy {
 	return this
 }
 
-func NewBuddy(a *Account, name string, alias string) *Buddy {
-	buddy := C.purple_buddy_new(a.account, C.CString(name), C.CString(alias))
+func NewBuddy(ac *Account, name string, alias string) *Buddy {
+	buddy := C.purple_buddy_new(ac.account, C.CString(name), C.CString(alias))
 	this := &Buddy{}
 	this.buddy = buddy
 	return this
@@ -121,7 +121,27 @@ func (this *BlistNode) GetBool(key string) bool {
 	}
 	return false
 }
+func (this *BlistNode) SetBool(key string, value bool) {
+	C.purple_blist_node_set_bool(this.node, C.CString(key), go2cBool(value))
+}
+
+func (this *BlistNode) GetString(key string) string {
+	s := C.purple_blist_node_get_string(this.node, C.CString(key))
+	return C.GoString(s)
+}
+func (this *BlistNode) SetString(key, value string) {
+	C.purple_blist_node_set_string(this.node, C.CString(key), C.CString(value))
+}
 
 func (this *BlistNode) Settings() *GHashTable {
 	return newGHashTableFrom(this.node.settings)
+}
+
+func (this *BlistNode) SetFlags(flags int) {
+	C.purple_blist_node_set_flags(this.node, C.PurpleBlistNodeFlags(flags))
+}
+func (this *BlistNode) GetFlags() (flags int) {
+	cflags := C.purple_blist_node_get_flags(this.node)
+	flags = int(cflags)
+	return
 }

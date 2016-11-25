@@ -30,6 +30,9 @@ func NewWechat() *Wechat {
 // 200ms
 // 客户端设置的回调函数会在Iterate线程内被调用
 func (this *Wechat) Iterate(userData interface{}) {
+	if this.OnEvent == nil {
+		log.Panicln("can not nil event handler: Wechat.OnEvent")
+	}
 	// 非阻塞读取chan，一次处理所有事件
 	hasEvent := true
 	for hasEvent {
@@ -44,6 +47,9 @@ func (this *Wechat) Iterate(userData interface{}) {
 			break
 		}
 	}
+}
+
+func (this *Wechat) Kill() {
 }
 
 func init() {

@@ -72,8 +72,10 @@ func newLongPoll(eqch chan<- *Event) *longPoll {
 		"Referer": "https://wx2.qq.com/?lang=en_US",
 	}
 	this.rops.UserAgent = UserAgent
-	// TODO 这个设置好像没有生效吗？
-	this.rops.RequestTimeout = 5 * time.Second
+	this.rops.IsAjax = true
+	// TODO 这个设置好像没有生效吗？好象并不生效
+	// 坑了，request.go:211行，这个参数只对ro.JSON等有附加数据的方法有效，对GET方法无效。
+	// this.rops.RequestTimeout = 5 * time.Second
 
 	this.loadCookies()
 	if this.cookies != nil {
@@ -115,6 +117,8 @@ func (this *longPoll) run() {
 	if this.cookies != nil {
 		this.reqState = REQ_SYNC_CHECK
 		this.reqState = REQ_CONTACT
+		this.eqch <- newEvent(EVT_GOT_BASEINFO, this.state.WxInitRawData)
+		this.eqch <- newEvent(EVT_LOGIN_STATUS, "true")
 	} else {
 		this.reqState = REQ_LOGIN
 	}
@@ -133,6 +137,7 @@ func (this *longPoll) run() {
 			this.wxInit()
 		case REQ_CONTACT:
 			this.getContact()
+			this.reqState = REQ_SYNC_CHECK
 		case REQ_SYNC_CHECK:
 			this.syncCheck()
 		case REQ_WEB_SYNC:
@@ -277,7 +282,8 @@ func (this *longPoll) saveCookies(resp *grequests.Response) {
 	if err != nil {
 		log.Println(err)
 	} else {
-		log.Println(string(sck))
+		// log.Println(string(sck))
+		log.Println(len(sck), string(sck)[0:78])
 		sck, err = jck.EncodePretty()
 		this.saveContent("cookies.txt", sck, nil, "")
 	}
@@ -364,6 +370,10 @@ func parsescan(str string) (code int) {
 		code, _ = strconv.Atoi(mats[0][1])
 	}
 	return
+}
+
+func (this *longPoll) timeoutRetryRequest() {
+
 }
 
 func (this *longPoll) pollScan() {
@@ -486,6 +496,7 @@ func (this *longPoll) wxInit() {
 	// qDebug(nsurl)
 	nsurl := fmt.Sprintf("%s/cgi-bin/mmwebwx-bin/webwxinit?r=%d&lang=en_US&pass_ticket=%s",
 		this.state.UrlBase, time.Now().Unix()-3600*24*30, this.state.WxPassTicket)
+	log.Println(nsurl)
 
 	/*
 		post_data = '{"BaseRequest":{"Uin":"%s","Sid":"%s","Skey":"","DeviceID":"%s"}}' % \
@@ -528,33 +539,82 @@ func (this *longPoll) wxInit() {
 					log.Println("SKey updated:", this.state.WxSKeyOld, this.state.WxSKey)
 				}
 				this.state.WxInitRawData = resp.String()
+				// TODO 确定这两者的顺序
 				this.reqState = REQ_SYNC_CHECK
 				this.reqState = REQ_CONTACT
 				this.saveCookies(resp)
 				this.eqch <- newEvent(EVT_GOT_BASEINFO, resp.String())
+				this.eqch <- newEvent(EVT_LOGIN_STATUS, "true")
 			}
 		}
 	}
 
 }
 
+// TODO 改成状态机无关请求
 func (this *longPoll) getContact() {
+	fns := []func() (resp *grequests.Response, err error){
+		this.getContactGet, this.getContactGetUrlEncoded,
+		this.getContactPost, this.getContactPostUrlEncoded,
+	}
+	for idx, fn := range fns {
+		resp, err := fn()
+		nsurl := resp.RawResponse.Request.URL.String()
+		if err != nil {
+			log.Println(err, nsurl)
+		}
 
+		defer resp.Close()
+		log.Println(resp.StatusCode, resp.Header, resp.Ok, len(resp.Bytes()))
+		bcc := resp.Bytes()
+		this.saveContent(fmt.Sprintf("wxcontact_req%d.json", idx), bcc, resp, nsurl)
+
+		if resp.Ok {
+			jcc, err := simplejson.NewJson(bcc)
+			if err != nil {
+				log.Println(err)
+			} else {
+				ret := jcc.GetPath("BaseResponse", "Ret").MustInt()
+				log.Println("ret", ret)
+				switch ret {
+				case 1101:
+				case 0:
+					this.state.WxContactRawData = resp.String()
+					this.eqch <- newEvent(EVT_GOT_CONTACT, resp.String())
+				default:
+					log.Println(ret)
+				}
+			}
+			// TODO 碰到个成功的就算了吧
+			// break
+		}
+
+	}
+}
+
+func (this *longPoll) getContactGet() (resp *grequests.Response, err error) {
+
+	// passTicket := strings.Replace(this.state.WxPassTicket, "%", "%25", -1)
+	passTicket := strings.Replace(this.state.WxPassTicket, "%", "%", -1)
+	skey := strings.Replace(this.state.WxSKey, "@", "@", -1)
 	// nsurl = 'https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxgetcontact?r=1377482079876'
 	// #nsurl = 'https://wx2.qq.com/cgi-bin/mmwebwx-bin/webwxgetcontact?r='
 	// nsurl = self.urlBase + '/cgi-bin/mmwebwx-bin/webwxgetcontact?r='
-	nsurl := fmt.Sprintf("%s/cgi-bin/mmwebwx-bin/webwxgetcontact?r=", this.state.UrlBase)
+	nsurl := fmt.Sprintf("%s/cgi-bin/mmwebwx-bin/webwxgetcontact?pass_ticket=%s&r=%d000&skey=%s&seq=0",
+		this.state.UrlBase, passTicket, this.nowTime(), skey)
+	log.Println(nsurl)
+	//问题 https://www.v2ex.com/t/302362
 
 	/*
 		post_data = '{}'
 		req = requests.Request('post', nsurl, data=post_data.encode())
 	*/
 
-	postData := fmt.Sprintf(`{}`)
-	this.rops.JSON = postData
+	resp, err = this.rses.Get(nsurl, this.rops)
+	if true {
+		return
+	}
 
-	resp, err := this.rses.Post(nsurl, this.rops)
-	this.rops.JSON = nil
 	if err != nil {
 		log.Println(err, nsurl)
 	}
@@ -563,10 +623,7 @@ func (this *longPoll) getContact() {
 	this.saveContent("wxcontact.json", bcc, resp, nsurl)
 	defer resp.Close()
 
-	if !resp.Ok {
-		this.reqState = REQ_END
-	} else {
-
+	if resp.Ok {
 		jcc, err := simplejson.NewJson(bcc)
 		if err != nil {
 			log.Println(err)
@@ -575,15 +632,56 @@ func (this *longPoll) getContact() {
 			log.Println("ret", ret)
 			switch ret {
 			case 1101:
-				this.reqState = REQ_END
-			default:
+			case 0:
 				this.state.WxContactRawData = resp.String()
-				this.reqState = REQ_SYNC_CHECK
-				// this.saveCookies(resp)
 				this.eqch <- newEvent(EVT_GOT_CONTACT, resp.String())
+			default:
+				log.Println(ret)
 			}
 		}
 	}
+	return
+}
+
+func (this *longPoll) getContactGetUrlEncoded() (resp *grequests.Response, err error) {
+	passTicket := strings.Replace(this.state.WxPassTicket, "%", "%25", -1)
+	skey := strings.Replace(this.state.WxSKey, "@", "@", -1)
+	nsurl := fmt.Sprintf("%s/cgi-bin/mmwebwx-bin/webwxgetcontact?pass_ticket=%s&r=%d000&skey=%s&seq=0",
+		this.state.UrlBase, passTicket, this.nowTime(), skey)
+	log.Println(nsurl)
+
+	resp, err = this.rses.Get(nsurl, this.rops)
+	return
+}
+
+func (this *longPoll) getContactPost() (resp *grequests.Response, err error) {
+
+	passTicket := strings.Replace(this.state.WxPassTicket, "%", "%", -1)
+	skey := strings.Replace(this.state.WxSKey, "@", "@", -1)
+	nsurl := fmt.Sprintf("%s/cgi-bin/mmwebwx-bin/webwxgetcontact?pass_ticket=%s&r=%d000&skey=%s&seq=0",
+		this.state.UrlBase, passTicket, this.nowTime(), skey)
+	log.Println(nsurl)
+
+	postData := fmt.Sprintf(`{}`)
+	this.rops.JSON = postData
+	resp, err = this.rses.Post(nsurl, this.rops)
+	this.rops.JSON = nil
+	return
+}
+
+func (this *longPoll) getContactPostUrlEncoded() (resp *grequests.Response, err error) {
+
+	passTicket := strings.Replace(this.state.WxPassTicket, "%", "%25", -1)
+	skey := strings.Replace(this.state.WxSKey, "@", "@", -1)
+	nsurl := fmt.Sprintf("%s/cgi-bin/mmwebwx-bin/webwxgetcontact?pass_ticket=%s&r=%d000&skey=%s&seq=0",
+		this.state.UrlBase, passTicket, this.nowTime(), skey)
+	log.Println(nsurl)
+
+	postData := fmt.Sprintf(`{}`)
+	this.rops.JSON = postData
+	resp, err = this.rses.Post(nsurl, this.rops)
+	this.rops.JSON = nil
+	return
 }
 
 func (this *longPoll) packSyncKey() string {
@@ -725,10 +823,13 @@ func (this *longPoll) webSync() {
 	}
 	post_data := string(post_data_bin)
 
+	this.rses.HTTPClient.Timeout = 5 * time.Second
 	this.rops.JSON = post_data
 	this.rops.Headers["Content-Type"] = "application/x-www-form-urlencoded"
 	resp, err := this.rses.Post(nsurl, this.rops)
 	this.rops.JSON = nil
+	this.rses.HTTPClient.Timeout = 0
+
 	delete(this.rops.Headers, "Content-Type")
 	if err != nil {
 		log.Println(err, nsurl)
@@ -772,7 +873,7 @@ func (this *longPoll) webSync() {
 			}
 		}
 
-		this.eqch <- newEvent(EVT_GOT_MESSAGE, resp.String())
+		this.eqch <- newEvent(EVT_RAW_MESSAGE, resp.String())
 	}
 
 }

@@ -33,6 +33,18 @@ static void gopurple_request_accept_cancel(void *handle, char *title, char *prim
 		 ac, who, conv, user_data, gopurple_request_action_cb, gopurple_request_action_cb);
 }
 
+static void gopurple_request_accept_cancel_with_icon(void *handle, char *title, char *primary,
+                                    char *secondary,
+                                    int default_action, PurpleAccount *ac, char *who,
+                                    PurpleConversation *conv,
+                                    gconstpointer icon_data, gsize icon_size,
+                                    char *user_data)
+{
+     purple_request_accept_cancel_with_icon(handle, title, primary, secondary, default_action,
+		 ac, who, conv, icon_data, icon_size, user_data,
+         gopurple_request_action_cb, gopurple_request_action_cb);
+}
+
 */
 import "C"
 import "unsafe"
@@ -59,8 +71,12 @@ func RequestYesNo(userData interface{}, gc *Connection, title, primary string,
 	req := &Request{seq: cseq, userData: userData, yescb: yescb, nocb: nocb}
 	requests[cseq] = req
 
-	handle := unsafe.Pointer(gc.conn)
-	ac := gc.ConnGetAccount()
+	var handle unsafe.Pointer
+	var ac *Account
+	if gc != nil {
+		handle = unsafe.Pointer(gc.conn)
+		ac = gc.ConnGetAccount()
+	}
 	// title := "it's title"
 	// primary := "it's primary"
 	// secondary := "it's secondary"
@@ -84,8 +100,12 @@ func RequestOkCancel(userData interface{}, gc *Connection, title, primary string
 	req := &Request{seq: cseq, userData: userData, yescb: yescb, nocb: nocb}
 	requests[cseq] = req
 
-	handle := unsafe.Pointer(gc.conn)
-	ac := gc.ConnGetAccount()
+	var handle unsafe.Pointer
+	var ac *Account
+	if gc != nil {
+		handle = unsafe.Pointer(gc.conn)
+		ac = gc.ConnGetAccount()
+	}
 	// title := "it's title"
 	// primary := "it's primary"
 	// secondary := "it's secondary"
@@ -109,8 +129,12 @@ func RequestAcceptCancel(userData interface{}, gc *Connection, title, primary st
 	req := &Request{seq: cseq, userData: userData, yescb: yescb, nocb: nocb}
 	requests[cseq] = req
 
-	handle := unsafe.Pointer(gc.conn)
-	ac := gc.ConnGetAccount()
+	var handle unsafe.Pointer
+	var ac *Account
+	if gc != nil {
+		handle = unsafe.Pointer(gc.conn)
+		ac = gc.ConnGetAccount()
+	}
 	// title := "it's title"
 	// primary := "it's primary"
 	// secondary := "it's secondary"
@@ -124,6 +148,39 @@ func RequestAcceptCancelDemo(userData interface{}, gc *Connection,
 	title := "it's title"
 	primary := "it's primary"
 	RequestAcceptCancel(userData, gc, title, primary, yescb, nocb)
+}
+
+func RequestAcceptCancelWithIcon(userData interface{}, gc *Connection, title, primary string,
+	iconData []byte,
+	yescb func(interface{}), nocb func(interface{})) {
+
+	cseq := (*C.char)(C.calloc(1, 1))
+	req := &Request{seq: cseq, userData: userData, yescb: yescb, nocb: nocb}
+	requests[cseq] = req
+
+	var handle unsafe.Pointer
+	var ac *Account
+	if gc != nil {
+		handle = unsafe.Pointer(gc.conn)
+		ac = gc.ConnGetAccount()
+	}
+	// title := "it's title"
+	// primary := "it's primary"
+	// secondary := "it's secondary"
+	default_action := 0
+	who := "who's"
+
+	cicon := (&iconData[0])
+	C.gopurple_request_accept_cancel_with_icon(handle, C.CString(title), C.CString(primary), nil,
+		C.int(default_action), ac.account, C.CString(who), nil,
+		cicon, C.gsize(len(iconData)), cseq)
+}
+func RequestAcceptCancelWithIconDemo(userData interface{}, gc *Connection,
+	iconData []byte,
+	yescb func(interface{}), nocb func(interface{})) {
+	title := "it's title"
+	primary := "it's primary\n\n\n\n\n\n\nend..."
+	RequestAcceptCancelWithIcon(userData, gc, title, primary, iconData, yescb, nocb)
 }
 
 //export gopurple_request_action_cb

@@ -31,7 +31,7 @@ func (this *User) IsGroup() bool {
 	return strings.HasPrefix(this.UserName, "@@")
 }
 
-func parseContact(contacto *simplejson.Json) *User {
+func ParseContact(contacto *simplejson.Json) *User {
 	u := &User{}
 	u.UserName = contacto.Get("UserName").MustString()
 	u.NickName = contacto.Get("NickName").MustString()
@@ -39,7 +39,7 @@ func parseContact(contacto *simplejson.Json) *User {
 
 	u.Members = make([]*User, 0)
 	NewParser2(contacto).Each("Member", func(itemo *simplejson.Json) {
-		mu := parseContact(itemo)
+		mu := ParseContact(itemo)
 		u.Members = append(u.Members, mu)
 	})
 
@@ -60,7 +60,7 @@ func parseChatSet(set *simplejson.Json) (cset []*User) {
 
 type MPArticle struct{}
 
-func parseWXInitData(data string) (users []*User) {
+func ParseWXInitData(data string) (users []*User) {
 	p := NewParser(data)
 	if !p.RetOK() {
 		return
@@ -68,7 +68,7 @@ func parseWXInitData(data string) (users []*User) {
 
 	users = make([]*User, 0)
 	p.Each("Contact", func(itemo *simplejson.Json) {
-		u := parseContact(itemo)
+		u := ParseContact(itemo)
 		users = append(users, u)
 	})
 	log.Println("parsered contacts:", len(users))
@@ -96,7 +96,7 @@ func parseWXInitData(data string) (users []*User) {
 	return
 }
 
-func parseContactData(data string) (users []*User) {
+func ParseContactData(data string) (users []*User) {
 	p := NewParser(data)
 	if !p.RetOK() {
 		return
@@ -104,7 +104,7 @@ func parseContactData(data string) (users []*User) {
 
 	users = make([]*User, 0)
 	p.Each("Member", func(itemo *simplejson.Json) {
-		u := parseContact(itemo)
+		u := ParseContact(itemo)
 		users = append(users, u)
 	})
 	log.Println("parsered members:", len(users))

@@ -43,6 +43,8 @@ func (this EVT_TYPE) String() (s string) {
 		s = "EVT_GOT_BASEINFO"
 	case EVT_GOT_CONTACT:
 		s = "EVT_GOT_CONTACT"
+	case EVT_RAW_MESSAGE:
+		s = "EVT_RAW_MESSAGE"
 	case EVT_GOT_MESSAGE:
 		s = "EVT_GOT_MESSAGE"
 	case EVT_LOGOUT:
