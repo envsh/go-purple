@@ -99,9 +99,23 @@ func (this *Account) BlistFindChat(name string) *Chat {
 	return newChatFrom(chat)
 }
 
+func (this *Account) ChatNew(alias string, components *GHashTable) *Chat {
+	chat := C.purple_chat_new(this.account, C.CString(alias), components.ht)
+	return newChatFrom(chat)
+}
+
+func (this *Chat) Destory() {
+	C.purple_chat_destroy(this.chat)
+	this.chat = nil
+}
+
 func (this *Chat) Node() *BlistNode {
 	node := &this.chat.node
 	return newBlistNodeFrom(node)
+}
+
+func (this *Chat) BlistAddChat(g *Group, node *BlistNode) {
+	C.purple_blist_add_chat(this.chat, nil, nil)
 }
 
 type BlistNode struct {
@@ -144,4 +158,41 @@ func (this *BlistNode) GetFlags() (flags int) {
 	cflags := C.purple_blist_node_get_flags(this.node)
 	flags = int(cflags)
 	return
+}
+
+type BuddyList struct {
+	// private
+	blst *C.PurpleBuddyList
+}
+
+func newBuddyListFrom(blst *C.PurpleBuddyList) *BuddyList {
+	this := &BuddyList{}
+	this.blst = blst
+	return this
+}
+
+func BlistNew() *BuddyList {
+	blst := C.purple_blist_new()
+	return newBuddyListFrom(blst)
+}
+
+func BlistSet(blst *BuddyList) {
+	C.purple_set_blist(blst.blst)
+}
+
+func BlistInit() {
+	C.purple_blist_init()
+}
+
+func BlistGet() *BuddyList {
+	blst := C.purple_get_blist()
+	return newBuddyListFrom(blst)
+}
+
+func BlistLoad() {
+	C.purple_blist_load()
+}
+
+func BlistScheduleSave() {
+	C.purple_blist_schedule_save()
 }

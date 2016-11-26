@@ -282,7 +282,7 @@ static void signed_on(PurpleConnection *gc, void *data)
 {
 	PurpleAccount *account = purple_connection_get_account(gc);
 	printf("Account connected: \"%s\" (%s)\n", purple_account_get_username(account), purple_account_get_protocol_id(account));
-    gopurple_signed_on();
+    gopurple_signed_on(gc, data);
 }
 
 static void buddy_signed_on(PurpleBuddy *buddy)

@@ -3,5 +3,6 @@
 
 #include <libpurple/purple.h>
 
+void gopurple_signed_on(PurpleConnection *gc, void *data);
 
 #endif

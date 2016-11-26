@@ -2,7 +2,9 @@ package purple
 
 /*
 #cgo pkg-config: glib-2.0 purple
-#cgo CFLAGS: -g -O0 -DHAVE_DBUS -DPURPLE_PLUGINS -DGOMAXPROCS=1
+#cgo CFLAGS: -g -O0 -DHAVE_DBUS=1 -DPURPLE_PLUGINS -DGOMAXPROCS=1
+
+#include <libpurple/purple.h>
 
 #include <unistd.h>
 #include <sys/syscall.h>

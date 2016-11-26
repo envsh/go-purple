@@ -72,3 +72,19 @@ func (this *Connection) GetPrplInfo() *PluginInfo {
 	plugin := C.purple_connection_get_prpl(this.conn)
 	return newPluginInfoFrom((*C.PurplePluginInfo)(plugin.info))
 }
+
+// error info
+type ConnectionErrorInfo struct {
+	// private
+	cei *C.PurpleConnectionErrorInfo
+}
+
+func newConnectionErrorInfoFrom(cei *C.PurpleConnectionErrorInfo) *ConnectionErrorInfo {
+	this := &ConnectionErrorInfo{}
+	this.cei = cei
+	return this
+}
+
+func (this *ConnectionErrorInfo) Get() (int, string) {
+	return 0, C.GoString(this.cei.description)
+}

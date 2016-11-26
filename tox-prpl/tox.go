@@ -109,6 +109,7 @@ func (this *ToxPlugin) tox_login(ac *purple.Account) {
 	this.setupSelfInfo(ac)
 	this.setupCallbacks(ac)
 	this.loadFriends(ac)
+	this.save_account(ac.GetConnection())
 
 	if false {
 		buddy := purple.NewBuddy(ac, "onlyyou-id", "onlyyou-nick")

@@ -1,13 +1,12 @@
 package purple
 
 /*
-// core.c encapse libpurple's core init
-
 #include <libpurple/purple.h>
 */
 import "C"
 
 type Account struct {
+	// private
 	account *C.PurpleAccount
 }
 
@@ -32,6 +31,11 @@ func NewAccountCreate(account string, protocol string, password string) *Account
 
 func NewAccount(args ...interface{}) *Account {
 	return nil
+}
+
+func (this *Account) Destroy() {
+	C.purple_account_destroy(this.account)
+	this.account = nil
 }
 
 func (this *Account) Connect() {
@@ -90,10 +94,6 @@ func (this *Account) FindBuddies(name string) []*Buddy {
 	return nil
 }
 
-func (this *Account) RequestAdd(name string) {
-	C.purple_account_request_add(this.account, C.CString(name), nil, nil, nil)
-}
-
 func (this *Account) SetEnabled(enable bool) {
 	C.purple_account_set_enabled(this.account, C.CString(UI_ID), C.TRUE)
 }
@@ -150,6 +150,54 @@ func (this *Account) SetUserInfo(userInfo string) {
 }
 func (this *Account) SetBuddyIconPath(path string) {
 	C.purple_account_set_buddy_icon_path(this.account, C.CString(path))
+}
+
+func (this *Account) GetProtocolId() string {
+	id := C.purple_account_get_protocol_id(this.account)
+	return C.GoString(id)
+}
+func (this *Account) GetProtocolName() string {
+	name := C.purple_account_get_protocol_name(this.account)
+	return C.GoString(name)
+}
+
+func (this *Account) GetLog(create bool) *Log {
+	log := C.purple_account_get_log(this.account, go2cBool(create))
+	return newLogFrom(log)
+}
+func (this *Account) DestroyLog() {
+	C.purple_account_destroy_log(this.account)
+}
+func (this *Account) GetCurrentError() *ConnectionErrorInfo {
+	return newConnectionErrorInfoFrom(C.purple_account_get_current_error(this.account))
+}
+func (this *Account) ClearCurrentError() {
+	C.purple_account_clear_current_error(this.account)
+}
+
+func (this *Account) NotifyAdded(remoteUser, id, alias, msg string) {
+	C.purple_account_notify_added(this.account, C.CString(remoteUser),
+		C.CString(id), C.CString(alias), C.CString(msg))
+}
+func (this *Account) RequestAdd(remoteUser, id, alias, msg string) {
+	C.purple_account_request_add(this.account, C.CString(remoteUser),
+		C.CString(id), C.CString(alias), C.CString(msg))
+}
+func (this *Account) RequestCloseWithAccount() {
+	C.purple_account_request_close_with_account(this.account)
+}
+
+func (this *Account) SetProtocolId(protocolId string) {
+	C.purple_account_set_protocol_id(this.account, C.CString(protocolId))
+}
+func (this *Account) SetConnection(gc *Connection) {
+	C.purple_account_set_connection(this.account, gc.conn)
+}
+func (this *Account) SetRememberPassword(value bool) {
+	C.purple_account_set_remember_password(this.account, go2cBool(value))
+}
+func (this *Account) SetCheckMail(value bool) {
+	C.purple_account_set_check_mail(this.account, go2cBool(value))
 }
 
 // accounts

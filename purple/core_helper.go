@@ -5,10 +5,11 @@ package purple
 #include <libpurple/purple.h>
 
 extern PurpleEventLoopUiOps *gopurple_get_loopops();
+extern void gopurple_connect_to_signals(void);
 */
 import "C"
 
-// import "unsafe"
+import "unsafe"
 
 import (
 	"flag"
@@ -65,10 +66,11 @@ func (this *PurpleCore) initCoreOps() {
 }
 
 func (this *PurpleCore) initLibpurple() {
-
-	home := fmt.Sprintf("%s/%s", os.Getenv("HOME"), CUSTOM_USER_DIRECTORY)
-	C.purple_util_set_user_dir(C.CString(home))
-	C.purple_debug_set_enabled(C.FALSE)
+	if false {
+		home := fmt.Sprintf("%s/%s", os.Getenv("HOME"), CUSTOM_USER_DIRECTORY)
+		C.purple_util_set_user_dir(C.CString(home))
+		C.purple_debug_set_enabled(C.FALSE)
+	}
 
 	// this.initCoreOps()
 	C.purple_core_set_ui_ops(&this.coreUiOps)
@@ -88,6 +90,9 @@ func (this *PurpleCore) initLibpurple() {
 	C.purple_prefs_load()
 	C.purple_plugins_load_saved(C.CString(PLUGIN_SAVE_PREF))
 	C.purple_pounces_load()
+
+	//
+	C.gopurple_connect_to_signals()
 }
 
 // 在这个setup之后，才能够调用purple函数。
@@ -132,9 +137,15 @@ func gopurple_network_disconnected() { log.Println("hehhe") }
 //export gopurple_report_disconnect_reason
 func gopurple_report_disconnect_reason() { log.Println("hehhe") }
 
+// TODO nice way
+var SignedOn func(*Connection)
+
 //export gopurple_signed_on
-func gopurple_signed_on() {
-	log.Println("hehhe")
+func gopurple_signed_on(gc *C.PurpleConnection, data unsafe.Pointer) {
+	log.Println("hehhe", gc, data)
+	if SignedOn != nil {
+		SignedOn(newConnectionFrom(gc))
+	}
 }
 
 //export gopurple_buddy_signed_on

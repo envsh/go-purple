@@ -12,6 +12,14 @@ const (
 	TYPED      = int(C.PURPLE_TYPED)
 )
 
+const (
+	CONV_TYPE_UNKNOWN = int(C.PURPLE_CONV_TYPE_UNKNOWN) /**< Unknown conversation type. */
+	CONV_TYPE_IM      = int(C.PURPLE_CONV_TYPE_IM)      /**< Instant Message.           */
+	CONV_TYPE_CHAT    = int(C.PURPLE_CONV_TYPE_CHAT)    /**< Chat room.                 */
+	CONV_TYPE_MISC    = int(C.PURPLE_CONV_TYPE_MISC)    /**< A misc. conversation.      */
+	CONV_TYPE_ANY     = int(C.PURPLE_CONV_TYPE_ANY)     /**< Any type of conversation.  */
+)
+
 type Conversation struct {
 	conv *C.PurpleConversation
 }
@@ -38,6 +46,13 @@ func newConvChatFrom(chat *C.PurpleConvChat) *ConvChat {
 func newConvChatBuddyFrom(buddy *C.PurpleConvChatBuddy) *ConvChatBuddy {
 	this := &ConvChatBuddy{}
 	this.buddy = buddy
+	return this
+}
+
+func NewConversation(ctype int, ac *Account, name string) *Conversation {
+	this := &Conversation{}
+	conv := C.purple_conversation_new(C.PurpleConversationType(ctype), ac.account, C.CString(name))
+	this.conv = conv
 	return this
 }
 

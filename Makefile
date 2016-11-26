@@ -9,6 +9,7 @@ toxb:
 
 toxi:
 	sudo install -v ./libtox.so /usr/lib/purple-2/
+	sudo install -v ./libtox.so /opt/pidgin/lib/purple-2/
 
 pld:
 	go build -v -o prpld go-purple/purpled

@@ -33,6 +33,8 @@ func (this *ToxPlugin) setupSelfInfo(ac *purple.Account) {
 
 func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 	conn := ac.GetConnection()
+	gc := conn
+
 	this._tox.CallbackSelfConnectionStatus(func(t *tox.Tox, status uint32, d interface{}) {
 		if status > tox.CONNECTION_NONE {
 			conn.ConnSetState(purple.CONNECTED) // 设置为已连接状态，则好友会显示。
@@ -41,6 +43,7 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 		} else {
 			conn.ConnSetState(purple.DISCONNECTED)
 		}
+		this.save_account(gc)
 	}, ac)
 
 	this._tox.CallbackFriendRequest(func(t *tox.Tox, pubkey, msg string, d interface{}) {
@@ -64,6 +67,7 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 					ac.AddBuddy(buddy)
 					buddy.BlistAdd(nil)
 				}
+				this.save_account(gc)
 			}, func(ud interface{}) {
 				// reject?
 			})
@@ -90,6 +94,7 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 
 		//
 		tryJoinFixedGroups(t, conn, friendNumber, status)
+		this.save_account(gc)
 	}, ac)
 
 	this._tox.CallbackFriendMessage(func(t *tox.Tox, friendNumber uint32, msg string, d interface{}) {
