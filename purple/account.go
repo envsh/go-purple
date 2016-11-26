@@ -136,6 +136,22 @@ func (this *Account) GetBool(name string) bool {
 	return false
 }
 
+func (this *Account) SetUserName(name string) {
+	C.purple_account_set_username(this.account, C.CString(name))
+}
+func (this *Account) SetAlias(alias string) {
+	C.purple_account_set_alias(this.account, C.CString(alias))
+}
+func (this *Account) SetPassword(password string) {
+	C.purple_account_set_password(this.account, C.CString(password))
+}
+func (this *Account) SetUserInfo(userInfo string) {
+	C.purple_account_set_user_info(this.account, C.CString(userInfo))
+}
+func (this *Account) SetBuddyIconPath(path string) {
+	C.purple_account_set_buddy_icon_path(this.account, C.CString(path))
+}
+
 // accounts
 func (this *Account) AccountsAdd() {
 	C.purple_accounts_add(this.account)

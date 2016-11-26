@@ -46,6 +46,26 @@ func ParseContact(contacto *simplejson.Json) *User {
 	return u
 }
 
+type MPArticle struct {
+	Title    string
+	Digest   string
+	Cover    string
+	Url      string
+	Time     string
+	UserName string
+	NickName string
+}
+
+func ParseArticle(articleo *simplejson.Json) *MPArticle {
+	a := &MPArticle{}
+	a.Title = articleo.Get("Title").MustString()
+	a.Digest = articleo.Get("Digest").MustString()
+	a.Cover = articleo.Get("Cover").MustString()
+	a.Url = articleo.Get("Url").MustString()
+
+	return a
+}
+
 // usernames seperated by ","
 func parseChatSet(set *simplejson.Json) (cset []*User) {
 	cset = make([]*User, 0)
@@ -57,8 +77,6 @@ func parseChatSet(set *simplejson.Json) (cset []*User) {
 	}
 	return
 }
-
-type MPArticle struct{}
 
 func ParseWXInitData(data string) (users []*User) {
 	p := NewParser(data)
@@ -73,25 +91,30 @@ func ParseWXInitData(data string) (users []*User) {
 	})
 	log.Println("parsered contacts:", len(users))
 
-	// MPArticleList
 	mpas := make([]*MPArticle, 0)
-	p.Each("MPArticle", func(itemo *simplejson.Json) {
-		mpa := &MPArticle{}
-		mpas = append(mpas, mpa)
-	})
-	log.Println("parsered mpas:", len(mpas))
-
 	// MPSubscribeMsgList
-	mpsubs := make([]*MPArticle, 0)
 	p.Each("MPSubscribeMsg", func(itemo *simplejson.Json) {
-		mpsub := &MPArticle{}
-		mpsubs = append(mpsubs, mpsub)
+		u := ParseContact(itemo)
+		users = append(users, u)
+
+		// MPArticleList
+		NewParser2(itemo).Each("MPArticle", func(itemo *simplejson.Json) {
+			a := ParseArticle(itemo)
+			mpas = append(mpas, a)
+		})
 	})
 	log.Println("parsered mpsubs:", len(mpas))
+	newInnerSession().mpas = mpas
 
 	// chatset
 	cset := parseChatSet(p.jso)
 	log.Println("ChatSet", len(cset), cset)
+
+	// me
+	me := ParseContact(p.jso.Get("User"))
+	if me == nil {
+	}
+	newInnerSession().me = me
 
 	return
 }

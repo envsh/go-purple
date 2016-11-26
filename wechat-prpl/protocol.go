@@ -4,7 +4,7 @@
 package main
 
 import (
-	// "fmt"
+	"fmt"
 	// "io/ioutil"
 	"log"
 	"strings"
@@ -12,31 +12,6 @@ import (
 	"go-purple/purple"
 	"go-purple/wechat-prpl/wechat"
 )
-
-func (this *WechatPlugin) setupSelfInfo(ac *purple.Account) {
-	/*
-		gc := ac.GetConnection()
-		data, _ := ioutil.ReadFile("/home/gzleo/oss/src/go-purple/wechat-prpl/wechat/qrcode.jpg")
-		purple.RequestAcceptCancelWithIconDemo(nil, gc, data, nil, nil)
-	*/
-	/*
-		if len(ac.GetAlias()) > 0 {
-			this._wechat.SelfSetName(ac.GetAlias())
-		} else {
-			this._wechat.SelfSetName(ac.GetUserName())
-		}
-		this._wechat.SelfSetStatusMessage("It's from gowechat-prpl, hoho.")
-
-		if false {
-			conn := ac.GetConnection()
-			purple.RequestYesNoDemo(this, conn, func(ud interface{}) {
-				log.Println("request yes")
-			}, func(ud interface{}) {
-				log.Println("request no")
-			})
-		}
-	*/
-}
 
 func (this *WechatPlugin) eventHandler(evt *wechat.Event, ud interface{}) {
 	ac := ud.(*purple.Account)
@@ -56,6 +31,8 @@ func (this *WechatPlugin) eventHandler(evt *wechat.Event, ud interface{}) {
 	case wechat.EVT_GOT_BASEINFO:
 		log.Println(int(evt.Type), evt.Type.String(), len(evt.Args), len(evt.Args[0]))
 		this.loadInitContact(ac, evt.Args[0])
+		this.setupSelfInfo(ac)
+		this.loadArticles(ac)
 	case wechat.EVT_LOGIN_STATUS:
 		switch evt.Args[0] {
 		case "true":
@@ -69,213 +46,8 @@ func (this *WechatPlugin) eventHandler(evt *wechat.Event, ud interface{}) {
 
 	case wechat.EVT_GOT_MESSAGE:
 		log.Println("you have 1 new message", evt.Args[0][0:65])
-		msgo := wechat.ParseMessage(evt.Args[0])
-		pubkey := msgo.FromUserName
-		msg := evt.Args[0]
-		buddy := this.findBuddyEx(ac, pubkey)
-		if buddy == nil {
-			log.Println("wtf", pubkey, msgo.MsgId)
-			buddy = purple.NewBuddy(ac, msgo.FromUserName, msgo.FromUserName)
-			gc.ServGotIM(buddy.GetName(), msg, purple.MESSAGE_RECV)
-		} else {
-			gc.ServGotIM(buddy.GetName(), msg, purple.MESSAGE_RECV)
-		}
-
+		this.onWXMessage(gc, evt)
 	}
-}
-
-func (this *WechatPlugin) setupCallbacks(ac *purple.Account) {
-	// conn := ac.GetConnection()
-
-	/*
-		this._wechat.CallbackSelfConnectionStatus(func(t *tox.Tox, status uint32, d interface{}) {
-			if status > tox.CONNECTION_NONE {
-				conn.ConnSetState(purple.CONNECTED) // 设置为已连接状态，则好友会显示。
-				// a helper for help me
-			} else {
-				conn.ConnSetState(purple.DISCONNECTED)
-			}
-		}, ac)
-
-		this._wechat.CallbackFriendRequest(func(t *tox.Tox, pubkey, msg string, d interface{}) {
-			log.Println("hehhe", pubkey, msg)
-			// TODO notice UI and then make desision
-			purple.RequestAcceptCancel(this, conn, "New Friend Request", msg,
-				func(ud interface{}) {
-					friendNumber, err := this._wechat.FriendAddNorequest(pubkey)
-					if err != nil {
-						log.Println(err, friendNumber)
-					}
-					this.save_account(conn)
-					friendName, err := this._wechat.FriendGetName(friendNumber)
-					if len(friendName) == 0 {
-						friendName = "GoWechat User"
-					}
-					buddy := this.findBuddyEx(ac, pubkey)
-					// log.Println(buddy, buddy.GetName(), buddy.GetAliasOnly())
-					if buddy == nil {
-						buddy := purple.NewBuddy(ac, pubkey, friendName)
-						ac.AddBuddy(buddy)
-						buddy.BlistAdd(nil)
-					}
-				}, func(ud interface{}) {
-					// reject?
-				})
-		}, ac)
-
-		this._wechat.CallbackFriendConnectionStatus(func(t *tox.Tox, friendNumber uint32, status uint32, d interface{}) {
-			log.Println(friendNumber, status)
-			pubkey, _ := t.FriendGetPublicKey(friendNumber)
-			name, _ := t.FriendGetName(friendNumber)
-
-			buddy := this.findBuddyEx(ac, pubkey)
-			if buddy == nil {
-				log.Println("can not find buddy:", name, pubkey)
-			} else {
-				switch status {
-				case tox.CONNECTION_NONE:
-					purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_OFFLINE_STR)
-				case tox.CONNECTION_TCP:
-					purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_BUSY_STR)
-				case tox.CONNECTION_UDP:
-					purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_ONLINE_STR)
-				}
-			}
-
-		}, ac)
-
-		this._wechat.CallbackFriendMessage(func(t *tox.Tox, friendNumber uint32, msg string, d interface{}) {
-			log.Println(friendNumber, msg, purple.MyTid2())
-			conn := ac.GetConnection()
-			pubkey, err := t.FriendGetPublicKey(friendNumber)
-			if err != nil {
-				log.Println(err)
-			} else {
-				buddy := this.findBuddyEx(ac, pubkey)
-				if buddy == nil {
-					log.Println("wtf", friendNumber, pubkey)
-				} else {
-					conn.ServGotIM(buddy.GetName(), msg, purple.MESSAGE_RECV)
-				}
-			}
-		}, ac)
-
-		this._wechat.CallbackFriendName(func(t *tox.Tox, friendNumber uint32, name string, d interface{}) {
-			// log.Println(friendNumber, name)
-			pubkey, err := t.FriendGetPublicKey(friendNumber)
-			if err != nil {
-				log.Println(err, pubkey)
-			} else {
-				buddy := this.findBuddyEx(ac, pubkey)
-				if buddy != nil {
-					if buddy.GetAliasOnly() != name {
-						buddy.SetAlias(name)
-					}
-				} else {
-					log.Println("wtf", friendNumber, name, pubkey)
-					// buddy := purple.NewBuddy(ac, pubkey, name)
-					// ac.AddBuddy(buddy)
-					// buddy.BlistAdd(nil)
-				}
-			}
-		}, nil)
-
-		this._wechat.CallbackGroupNameListChange(func(t *tox.Tox, groupNumber int,
-			peerNumber int, change uint8, d interface{}) {
-			log.Println(groupNumber, peerNumber, change)
-			conn := ac.GetConnection()
-			conv := conn.ConnFindChat(groupNumber)
-			switch change {
-			case tox.CHAT_CHANGE_PEER_ADD:
-			case tox.CHAT_CHANGE_PEER_DEL:
-			case tox.CHAT_CHANGE_PEER_NAME:
-			}
-			this.UpdateMembers(groupNumber, conv)
-		}, ac)
-
-		this._wechat.CallbackGroupMessage(func(t *tox.Tox, groupNumber int,
-			peerNumber int, message string, d interface{}) {
-			log.Println(groupNumber, peerNumber, message)
-			conn := ac.GetConnection()
-			pubkey, err := t.GroupPeerPubkey(groupNumber, peerNumber)
-			peerName, err := t.GroupPeerName(groupNumber, peerNumber)
-			if err != nil {
-				log.Println(err, peerName, pubkey)
-			} else {
-				if false {
-					conn.ServGotChatIn(groupNumber, pubkey, purple.MESSAGE_RECV, message)
-				}
-				groupTitle, err := this._wechat.GroupGetTitle(groupNumber)
-				if err != nil {
-					log.Println(err, groupTitle)
-				}
-
-				convs := purple.GetConversations()
-				for _, conv := range convs {
-					log.Println(conv.GetName(), conv.GetChatData().GetUsers(), conv.GetData("GroupNumber"))
-				}
-				if len(convs) == 0 {
-					log.Println("can not find conv chat:", groupNumber, groupTitle)
-				}
-				// conversation should be created when invited
-				conv := conn.FindChat(int(groupNumber))
-				if conv == nil {
-					log.Println("can not find conv chat:", groupNumber, groupTitle)
-				} else {
-					// conv.GetChatData().Send(message) // infinite message loop!!!
-					conn.ServGotChatIn(groupNumber, peerName, purple.MESSAGE_RECV, message)
-					// conn.ServGotChatIn(groupNumber, pubkey, purple.MESSAGE_RECV, message)
-				}
-			}
-		}, ac)
-
-		// TODO should notify UI first
-		this._wechat.CallbackGroupInvite(func(t *tox.Tox,
-			friendNumber uint32, itype uint8, data []byte, d interface{}) {
-			log.Println(friendNumber, len(data), itype)
-			var groupNumber int
-			var err error
-			switch itype {
-			case tox.GROUPCHAT_TYPE_AV:
-				groupNumber, err = this._wechat.JoinAVGroupChat(friendNumber, data)
-				if err != nil {
-					log.Println(err, groupNumber)
-				}
-			case tox.GROUPCHAT_TYPE_TEXT:
-				groupNumber, err = this._wechat.JoinGroupChat(friendNumber, data)
-				if err != nil {
-					log.Println(err, groupNumber)
-				}
-			default:
-				log.Panicln("wtf")
-			}
-			if err == nil {
-				groupTitle, err := this._wechat.GroupGetTitle(groupNumber)
-				if err != nil {
-					log.Println(err, groupTitle)
-					groupTitle = DEFAULT_GROUPCHAT_TITLE
-				}
-				conv := conn.ServGotJoinedChat(groupNumber, groupTitle)
-				if conv == nil {
-					log.Println("join chat failed:", conv, groupNumber, groupTitle)
-				} else if conv != nil {
-					conv.SetData("GroupNumber", fmt.Sprintf("%d", groupNumber))
-				}
-			}
-		}, ac)
-
-		this._wechat.CallbackGroupTitle(func(t *tox.Tox,
-			groupNumber int, peerNumber int, title string, d interface{}) {
-			log.Println(groupNumber, peerNumber, title)
-			conv := conn.ConnFindChat(groupNumber)
-			if conv != nil {
-				if conv.GetName() != title {
-					conv.SetName(title)
-				}
-			}
-		}, ac)
-
-	*/
 }
 
 func (this *WechatPlugin) loadInitContact(ac *purple.Account, initData string) {
@@ -293,6 +65,7 @@ func (this *WechatPlugin) loadInitContact(ac *purple.Account, initData string) {
 			for _, _buddy := range buddies {
 				if strings.HasPrefix(_buddy.GetName(), pubkey) {
 					found = true
+					buddy = _buddy
 					break
 				}
 			}
@@ -306,8 +79,55 @@ func (this *WechatPlugin) loadInitContact(ac *purple.Account, initData string) {
 				buddy.SetAlias(name)
 			}
 		}
-		// purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_ONLINE_STR)
+		purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_ONLINE_STR)
 		log.Println("adding...", name, pubkey, purple.MyTid2())
+	}
+}
+
+func (this *WechatPlugin) setupSelfInfo(ac *purple.Account) {
+	me := this._wechat.Me()
+	ac.SetUserName(me.UserName)
+	ac.SetAlias(me.NickName)
+
+	/*
+		gc := ac.GetConnection()
+		data, _ := ioutil.ReadFile("/home/gzleo/oss/src/go-purple/wechat-prpl/wechat/qrcode.jpg")
+		purple.RequestAcceptCancelWithIconDemo(nil, gc, data, nil, nil)
+	*/
+
+	pubkey := reader_user
+	name := reader_nick
+
+	buddy := ac.FindBuddy(pubkey)
+	if buddy == nil {
+		buddy = purple.NewBuddy(ac, pubkey, name)
+		ac.AddBuddy(buddy)
+		buddy.BlistAdd(nil)
+	} else {
+		if buddy.GetAliasOnly() != name {
+			buddy.SetAlias(name)
+		}
+	}
+	purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_ONLINE_STR)
+	log.Println("adding...", name, pubkey, purple.MyTid2())
+}
+
+var reader_user = "article_reader_longlonglong"
+var reader_nick = "阅读&订阅"
+
+func (this *WechatPlugin) loadArticles(ac *purple.Account) {
+	pubkey := reader_user
+
+	buddy := ac.FindBuddy(pubkey)
+	if buddy == nil {
+		log.Println("wtf")
+	} else {
+		gc := ac.GetConnection()
+		mpas := this._wechat.Articles()
+		for _, a := range mpas {
+			msg := fmt.Sprintf("%s: %s", a.Title, a.Url)
+			gc.ServGotIM(buddy.GetName(), msg, purple.MESSAGE_RECV)
+		}
 	}
 }
 
@@ -326,6 +146,7 @@ func (this *WechatPlugin) loadAllContact(ac *purple.Account, contactData string)
 			for _, _buddy := range buddies {
 				if strings.HasPrefix(_buddy.GetName(), pubkey) {
 					found = true
+					buddy = _buddy
 					break
 				}
 			}
@@ -339,50 +160,9 @@ func (this *WechatPlugin) loadAllContact(ac *purple.Account, contactData string)
 				buddy.SetAlias(name)
 			}
 		}
-		// purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_ONLINE_STR)
+		purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_ONLINE_STR)
 		log.Println("adding...", name, pubkey, purple.MyTid2())
 	}
-}
-
-func (this *WechatPlugin) loadFriends(ac *purple.Account) {
-	/*
-		fns := this._wechat.SelfGetFriendList()
-		if fns == nil || len(fns) == 0 {
-			log.Println("oh, you have 0 friends")
-		}
-		buddies := ac.FindBuddies("")
-		for _, fn := range fns {
-			name, err := this._wechat.FriendGetName(fn)
-			pubkey, err := this._wechat.FriendGetPublicKey(fn)
-			if err != nil {
-				log.Println(err)
-			}
-			if len(name) == 0 {
-				name = "GoWechat User"
-			}
-			buddy := ac.FindBuddy(pubkey)
-			if buddy == nil {
-				found := false
-				for _, _buddy := range buddies {
-					if strings.HasPrefix(_buddy.GetName(), pubkey) {
-						found = true
-						break
-					}
-				}
-				if !found {
-					buddy = purple.NewBuddy(ac, pubkey, name)
-					ac.AddBuddy(buddy)
-					buddy.BlistAdd(nil)
-				}
-			} else {
-				if buddy.GetAliasOnly() != name {
-					buddy.SetAlias(name)
-				}
-			}
-			// purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_ONLINE_STR)
-			log.Println("adding...", name, pubkey, purple.MyTid2())
-		}
-	*/
 }
 
 // 因为存储的name可能是friendId，也可能是pubkey。
@@ -399,6 +179,26 @@ func (this *WechatPlugin) findBuddyEx(ac *purple.Account, pubkeyOrFriendID strin
 		}
 	}
 	return buddy
+}
+
+// poll handlers
+
+func (this *WechatPlugin) onWXMessage(gc *purple.Connection, evt *wechat.Event) {
+	ac := gc.ConnGetAccount()
+
+	msgo := wechat.ParseMessage(evt.Args[0])
+	pubkey := msgo.ToUserName
+	msg := evt.Args[0]
+	buddy := this.findBuddyEx(ac, pubkey)
+	if buddy == nil {
+		log.Println("wtf", pubkey, msgo.MsgId)
+		// buddy = purple.NewBuddy(ac, msgo.FromUserName, msgo.FromUserName)
+		buddy = purple.NewBuddy(ac, msgo.ToUserName, msgo.ToUserName)
+		gc.ServGotIM(buddy.GetName(), msg, purple.MESSAGE_RECV)
+	} else {
+		log.Println(buddy, msgo)
+		gc.ServGotIM(buddy.GetName(), msg, purple.MESSAGE_RECV)
+	}
 }
 
 // optional callbacks
@@ -419,6 +219,18 @@ func (this *WechatPlugin) ChatInfoDefaults(gc *purple.Connection, chatName strin
 
 func (this *WechatPlugin) SendIM(gc *purple.Connection, who string, msg string) int {
 	log.Println(gc, who, msg)
+	me := this._wechat.Me()
+	log.Println(me)
+
+	if who == reader_user {
+		return -1
+	}
+
+	ret := this._wechat.SendMessage(me.UserName, who, msg)
+	log.Println(ret)
+	if !ret {
+		return -1
+	}
 	/*
 		friendNumber, _ := this._wechat.FriendByPublicKey(who)
 		len, err := this._wechat.FriendSendMessage(friendNumber, msg)
@@ -428,7 +240,7 @@ func (this *WechatPlugin) SendIM(gc *purple.Connection, who string, msg string) 
 		}
 		return int(len)
 	*/
-	return 0
+	return len(msg)
 }
 
 func (this *WechatPlugin) JoinChat(gc *purple.Connection, comp *purple.GHashTable) {

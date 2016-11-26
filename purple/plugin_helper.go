@@ -689,7 +689,9 @@ func goprpl_status_text(buddy *C.PurpleBuddy) *C.char {
 	var this = _plugin_instance
 	if this.ppi.StatusText != nil {
 		stxt := this.ppi.StatusText(newBuddyFrom(buddy))
-		return C.CString(stxt)
+		if len(stxt) > 0 {
+			return C.CString(stxt)
+		}
 	}
 	return nil
 }

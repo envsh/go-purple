@@ -40,6 +40,7 @@ type pollState struct {
 	WxSKey           string
 	WxInitRawData    string
 	WxContactRawData string
+	ClientVersion    string
 }
 
 // 用于保持连接和接收消息，
@@ -117,8 +118,9 @@ func (this *longPoll) run() {
 	if this.cookies != nil {
 		this.reqState = REQ_SYNC_CHECK
 		this.reqState = REQ_CONTACT
-		this.eqch <- newEvent(EVT_GOT_BASEINFO, this.state.WxInitRawData)
-		this.eqch <- newEvent(EVT_LOGIN_STATUS, "true")
+		this.reqState = REQ_WXINIT
+		// this.eqch <- newEvent(EVT_GOT_BASEINFO, this.state.WxInitRawData)
+		// this.eqch <- newEvent(EVT_LOGIN_STATUS, "true")
 	} else {
 		this.reqState = REQ_LOGIN
 	}

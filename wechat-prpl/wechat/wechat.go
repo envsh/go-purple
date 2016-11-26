@@ -3,6 +3,9 @@ package wechat
 import (
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/bitly/go-simplejson"
 	"github.com/kitech/colog"
@@ -12,13 +15,16 @@ type Wechat struct {
 	OnEvent func(evt *Event, userData interface{})
 
 	// private
-	eqch   chan *Event
-	poller *longPoll
-	inses  innerSession
+	eqch      chan *Event
+	poller    *longPoll
+	inses     *innerSession
+	msgIDBase int64
 }
 
 func NewWechat() *Wechat {
 	this := &Wechat{}
+	this.inses = newInnerSession()
+	this.msgIDBase = time.Now().UnixNano()
 
 	this.eqch = make(chan *Event, 8000)
 	this.poller = newLongPoll(this.eqch)
@@ -27,7 +33,7 @@ func NewWechat() *Wechat {
 	return this
 }
 
-// 200ms
+// ~200ms
 // 客户端设置的回调函数会在Iterate线程内被调用
 func (this *Wechat) Iterate(userData interface{}) {
 	if this.OnEvent == nil {
@@ -74,43 +80,61 @@ func (this *Wechat) GetContactData() string {
 	return this.poller.state.WxContactRawData
 }
 
+func (this *Wechat) Me() *User              { return newInnerSession().me }
+func (this *Wechat) Articles() []*MPArticle { return newInnerSession().mpas }
+func (this *Wechat) nextMsgId() int64       { this.msgIDBase += 1; return this.msgIDBase }
+
 // 这些发送都是需要等待响应的？
 // 应该在没有登陆或者网络不通的情况会发送失败。
 func (this *Wechat) SendMessage(fromUserName, toUserName string, message string) bool {
-	nsurl := fmt.Sprintf("%s/cgi-bin/mmwebwx-bin/webwxsendmsg?lang=en_US&pass_ticket=%s",
-		this.poller.state.UrlBase, this.poller.state.WxPassTicket)
+	passTicket := strings.Replace(this.poller.state.WxPassTicket, "%", "%25", -1)
 
-	BaseRequest := map[string]string{
-		"Uin":      this.poller.state.Wxuin,
+	nsurl := fmt.Sprintf("%s/cgi-bin/mmwebwx-bin/webwxsendmsg?lang=en_US&pass_ticket=%s",
+		this.poller.state.UrlBase, passTicket)
+	uin, _ := strconv.Atoi(this.poller.state.Wxuin)
+
+	BaseRequest := map[string]interface{}{
+		"Uin":      uin,
 		"Sid":      this.poller.state.Wxsid,
 		"Skey":     this.poller.state.WxSKey,
 		"DeviceID": this.poller.state.Wxdevid,
 	}
-	Msg := map[string]string{
-		"Type":         "msg_type",
+	msgID := this.nextMsgId()
+	msgType := 1
+	Msg := map[string]interface{}{
+		"Type":         msgType,
 		"Content":      message,
 		"FromUserName": fromUserName,
 		"ToUserName":   toUserName,
-		"LocalID":      "clientMsgId",
-		"ClientMsgId":  "clientMsgId",
+		"LocalID":      fmt.Sprintf("%d", msgID),
+		"ClientMsgId":  fmt.Sprintf("%d", msgID),
 	}
 
 	jso := simplejson.New()
 	jso.Set("BaseRequest", BaseRequest)
 	jso.Set("Msg", Msg)
+	jso.Set("Scene", 0)
 
 	postData, _ := jso.Encode()
+	log.Println(string(postData))
 
 	// TODO options 在有并发请求时可能会冲突
 	this.poller.rops.Headers["Content-Type"] = "application/x-www-form-urlencoded"
+	this.poller.rops.Headers["Content-Type"] = "application/json;charset=UTF-8"
 	this.poller.rops.JSON = postData
 	resp, err := this.poller.rses.Post(nsurl, this.poller.rops)
 	delete(this.poller.rops.Headers, "Content-Type")
 	this.poller.rops.JSON = nil
 	defer resp.Close()
+	this.poller.saveContent("sendmsg.json", resp.Bytes(), resp, nsurl)
 
 	if err != nil {
 		log.Println(err)
+	}
+
+	p := NewParser(resp.String())
+	if !p.RetOK() {
+		return false
 	}
 	return true
 }

@@ -39,6 +39,7 @@ func parseMessageJson(msgo *simplejson.Json) *Message {
 	msg.Content = msgo.Get("Content").MustString()
 	msg.CreateTime = msgo.Get("CreateTime").MustUint64()
 
+	msg.SwapFromTo()
 	return msg
 }
 
@@ -56,4 +57,13 @@ func parseMessages(data string) (msgs []*Message) {
 	log.Println("parsed msgs:", len(msgs))
 
 	return
+}
+
+// 确保ToUserName一定是对话的对方，不是me
+func (this *Message) SwapFromTo() {
+	me := newInnerSession().me
+	log.Println(me)
+	if this.ToUserName == me.UserName {
+		this.ToUserName, this.FromUserName = this.FromUserName, this.ToUserName
+	}
 }

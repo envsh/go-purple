@@ -15,11 +15,12 @@ Now implement most API function for write new IM protocol and simple client.
 
 ### sub projects
 
-* purple the main binding project
-* purpled might be a purple daemon with a web ui interface
-* tox-prpl tox protocol implement with go-purple
-* wechat-prpl wechat web protocol implement with go-purple
-* yobot an IM robot that relay messages between different protocols, and build on go-purple.
+* [purple](purple/) the main binding project
+* [purpled](purpled/) might be a purple daemon with a web ui interface
+* [tox-prpl](tox-prpl/) tox protocol implement with go-purple
+* [wechat-prpl](wechat-prpl/) wechat prpl plugin
+* [wechat-prpl/wechat](wechat-prpl/wechat/) wechat web protocol implement
+* [yobot](yobot/) an IM robot that relay messages between different protocols, and build on go-purple.
 
 ### Notes
 

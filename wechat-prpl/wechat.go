@@ -49,6 +49,7 @@ func (this *WechatPlugin) destroy_wechat(p *purple.Plugin) {
 
 // protocol functions, must implemented
 func (this *WechatPlugin) wechat_blist_icon() string {
+	// /usr/share/pixmaps/pidgin/protocols/22/gowechat.png
 	return "gowechat"
 }
 
@@ -72,9 +73,7 @@ func (this *WechatPlugin) wechat_login(ac *purple.Account) {
 		conn.ConnSetState(purple.CONNECTING)
 	}
 
-	this.setupSelfInfo(ac)
-	// this.setupCallbacks(ac)
-	// this.loadFriends(ac)
+	// this.setupSelfInfo(ac)
 
 	if false {
 		buddy := purple.NewBuddy(ac, "onlyyou-id", "onlyyou-nick")
