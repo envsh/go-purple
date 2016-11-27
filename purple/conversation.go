@@ -4,6 +4,8 @@ package purple
 #include <libpurple/purple.h>
 */
 import "C"
+import "unsafe"
+
 import _ "log"
 
 const (
@@ -51,7 +53,7 @@ func newConvChatBuddyFrom(buddy *C.PurpleConvChatBuddy) *ConvChatBuddy {
 
 func NewConversation(ctype int, ac *Account, name string) *Conversation {
 	this := &Conversation{}
-	conv := C.purple_conversation_new(C.PurpleConversationType(ctype), ac.account, C.CString(name))
+	conv := C.purple_conversation_new(C.PurpleConversationType(ctype), ac.account, CCString(name).Ptr)
 	this.conv = conv
 	return this
 }
@@ -62,7 +64,7 @@ func (this *Conversation) GetChatData() *ConvChat {
 }
 
 func (this *Conversation) SetName(title string) {
-	C.purple_conversation_set_name(this.conv, C.CString(title))
+	C.purple_conversation_set_name(this.conv, CCString(title).Ptr)
 }
 
 func (this *Conversation) GetName() string {
@@ -71,11 +73,11 @@ func (this *Conversation) GetName() string {
 }
 
 func (this *Conversation) SetData(key, data string) {
-	C.purple_conversation_set_data(this.conv, C.CString(key), C.CString(data))
+	C.purple_conversation_set_data(this.conv, CCString(key).Ptr, CCString(data).Ptr)
 }
 
 func (this *Conversation) GetData(key string) string {
-	data := C.purple_conversation_get_data(this.conv, C.CString(key))
+	data := C.purple_conversation_get_data(this.conv, CCString(key).Ptr)
 	return C.GoString((*C.char)(data))
 }
 
@@ -87,16 +89,16 @@ func (this *Conversation) IsLogging() bool {
 }
 
 func (this *ConvChat) AddUser(user string) {
-	C.purple_conv_chat_add_user(this.chat, C.CString(user), nil, 0, C.TRUE)
+	C.purple_conv_chat_add_user(this.chat, CCString(user).Ptr, nil, 0, C.TRUE)
 }
 
 func (this *ConvChat) RenameUser(oldUser string, newUser string) {
-	C.purple_conv_chat_rename_user(this.chat, C.CString(oldUser), C.CString(newUser))
+	C.purple_conv_chat_rename_user(this.chat, CCString(oldUser).Ptr, CCString(newUser).Ptr)
 }
 
 func (this *ConvChat) RemoveUser(user string) {
 	reason := "hehe"
-	C.purple_conv_chat_remove_user(this.chat, C.CString(user), C.CString(reason))
+	C.purple_conv_chat_remove_user(this.chat, CCString(user).Ptr, CCString(reason).Ptr)
 }
 
 func (this *ConvChat) GetUsers() []string {
@@ -114,19 +116,19 @@ func (this *ConvChat) GetUsers() []string {
 }
 
 func (this *ConvChat) Send(message string) {
-	C.purple_conv_chat_send(this.chat, C.CString(message))
+	C.purple_conv_chat_send(this.chat, CCString(message).Ptr)
 }
 
 func (this *ConvChat) Write(who string, message string, flags int) {
-	// C.purple_conv_chat_write(this.chat, C.CString(message))
+	// C.purple_conv_chat_write(this.chat, CCString(message).Ptr)
 }
 
 func (this *ConvChat) SendWithFlag(message string, flags int) {
-	C.purple_conv_chat_send_with_flags(this.chat, C.CString(message), C.PurpleMessageFlags(flags))
+	C.purple_conv_chat_send_with_flags(this.chat, CCString(message).Ptr, C.PurpleMessageFlags(flags))
 }
 
 func (this *ConvChat) FindBuddy(name string) *ConvChatBuddy {
-	cbbudy := C.purple_conv_chat_cb_find(this.chat, C.CString(name))
+	cbbudy := C.purple_conv_chat_cb_find(this.chat, CCString(name).Ptr)
 	return newConvChatBuddyFrom(cbbudy)
 }
 
@@ -142,6 +144,9 @@ func (this *ConvChatBuddy) SetAlias(alias string) {
 	if this.buddy != nil {
 		if this.buddy.alias != nil {
 			// TODO free it first
+		}
+		if this.buddy.alias != nil {
+			C.free(unsafe.Pointer(this.buddy.alias))
 		}
 		this.buddy.alias = C.CString(alias)
 	}

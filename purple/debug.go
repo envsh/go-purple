@@ -20,27 +20,27 @@ static void gopurple_debug_fatal(const char *category, const char *format)
 import "C"
 
 func Debug(level int, cat string, log string) {
-	C.gopurple_debug(C.PurpleDebugLevel(level), C.CString(cat), C.CString(log))
+	C.gopurple_debug(C.PurpleDebugLevel(level), CCString(cat).Ptr, CCString(log).Ptr)
 }
 
 func DebugMisc(cat string, log string) {
-	C.gopurple_debug_misc(C.CString(cat), C.CString(log))
+	C.gopurple_debug_misc(CCString(cat).Ptr, CCString(log).Ptr)
 }
 
 func DebugInfo(cat string, log string) {
-	C.gopurple_debug_info(C.CString(cat), C.CString(log))
+	C.gopurple_debug_info(CCString(cat).Ptr, CCString(log).Ptr)
 }
 
 func DebugWarning(cat string, log string) {
-	C.gopurple_debug_warning(C.CString(cat), C.CString(log))
+	C.gopurple_debug_warning(CCString(cat).Ptr, CCString(log).Ptr)
 }
 
 func DebugError(cat string, log string) {
-	C.gopurple_debug_error(C.CString(cat), C.CString(log))
+	C.gopurple_debug_error(CCString(cat).Ptr, CCString(log).Ptr)
 }
 
 func DebugFatal(cat string, log string) {
-	C.gopurple_debug_fatal(C.CString(cat), C.CString(log))
+	C.gopurple_debug_fatal(CCString(cat).Ptr, CCString(log).Ptr)
 }
 
 func DebugSetEnabled(enabled bool) {

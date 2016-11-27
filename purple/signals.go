@@ -14,5 +14,5 @@ static gulong gopurple_signal_connect(char *signal) {
 import "C"
 
 func SignalConnect(signal string, cbfn func()) {
-	C.gopurple_signal_connect(C.CString(signal))
+	C.gopurple_signal_connect(CCString(signal).Ptr)
 }

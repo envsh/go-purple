@@ -82,8 +82,8 @@ func RequestYesNo(userData interface{}, gc *Connection, title, primary string,
 	// secondary := "it's secondary"
 	default_action := 0
 	who := "who's"
-	C.gopurple_request_yes_no(handle, C.CString(title), C.CString(primary), nil,
-		C.int(default_action), ac.account, C.CString(who), nil, cseq)
+	C.gopurple_request_yes_no(handle, CCString(title).Ptr, CCString(primary).Ptr, nil,
+		C.int(default_action), ac.account, CCString(who).Ptr, nil, cseq)
 }
 
 func RequestYesNoDemo(userData interface{}, gc *Connection,
@@ -111,8 +111,8 @@ func RequestOkCancel(userData interface{}, gc *Connection, title, primary string
 	// secondary := "it's secondary"
 	default_action := 0
 	who := "who's"
-	C.gopurple_request_ok_cancel(handle, C.CString(title), C.CString(primary), nil,
-		C.int(default_action), ac.account, C.CString(who), nil, cseq)
+	C.gopurple_request_ok_cancel(handle, CCString(title).Ptr, CCString(primary).Ptr, nil,
+		C.int(default_action), ac.account, CCString(who).Ptr, nil, cseq)
 }
 
 func RequestOkCancelDemo(userData interface{}, gc *Connection,
@@ -140,8 +140,8 @@ func RequestAcceptCancel(userData interface{}, gc *Connection, title, primary st
 	// secondary := "it's secondary"
 	default_action := 0
 	who := "who's"
-	C.gopurple_request_accept_cancel(handle, C.CString(title), C.CString(primary), nil,
-		C.int(default_action), ac.account, C.CString(who), nil, cseq)
+	C.gopurple_request_accept_cancel(handle, CCString(title).Ptr, CCString(primary).Ptr, nil,
+		C.int(default_action), ac.account, CCString(who).Ptr, nil, cseq)
 }
 func RequestAcceptCancelDemo(userData interface{}, gc *Connection,
 	yescb func(interface{}), nocb func(interface{})) {
@@ -171,8 +171,8 @@ func RequestAcceptCancelWithIcon(userData interface{}, gc *Connection, title, pr
 	who := "who's"
 
 	cicon := (&iconData[0])
-	C.gopurple_request_accept_cancel_with_icon(handle, C.CString(title), C.CString(primary), nil,
-		C.int(default_action), ac.account, C.CString(who), nil,
+	C.gopurple_request_accept_cancel_with_icon(handle, CCString(title).Ptr, CCString(primary).Ptr, nil,
+		C.int(default_action), ac.account, CCString(who).Ptr, nil,
 		cicon, C.gsize(len(iconData)), cseq)
 }
 func RequestAcceptCancelWithIconDemo(userData interface{}, gc *Connection,

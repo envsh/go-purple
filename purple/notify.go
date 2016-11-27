@@ -42,10 +42,10 @@ type notifyUserInfoCallbackData struct {
 var notifyUserInfoCallbackDatas = make(map[*C.char]*notifyUserInfoCallbackData, 0)
 
 func (this *Connection) NotifyUserInfo(who string, nui *NotifyUserInfo, closecb func(interface{}), userData interface{}) {
-	// C.purple_notify_userinfo(this.conn, C.CString(who), nui.nui, nil, nil)
+	// C.purple_notify_userinfo(this.conn, CCString(who).Ptr, nui.nui, nil, nil)
 	cuserData := C.calloc(1, 1)
 	notifyUserInfoCallbackDatas[(*C.char)(cuserData)] = &notifyUserInfoCallbackData{closecb, userData}
-	C.gopurple_notify_userinfo(this.conn, C.CString(who), nui.nui, cuserData)
+	C.gopurple_notify_userinfo(this.conn, CCString(who).Ptr, nui.nui, cuserData)
 }
 
 func NewNotifyUserInfo() *NotifyUserInfo {
@@ -59,15 +59,15 @@ func (this *NotifyUserInfo) Destroy() {
 }
 
 func (this *NotifyUserInfo) AddPair(label, value string) {
-	C.purple_notify_user_info_add_pair(this.nui, C.CString(label), C.CString(value))
+	C.purple_notify_user_info_add_pair(this.nui, CCString(label).Ptr, CCString(value).Ptr)
 }
 
 func (this *NotifyUserInfo) AddPairPlaintext(label, value string) {
-	C.purple_notify_user_info_add_pair_plaintext(this.nui, C.CString(label), C.CString(value))
+	C.purple_notify_user_info_add_pair_plaintext(this.nui, CCString(label).Ptr, CCString(value).Ptr)
 }
 
 func (this *NotifyUserInfo) PrependPair(label, value string) {
-	C.purple_notify_user_info_prepend_pair(this.nui, C.CString(label), C.CString(value))
+	C.purple_notify_user_info_prepend_pair(this.nui, CCString(label).Ptr, CCString(value).Ptr)
 }
 
 func (this *NotifyUserInfo) RemoveEntry(entry *NotifyUserInfoEntry) {

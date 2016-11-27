@@ -15,14 +15,14 @@ func newBuddyFrom(buddy *C.PurpleBuddy) *Buddy {
 }
 
 func NewBuddy(ac *Account, name string, alias string) *Buddy {
-	buddy := C.purple_buddy_new(ac.account, C.CString(name), C.CString(alias))
+	buddy := C.purple_buddy_new(ac.account, CCString(name).Ptr, CCString(alias).Ptr)
 	this := &Buddy{}
 	this.buddy = buddy
 	return this
 }
 
 func (this *Buddy) SetAlias(alias string) {
-	C.purple_blist_alias_buddy(this.buddy, C.CString(alias))
+	C.purple_blist_alias_buddy(this.buddy, CCString(alias).Ptr)
 }
 
 // @param g can be nil
@@ -35,7 +35,7 @@ func (this *Buddy) BlistAdd(g *Group) {
 }
 
 func (this *Buddy) SetProtocolData(data interface{}) {
-	C.purple_buddy_set_protocol_data(this.buddy, C.CString("hehhehee"))
+	C.purple_buddy_set_protocol_data(this.buddy, CCString("hehhehee").Ptr)
 }
 
 func (this *Buddy) GetName() string {
@@ -53,7 +53,7 @@ type Group struct {
 }
 
 func NewGroup(name string) *Group {
-	group := C.purple_group_new(C.CString(name))
+	group := C.purple_group_new(CCString(name).Ptr)
 	this := &Group{}
 	this.group = group
 	return this
@@ -92,7 +92,7 @@ func (this *Chat) GetComponents() *GHashTable {
 }
 
 func (this *Account) BlistFindChat(name string) *Chat {
-	chat := C.purple_blist_find_chat(this.account, C.CString(name))
+	chat := C.purple_blist_find_chat(this.account, CCString(name).Ptr)
 	if chat == nil {
 		return nil
 	}
@@ -100,7 +100,7 @@ func (this *Account) BlistFindChat(name string) *Chat {
 }
 
 func (this *Account) ChatNew(alias string, components *GHashTable) *Chat {
-	chat := C.purple_chat_new(this.account, C.CString(alias), components.ht)
+	chat := C.purple_chat_new(this.account, CCString(alias).Ptr, components.ht)
 	return newChatFrom(chat)
 }
 
@@ -129,22 +129,22 @@ func newBlistNodeFrom(node *C.PurpleBlistNode) *BlistNode {
 }
 
 func (this *BlistNode) GetBool(key string) bool {
-	rc := C.purple_blist_node_get_bool(this.node, C.CString(key))
+	rc := C.purple_blist_node_get_bool(this.node, CCString(key).Ptr)
 	if rc == C.TRUE {
 		return true
 	}
 	return false
 }
 func (this *BlistNode) SetBool(key string, value bool) {
-	C.purple_blist_node_set_bool(this.node, C.CString(key), go2cBool(value))
+	C.purple_blist_node_set_bool(this.node, CCString(key).Ptr, go2cBool(value))
 }
 
 func (this *BlistNode) GetString(key string) string {
-	s := C.purple_blist_node_get_string(this.node, C.CString(key))
+	s := C.purple_blist_node_get_string(this.node, CCString(key).Ptr)
 	return C.GoString(s)
 }
 func (this *BlistNode) SetString(key, value string) {
-	C.purple_blist_node_set_string(this.node, C.CString(key), C.CString(value))
+	C.purple_blist_node_set_string(this.node, CCString(key).Ptr, CCString(value).Ptr)
 }
 
 func (this *BlistNode) Settings() *GHashTable {

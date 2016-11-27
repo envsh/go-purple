@@ -19,10 +19,10 @@ func newAccountFrom(acc *C.PurpleAccount) *Account {
 func NewAccountCreate(account string, protocol string, password string) *Account {
 	this := &Account{}
 
-	acc := C.purple_account_new(C.CString(account), C.CString(protocol))
-	C.purple_account_set_password(acc, C.CString(password))
+	acc := C.purple_account_new(CCString(account).Ptr, CCString(protocol).Ptr)
+	C.purple_account_set_password(acc, CCString(password).Ptr)
 	C.purple_account_set_remember_password(acc, C.TRUE)
-	C.purple_account_set_enabled(acc, C.CString(UI_ID), C.TRUE)
+	C.purple_account_set_enabled(acc, CCString(UI_ID).Ptr, C.TRUE)
 	C.purple_accounts_add(acc)
 
 	this.account = acc
@@ -65,7 +65,7 @@ func (this *Account) AddBuddy(b *Buddy) {
 }
 
 func (this *Account) FindBuddy(name string) *Buddy {
-	buddy := C.purple_find_buddy(this.account, C.CString(name))
+	buddy := C.purple_find_buddy(this.account, CCString(name).Ptr)
 	if buddy == nil {
 		return nil
 	}
@@ -77,7 +77,7 @@ func (this *Account) FindBuddies(name string) []*Buddy {
 	if name == "" {
 		slst = C.purple_find_buddies(this.account, nil)
 	} else {
-		slst = C.purple_find_buddies(this.account, C.CString(name))
+		slst = C.purple_find_buddies(this.account, CCString(name).Ptr)
 	}
 
 	if slst != nil {
@@ -95,41 +95,41 @@ func (this *Account) FindBuddies(name string) []*Buddy {
 }
 
 func (this *Account) SetEnabled(enable bool) {
-	C.purple_account_set_enabled(this.account, C.CString(UI_ID), C.TRUE)
+	C.purple_account_set_enabled(this.account, CCString(UI_ID).Ptr, C.TRUE)
 }
 func (this *Account) GetEnabled() bool {
-	rc := C.purple_account_get_enabled(this.account, C.CString(UI_ID))
+	rc := C.purple_account_get_enabled(this.account, CCString(UI_ID).Ptr)
 	if rc == C.TRUE {
 		return true
 	}
 	return false
 }
 func (this *Account) GetString(name string) string {
-	cstr := C.purple_account_get_string(this.account, C.CString(name), nil)
+	cstr := C.purple_account_get_string(this.account, CCString(name).Ptr, nil)
 	if cstr == nil {
 		return ""
 	}
 	return C.GoString(cstr)
 }
 func (this *Account) SetString(name string, value string) {
-	C.purple_account_set_string(this.account, C.CString(name), C.CString(value))
+	C.purple_account_set_string(this.account, CCString(name).Ptr, CCString(value).Ptr)
 }
 func (this *Account) SetInt(name string, value int) {
-	C.purple_account_set_int(this.account, C.CString(name), C.int(value))
+	C.purple_account_set_int(this.account, CCString(name).Ptr, C.int(value))
 }
 func (this *Account) GetInt(name string) int {
-	rc := C.purple_account_get_int(this.account, C.CString(name), C.int(0))
+	rc := C.purple_account_get_int(this.account, CCString(name).Ptr, C.int(0))
 	return int(rc)
 }
 func (this *Account) SetBool(name string, value bool) {
 	if value {
-		C.purple_account_set_bool(this.account, C.CString(name), C.TRUE)
+		C.purple_account_set_bool(this.account, CCString(name).Ptr, C.TRUE)
 	} else {
-		C.purple_account_set_bool(this.account, C.CString(name), C.FALSE)
+		C.purple_account_set_bool(this.account, CCString(name).Ptr, C.FALSE)
 	}
 }
 func (this *Account) GetBool(name string) bool {
-	rc := C.purple_account_get_bool(this.account, C.CString(name), C.FALSE)
+	rc := C.purple_account_get_bool(this.account, CCString(name).Ptr, C.FALSE)
 	if rc == C.TRUE {
 		return true
 	}
@@ -137,19 +137,19 @@ func (this *Account) GetBool(name string) bool {
 }
 
 func (this *Account) SetUserName(name string) {
-	C.purple_account_set_username(this.account, C.CString(name))
+	C.purple_account_set_username(this.account, CCString(name).Ptr)
 }
 func (this *Account) SetAlias(alias string) {
-	C.purple_account_set_alias(this.account, C.CString(alias))
+	C.purple_account_set_alias(this.account, CCString(alias).Ptr)
 }
 func (this *Account) SetPassword(password string) {
-	C.purple_account_set_password(this.account, C.CString(password))
+	C.purple_account_set_password(this.account, CCString(password).Ptr)
 }
 func (this *Account) SetUserInfo(userInfo string) {
-	C.purple_account_set_user_info(this.account, C.CString(userInfo))
+	C.purple_account_set_user_info(this.account, CCString(userInfo).Ptr)
 }
 func (this *Account) SetBuddyIconPath(path string) {
-	C.purple_account_set_buddy_icon_path(this.account, C.CString(path))
+	C.purple_account_set_buddy_icon_path(this.account, CCString(path).Ptr)
 }
 
 func (this *Account) GetProtocolId() string {
@@ -176,19 +176,19 @@ func (this *Account) ClearCurrentError() {
 }
 
 func (this *Account) NotifyAdded(remoteUser, id, alias, msg string) {
-	C.purple_account_notify_added(this.account, C.CString(remoteUser),
-		C.CString(id), C.CString(alias), C.CString(msg))
+	C.purple_account_notify_added(this.account, CCString(remoteUser).Ptr,
+		CCString(id).Ptr, CCString(alias).Ptr, CCString(msg).Ptr)
 }
 func (this *Account) RequestAdd(remoteUser, id, alias, msg string) {
-	C.purple_account_request_add(this.account, C.CString(remoteUser),
-		C.CString(id), C.CString(alias), C.CString(msg))
+	C.purple_account_request_add(this.account, CCString(remoteUser).Ptr,
+		CCString(id).Ptr, CCString(alias).Ptr, CCString(msg).Ptr)
 }
 func (this *Account) RequestCloseWithAccount() {
 	C.purple_account_request_close_with_account(this.account)
 }
 
 func (this *Account) SetProtocolId(protocolId string) {
-	C.purple_account_set_protocol_id(this.account, C.CString(protocolId))
+	C.purple_account_set_protocol_id(this.account, CCString(protocolId).Ptr)
 }
 func (this *Account) SetConnection(gc *Connection) {
 	C.purple_account_set_connection(this.account, gc.conn)
@@ -233,7 +233,7 @@ func AccountsGetAllActive() []*Account {
 	return acs
 }
 func AccountsFind(name, protocol string) *Account {
-	acc := C.purple_accounts_find(C.CString(name), C.CString(protocol))
+	acc := C.purple_accounts_find(CCString(name).Ptr, CCString(protocol).Ptr)
 	if acc == nil {
 	} else {
 		return newAccountFrom(acc)

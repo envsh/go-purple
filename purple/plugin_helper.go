@@ -489,11 +489,11 @@ func goprpl_status_types(ac *C.PurpleAccount) *C.GList {
 		var stype *C.PurpleStatusType
 
 		stype = C.purple_status_type_new(C.PURPLE_STATUS_AVAILABLE,
-			C.CString("tox_online"), C.CString("Online"), C.TRUE)
+			CCString("tox_online").Ptr, CCString("Online").Ptr, C.TRUE)
 		types = C.g_list_append(types, stype)
 
 		stype = C.purple_status_type_new(C.PURPLE_STATUS_OFFLINE,
-			C.CString("tox_offline"), C.CString("Offline"), C.TRUE)
+			CCString("tox_offline").Ptr, CCString("Offline").Ptr, C.TRUE)
 		types = C.g_list_append(types, stype)
 	}
 
@@ -541,7 +541,7 @@ func goprpl_chat_info_defaults(gc *C.PurpleConnection, chatName *C.char) *C.GHas
 	var defaults *C.GHashTable
 	defaults = C.goprpl_hash_table_new_full()
 	if chatName != nil {
-		dchan := C.g_strdup((*C.gchar)(C.CString("ToxChannel")))
+		dchan := C.g_strdup((*C.gchar)(CCString("ToxChannel").Ptr))
 		C.g_hash_table_insert(defaults, dchan,
 			(*C.gchar)(C.g_strdup((*C.gchar)(chatName))))
 	}

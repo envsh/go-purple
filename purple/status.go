@@ -51,7 +51,7 @@ func NewStatusTypeFull(primitive int, id, name string, saveable bool,
 	}
 
 	this.sty = C.purple_status_type_new_full(C.PurpleStatusPrimitive(primitive),
-		C.CString(id), C.CString(name), csaveable, csettable, cindependent)
+		CCString(id).Ptr, CCString(name).Ptr, csaveable, csettable, cindependent)
 	return this
 }
 
@@ -63,7 +63,7 @@ func NewStatusType(primitive int, id, name string, settable bool) *StatusType {
 	}
 
 	this.sty = C.purple_status_type_new(C.PurpleStatusPrimitive(primitive),
-		C.CString(id), C.CString(name), csettable)
+		CCString(id).Ptr, CCString(name).Ptr, csettable)
 	return this
 }
 

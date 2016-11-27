@@ -14,21 +14,21 @@ import "C"
 // import "unsafe"
 
 func PluginsFindWithName(name string) *Plugin {
-	plugin := C.purple_plugins_find_with_name(C.CString(name))
+	plugin := C.purple_plugins_find_with_name(CCString(name).Ptr)
 	return newPluginFrom(plugin)
 }
 
 func PluginsFindWithFilename(filename string) *Plugin {
-	plugin := C.purple_plugins_find_with_filename(C.CString(filename))
+	plugin := C.purple_plugins_find_with_filename(CCString(filename).Ptr)
 	return newPluginFrom(plugin)
 }
 func PluginsFindWithBasename(basename string) *Plugin {
 
-	plugin := C.purple_plugins_find_with_basename(C.CString(basename))
+	plugin := C.purple_plugins_find_with_basename(CCString(basename).Ptr)
 	return newPluginFrom(plugin)
 }
 func PluginsFindWithId(id string) *Plugin {
-	plugin := C.purple_plugins_find_with_id(C.CString(id))
+	plugin := C.purple_plugins_find_with_id(CCString(id).Ptr)
 	return newPluginFrom(plugin)
 }
 

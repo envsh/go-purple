@@ -21,7 +21,7 @@ func NewCoreUiOps() *CoreUiOps {
 }
 
 func CoreInit(ui string) bool {
-	return c2goBool(C.purple_core_init(C.CString(ui)))
+	return c2goBool(C.purple_core_init(CCString(ui).Ptr))
 }
 func CoreQuit() {
 	C.purple_core_quit()

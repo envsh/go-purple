@@ -17,7 +17,7 @@ import (
 
 // cgo don't support variadic parameter list, so wrapper it
 func PrplGotUserStatus(ac *Account, name, statusId string) {
-	C.gopurple_prpl_got_user_status(ac.account, C.CString(name), C.CString(statusId))
+	C.gopurple_prpl_got_user_status(ac.account, CCString(name).Ptr, CCString(statusId).Ptr)
 }
 
 type ProtoChatEntry struct {

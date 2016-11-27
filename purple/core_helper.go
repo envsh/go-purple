@@ -68,7 +68,7 @@ func (this *PurpleCore) initCoreOps() {
 func (this *PurpleCore) initLibpurple() {
 	if false {
 		home := fmt.Sprintf("%s/%s", os.Getenv("HOME"), CUSTOM_USER_DIRECTORY)
-		C.purple_util_set_user_dir(C.CString(home))
+		C.purple_util_set_user_dir(CCString(home).Ptr)
 		C.purple_debug_set_enabled(C.FALSE)
 	}
 
@@ -77,9 +77,9 @@ func (this *PurpleCore) initLibpurple() {
 	// C.purple_eventloop_set_ui_ops(&this.loopUiOps)
 	C.purple_eventloop_set_ui_ops(C.gopurple_get_loopops())
 
-	C.purple_plugins_add_search_path(C.CString(CUSTOM_PLUGIN_PATH))
+	C.purple_plugins_add_search_path(CCString(CUSTOM_PLUGIN_PATH).Ptr)
 
-	if cok := C.purple_core_init(C.CString(UI_ID)); cok != C.TRUE {
+	if cok := C.purple_core_init(CCString(UI_ID).Ptr); cok != C.TRUE {
 		log.Println("libpurple initialization failed. Dumping core." +
 			"Please report this!\n")
 		os.Exit(-1)
@@ -88,7 +88,7 @@ func (this *PurpleCore) initLibpurple() {
 	C.purple_set_blist(C.purple_blist_new())
 	C.purple_blist_load()
 	C.purple_prefs_load()
-	C.purple_plugins_load_saved(C.CString(PLUGIN_SAVE_PREF))
+	C.purple_plugins_load_saved(CCString(PLUGIN_SAVE_PREF).Ptr)
 	C.purple_pounces_load()
 
 	//

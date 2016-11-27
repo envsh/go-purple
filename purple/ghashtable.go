@@ -32,12 +32,12 @@ func (this *GHashTable) Destroy() {
 }
 
 func (this *GHashTable) Lookup(key string) string {
-	val := C.g_hash_table_lookup(this.ht, C.CString(key))
+	val := C.g_hash_table_lookup(this.ht, CCString(key).Ptr)
 	return C.GoString((*C.char)(val))
 }
 
 func (this *GHashTable) Insert(key string, value string) bool {
-	ret := C.g_hash_table_insert(this.ht, C.CString(key), C.CString(value))
+	ret := C.g_hash_table_insert(this.ht, CCString(key).Ptr, CCString(value).Ptr)
 	if ret == C.TRUE {
 		return true
 	} else {
@@ -46,7 +46,7 @@ func (this *GHashTable) Insert(key string, value string) bool {
 }
 
 func (this *GHashTable) Replace(key string, value string) bool {
-	ret := C.g_hash_table_replace(this.ht, C.CString(key), C.CString(value))
+	ret := C.g_hash_table_replace(this.ht, CCString(key).Ptr, CCString(value).Ptr)
 	if ret == C.TRUE {
 		return true
 	} else {
@@ -55,7 +55,7 @@ func (this *GHashTable) Replace(key string, value string) bool {
 }
 
 func (this *GHashTable) Add(key string) bool {
-	ret := C.g_hash_table_add(this.ht, C.CString(key))
+	ret := C.g_hash_table_add(this.ht, CCString(key).Ptr)
 	if ret == C.TRUE {
 		return true
 	} else {
@@ -64,7 +64,7 @@ func (this *GHashTable) Add(key string) bool {
 }
 
 func (this *GHashTable) Remove(key string) bool {
-	ret := C.g_hash_table_remove(this.ht, C.CString(key))
+	ret := C.g_hash_table_remove(this.ht, CCString(key).Ptr)
 	if ret == C.TRUE {
 		return true
 	} else {
@@ -73,7 +73,7 @@ func (this *GHashTable) Remove(key string) bool {
 }
 
 func (this *GHashTable) Contains(key string) bool {
-	ret := C.g_hash_table_contains(this.ht, C.CString(key))
+	ret := C.g_hash_table_contains(this.ht, CCString(key).Ptr)
 	if ret == C.TRUE {
 		return true
 	} else {

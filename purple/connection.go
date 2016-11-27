@@ -56,7 +56,7 @@ func (this *Connection) ConnGetAccount() *Account {
 }
 
 func (this *Connection) ConnSetDisplayName(name string) {
-	C.purple_connection_set_display_name(this.conn, C.CString(name))
+	C.purple_connection_set_display_name(this.conn, CCString(name).Ptr)
 }
 
 func (this *Connection) ConnFindChat(id int) *Conversation {
