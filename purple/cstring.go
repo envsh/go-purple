@@ -67,7 +67,7 @@ func setFinalizerForCString(this *CString) {
 }
 
 func freeCString(cs *CString) {
-	if true {
+	if false {
 		ostr := cs.Str
 		if len(ostr) > 67 {
 			ostr = ostr[0:67] + "..."
@@ -80,9 +80,14 @@ func freeCString(cs *CString) {
 			cs, cs.Ptr, len(cs.Str), ostr, freedSize+uint64(cs.sz),
 			cs.pc, cs.t, file, line, name)
 	}
+	pp := &cs.Ptr
 	p := unsafe.Pointer(cs.Ptr)
 	cs.Ptr = nil
 	C.free(p)
+	pp = (**C.char)((unsafe.Pointer)((uintptr)(0x1)))
+	if false {
+		println(pp)
+	}
 
 	if freeCounter != nil {
 		freeCounter()

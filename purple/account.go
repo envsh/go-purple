@@ -4,6 +4,7 @@ package purple
 #include <libpurple/purple.h>
 */
 import "C"
+import "unsafe"
 
 type Account struct {
 	// private
@@ -242,4 +243,8 @@ func AccountsFind(name, protocol string) *Account {
 }
 func AccountsRestoreCurrentStatues() {
 	C.purple_accounts_restore_current_statuses()
+}
+
+func AccountsGetHandle() unsafe.Pointer {
+	return C.purple_accounts_get_handle()
 }

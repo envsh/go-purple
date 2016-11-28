@@ -4,6 +4,7 @@ package purple
 #include <libpurple/purple.h>
 */
 import "C"
+import "unsafe"
 
 type Buddy struct {
 	buddy *C.PurpleBuddy
@@ -195,4 +196,8 @@ func BlistLoad() {
 
 func BlistScheduleSave() {
 	C.purple_blist_schedule_save()
+}
+
+func BlistGetHandle() unsafe.Pointer {
+	return C.purple_blist_get_handle()
 }

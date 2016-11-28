@@ -189,3 +189,7 @@ func (this *Connection) FindChat(id int) *Conversation {
 	}
 	return newConversationFrom(conv)
 }
+
+func ConversationsGetHandle() unsafe.Pointer {
+	return C.purple_conversations_get_handle()
+}

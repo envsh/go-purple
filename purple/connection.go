@@ -4,6 +4,7 @@ package purple
 #include <libpurple/purple.h>
 */
 import "C"
+import "unsafe"
 
 import (
 	"log"
@@ -87,4 +88,8 @@ func newConnectionErrorInfoFrom(cei *C.PurpleConnectionErrorInfo) *ConnectionErr
 
 func (this *ConnectionErrorInfo) Get() (int, string) {
 	return 0, C.GoString(this.cei.description)
+}
+
+func ConnectionsGetHandle() unsafe.Pointer {
+	return C.purple_connections_get_handle()
 }

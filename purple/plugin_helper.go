@@ -251,7 +251,8 @@ func (this *Plugin) convertInfo() {
 	this.cppi.author = C.CString(this.pi.Author)
 
 	// this will set all without check
-	C._set_plugin_funcs(this.cppi, this.cpppi)
+	C._set_plugin_funcs(this.cppi, this.cpppi) // c version
+	this.set_plugin_funcs()                    // go version
 	// this will check and unset nil callback functions
 	this._unset_plugin_funcs()
 
@@ -260,6 +261,56 @@ func (this *Plugin) convertInfo() {
 	this.cpppi.options = C.OPT_PROTO_CHAT_TOPIC | C.OPT_PROTO_PASSWORD_OPTIONAL |
 		C.OPT_PROTO_INVITE_MESSAGE
 	this.cpppi.struct_size = C.sizeof_PurplePluginProtocolInfo
+}
+
+// go version of C._set_plugin_funcs()
+func (this *Plugin) set_plugin_funcs() {
+	var ispec C.PurpleBuddyIconSpec
+	this.cpppi.icon_spec = ispec
+
+	// must
+	this.cpppi.list_icon = go2cfn(C.goprpl_blist_icon)
+	this.cpppi.status_types = go2cfn(C.goprpl_status_types)
+	this.cpppi.login = go2cfn(C.goprpl_login)
+	this.cpppi.close = go2cfn(C.goprpl_close)
+
+	// optional, might by Proirity high to low
+	this.cpppi.chat_info = go2cfn(C.goprpl_chat_info)
+	this.cpppi.chat_info_defaults = go2cfn(C.goprpl_chat_info_defaults)
+	this.cpppi.send_im = go2cfn(C.goprpl_send_im)
+	this.cpppi.join_chat = go2cfn(C.goprpl_join_chat)
+	this.cpppi.reject_chat = go2cfn(C.goprpl_reject_chat)
+	this.cpppi.get_chat_name = go2cfn(C.goprpl_get_chat_name)
+	this.cpppi.chat_invite = go2cfn(C.goprpl_chat_invite)
+	this.cpppi.chat_leave = go2cfn(C.goprpl_chat_leave)
+	this.cpppi.chat_whisper = go2cfn(C.goprpl_chat_whisper)
+	this.cpppi.chat_send = go2cfn(C.goprpl_chat_send)
+	this.cpppi.roomlist_get_list = go2cfn(C.goprpl_roomlist_get_list)
+	this.cpppi.add_buddy_with_invite = go2cfn(C.goprpl_add_buddy_with_invite)
+	this.cpppi.remove_buddy = go2cfn(C.goprpl_remove_buddy)
+	this.cpppi.add_permit = go2cfn(C.goprpl_add_permit)
+	this.cpppi.add_deny = go2cfn(C.goprpl_add_deny)
+	this.cpppi.rem_permit = go2cfn(C.goprpl_rem_permit)
+	this.cpppi.rem_deny = go2cfn(C.goprpl_rem_deny)
+	this.cpppi.get_info = go2cfn(C.goprpl_get_info)
+	this.cpppi.status_text = go2cfn(C.goprpl_status_text)
+	this.cpppi.set_chat_topic = go2cfn(C.goprpl_set_chat_topic)
+	this.cpppi.normalize = go2cfn(C.goprpl_normalize)
+
+	// not tested
+	this.cpppi.list_emblem = go2cfn(C.goprpl_list_emblem)
+	this.cpppi.tooltip_text = go2cfn(C.goprpl_tooltip_text)
+	this.cpppi.send_typing = go2cfn(C.goprpl_send_typing)
+	this.cpppi.keepalive = go2cfn(C.goprpl_keepalive)
+	this.cpppi.register_user = go2cfn(C.goprpl_register_user)
+	// UnregisterUser func(ac *Account, cb PurpleAccountUnregistrationCb, ...)
+
+	this.cpppi.offline_message = go2cfn(C.goprpl_offline_message)
+	this.cpppi.send_raw = go2cfn(C.goprpl_send_raw)
+	// RoomlistRoomSerialize func(room *RoomlistRoom) string
+	this.cpppi.send_attention = go2cfn(C.goprpl_send_attention)
+	this.cpppi.get_attention_types = go2cfn(C.goprpl_get_attension_types)
+
 }
 
 // this will check and unset nil callback functions

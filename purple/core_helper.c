@@ -128,21 +128,22 @@ void gopurple_connect_to_signals(void)
 
 	purple_signal_connect(purple_connections_get_handle(), "signed-on", &handle,
                           PURPLE_CALLBACK(gopurple_signed_on), (void*)&handle);
-    /*
+
+	purple_signal_connect(purple_connections_get_handle(), "signed-off", &handle,
+                          PURPLE_CALLBACK(gopurple_signed_off), (void*)&handle);
+
 	purple_signal_connect(purple_blist_get_handle(), "buddy-signed-on", &handle,
-				PURPLE_CALLBACK(buddy_signed_on), NULL);
+				PURPLE_CALLBACK(gopurple_buddy_signed_on), NULL);
 
 	purple_signal_connect(purple_blist_get_handle(), "buddy-signed-off", &handle,
-				PURPLE_CALLBACK(buddy_signed_off), NULL);
-
+				PURPLE_CALLBACK(gopurple_buddy_signed_off), NULL);
+    /*
 	purple_signal_connect(purple_blist_get_handle(), "buddy-status-changed", &handle,
 				PURPLE_CALLBACK(buddy_away), NULL);
 
 	purple_signal_connect(purple_blist_get_handle(), "buddy-idle-changed", &handle,
 				PURPLE_CALLBACK(buddy_idle), NULL);
 
-	purple_signal_connect(purple_conversations_get_handle(), "received-im-msg", &handle,
-				PURPLE_CALLBACK(received_im_msg), NULL);
 
 	purple_signal_connect(purple_conversations_get_handle(), "buddy-typing", &handle,
 				PURPLE_CALLBACK(buddy_typing), NULL);
@@ -158,8 +159,12 @@ void gopurple_connect_to_signals(void)
 
 	// purple_signal_connect(purple_accounts_get_handle(), "dbus-method-called", &handle,
 				// PURPLE_CALLBACK(dbus_method_called), NULL);
+    */
+
+    purple_signal_connect(purple_conversations_get_handle(), "received-im-msg", &handle,
+				PURPLE_CALLBACK(gopurple_received_im_msg), NULL);
 
 	purple_signal_connect(purple_conversations_get_handle(), "received-chat-msg", &handle,
-                          PURPLE_CALLBACK(received_chat_msg), NULL);
-    */
+                          PURPLE_CALLBACK(gopurple_received_chat_msg), NULL);
+
 }

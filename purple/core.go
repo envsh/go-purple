@@ -26,3 +26,8 @@ func CoreInit(ui string) bool {
 func CoreQuit() {
 	C.purple_core_quit()
 }
+
+func CoreGetVersion() string {
+	ret := C.purple_core_get_version()
+	return C.GoString(ret)
+}

@@ -126,7 +126,7 @@ static void *request_authorize(PurpleAccount *account, const char *remote_user, 
 	authorize_cb(user_data);
 	//deny_cb(user_data);
 
-    gopurple_request_authorize();
+    gopurple_request_authorize(account, remote_user, id, alias, message, on_list, authorize_cb, deny_cb, user_data);
 
 	return NULL;
 }
@@ -134,13 +134,19 @@ static void *request_authorize(PurpleAccount *account, const char *remote_user, 
 static void connect_progress(PurpleConnection *gc, const char *text, size_t step, size_t step_count)
 {
 	printf("Connection in progress: %i/%i: %s\n", step, step_count, text);
-    gopurple_connect_progress();
+    gopurple_connect_progress(gc, (char*)text, step, step_count);
 }
 
 static void notice(PurpleConnection *gc, const char *text)
 {
 	printf("Connection notice: %s\n", text);
-    gopurple_notice();
+    gopurple_notice(gc, (char*)text);
+}
+
+static void network_connected(void)
+{
+	printf("This machine has been disconnected from the internet\n");
+    gopurple_network_connected();
 }
 
 static void network_disconnected(void)
@@ -153,7 +159,7 @@ static void report_disconnect_reason(PurpleConnection *gc, PurpleConnectionError
 {
 	PurpleAccount *account = purple_connection_get_account(gc);
 	printf("Connection disconnected: \"%s\" (%s)\n  >Error: %d\n  >Reason: %s\n", purple_account_get_username(account), purple_account_get_protocol_id(account), reason, text);
-    gopurple_report_disconnect_reason();
+    gopurple_report_disconnect_reason(gc, reason, (char*)text);
 }
 
 //*** Conversation uiops
@@ -288,13 +294,13 @@ static void signed_on(PurpleConnection *gc, void *data)
 static void buddy_signed_on(PurpleBuddy *buddy)
 {
 	printf("Buddy \"%s\" (%s) signed on\n", purple_buddy_get_name(buddy), purple_account_get_protocol_id(purple_buddy_get_account(buddy)));
-    gopurple_buddy_signed_on();
+    gopurple_buddy_signed_on(buddy);
 }
 
 static void buddy_signed_off(PurpleBuddy *buddy)
 {
 	printf("Buddy \"%s\" (%s) signed off\n", purple_buddy_get_name(buddy), purple_account_get_protocol_id(purple_buddy_get_account(buddy)));
-    gopurple_buddy_signed_off();
+    gopurple_buddy_signed_off(buddy);
 }
 
 static void buddy_away(PurpleBuddy *buddy, PurpleStatus *old_status, PurpleStatus *status)
@@ -328,7 +334,7 @@ static void readanswer(size_t *size, char *buffer, const char *sender, const cha
 
 static void received_im_msg(PurpleAccount *account, char *sender, char *message, PurpleConversation *conv, PurpleMessageFlags flags)
 {
-    gopurple_received_im_msg();
+    gopurple_received_im_msg(account, sender, message, conv, flags);
 
 	if (conv==NULL)
   	{
@@ -389,7 +395,7 @@ received_chat_msg(PurpleAccount *account, char *sender, char *buffer,
                   PurpleConversation *chat, PurpleMessageFlags flags, void *data)
 {
     printf("received chat msg: %s / %s \n", sender, buffer);
-    gopurple_received_chat_msg();
+    gopurple_received_chat_msg(account, sender, buffer, chat, flags, data);
 }
 
 static void connect_to_signals(void)

@@ -10,6 +10,29 @@ import (
 	"time"
 )
 
+//
+func (this *Connection) ServSendTyping(name string, state int) uint {
+	rc := C.serv_send_typing(this.conn, CCString(name).Ptr, C.PurpleTypingState(state))
+	return uint(rc)
+}
+func (this *Buddy) ServMoveBuddy(g0 *Group, g1 *Group) {
+	C.serv_move_buddy(this.buddy, g0.group, g1.group)
+}
+func (this *Connection) ServSendIM(who string, message string, flags int) int {
+	rc := C.serv_send_im(this.conn, CCString(who).Ptr, CCString(message).Ptr, C.PurpleMessageFlags(flags))
+	return int(rc)
+}
+func (this *Account) GetAttentionTypeFromCode(typeCode uint) *C.PurpleAttentionType {
+	ret := C.purple_get_attention_type_from_code(this.account, C.guint(typeCode))
+	return ret
+}
+func (this *Connection) ServSendAttention(who string, typeCode uint) {
+	C.serv_send_attention(this.conn, CCString(who).Ptr, C.guint(typeCode))
+}
+func (this *Connection) ServGotAttention(who string, typeCode uint) {
+	C.serv_got_attention(this.conn, CCString(who).Ptr, C.guint(typeCode))
+}
+
 ////
 func (this *Connection) ServChatInvite(id int, name string, who string) {
 	C.serv_chat_invite(this.conn, C.int(id), CCString(name).Ptr, CCString(who).Ptr)
