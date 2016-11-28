@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"sync"
 
 	"github.com/thoj/go-ircevent"
@@ -12,20 +13,20 @@ const (
 	PROTO_TOX
 )
 
-var busch = make(chan interface{}, 123)
-
 type Account struct {
 	proto int
 	ircon *irc.Connection
 }
 
 type AccountPool struct {
+	ctx *Context
 	mtx sync.Mutex
 	acs map[string]*Account
 }
 
 func NewAccountPool() *AccountPool {
 	this := &AccountPool{}
+	this.ctx = ctx
 	this.acs = make(map[string]*Account)
 	return this
 }
@@ -50,15 +51,18 @@ func (this *AccountPool) add(name string) *Account {
 	ircon.UseTLS = true
 	ircon.Debug = false
 
-	ircon.AddCallback("*", func(e *irc.Event) {
-		busch <- e
-	})
+	ircon.AddCallback("*", func(e *irc.Event) { this.ctx.busch <- e })
 
 	ac := &Account{}
 	ac.ircon = ircon
 	this.acs[name] = ac
 
-	go ac.ircon.Connect(serverssl)
+	go func() {
+		err := ac.ircon.Connect(serverssl)
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 
 	return ac
 }
@@ -67,5 +71,7 @@ func (this *AccountPool) remove(name string) {
 	ac, _ := this.acs[name]
 	delete(this.acs, name)
 	ac.ircon.ClearCallback("*")
-	ac.ircon.Disconnect()
+	if ac.ircon.Connected() {
+		ac.ircon.Disconnect()
+	}
 }

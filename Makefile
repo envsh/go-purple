@@ -30,6 +30,9 @@ wxl:
 bot:
 	go build -v -o yobot.bin go-purple/yobot/
 
+bot2:
+	go build -v -o yobot2.bin go-purple/yobot2/
+
 cmem:
 	go install -v go-purple/cmemory
 
