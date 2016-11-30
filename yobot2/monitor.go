@@ -5,6 +5,8 @@ import (
 	"log"
 	"strings"
 
+	"go-purple/purple"
+
 	"github.com/godbus/dbus"
 )
 
@@ -19,9 +21,9 @@ func NewController() *Controller {
 	return this
 }
 
-var service = "im.pidgin.gopurple.PurpleService"
-var path = "/im/pidgin/gopurple/PurpleObject"
-var iface = "im.pidgin.gopurple.PurpleInterface"
+var service = purple.GetDBusService() //  "im.pidgin.gopurple.PurpleService"
+var path = purple.GetDBusPath()       // "/im/pidgin/gopurple/PurpleObject"
+var iface = purple.GetDBusInterface() // "im.pidgin.gopurple.PurpleInterface"
 
 func (this *Controller) init() {
 	var err error
@@ -34,6 +36,7 @@ func (this *Controller) init() {
 
 	sigstr := fmt.Sprintf(
 		"type='signal',path='%s',interface='%s',sender='%s'", path, iface, service)
+	log.Println(sigstr)
 	this.conn.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, sigstr)
 	this.sigch = make(chan *dbus.Signal, 123)
 	this.conn.Signal(this.sigch)

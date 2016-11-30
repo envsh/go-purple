@@ -2,6 +2,11 @@ package purple
 
 /*
 #include <libpurple/purple.h>
+
+static void gopurple_account_set_status(PurpleAccount *account, const char *status_id,
+	gboolean active) {
+    purple_account_set_status(account, status_id, active, NULL);
+}
 */
 import "C"
 import "unsafe"
@@ -51,6 +56,19 @@ func (this *Account) GetConnection() *Connection {
 	return newConnectionFrom(cgc)
 }
 
+func (this *Account) IsConnected() bool {
+	ret := C.purple_account_is_connected(this.account)
+	return c2goBool(ret)
+}
+func (this *Account) IsConnecting() bool {
+	ret := C.purple_account_is_connecting(this.account)
+	return c2goBool(ret)
+}
+func (this *Account) IsDisconnected() bool {
+	ret := C.purple_account_is_disconnected(this.account)
+	return c2goBool(ret)
+}
+
 func (this *Account) GetUserName() string {
 	cstr := C.purple_account_get_username(this.account)
 	return C.GoString(cstr)
@@ -95,15 +113,12 @@ func (this *Account) FindBuddies(name string) []*Buddy {
 	return nil
 }
 
-func (this *Account) SetEnabled(enable bool) {
-	C.purple_account_set_enabled(this.account, CCString(UI_ID).Ptr, C.TRUE)
+func (this *Account) SetEnabled(enabled bool) {
+	C.purple_account_set_enabled(this.account, CCString(UI_ID).Ptr, go2cBool(enabled))
 }
 func (this *Account) GetEnabled() bool {
 	rc := C.purple_account_get_enabled(this.account, CCString(UI_ID).Ptr)
-	if rc == C.TRUE {
-		return true
-	}
-	return false
+	return c2goBool(rc)
 }
 func (this *Account) GetString(name string) string {
 	cstr := C.purple_account_get_string(this.account, CCString(name).Ptr, nil)
@@ -123,18 +138,11 @@ func (this *Account) GetInt(name string) int {
 	return int(rc)
 }
 func (this *Account) SetBool(name string, value bool) {
-	if value {
-		C.purple_account_set_bool(this.account, CCString(name).Ptr, C.TRUE)
-	} else {
-		C.purple_account_set_bool(this.account, CCString(name).Ptr, C.FALSE)
-	}
+	C.purple_account_set_bool(this.account, CCString(name).Ptr, go2cBool(value))
 }
 func (this *Account) GetBool(name string) bool {
 	rc := C.purple_account_get_bool(this.account, CCString(name).Ptr, C.FALSE)
-	if rc == C.TRUE {
-		return true
-	}
-	return false
+	return c2goBool(rc)
 }
 
 func (this *Account) SetUserName(name string) {
@@ -151,6 +159,10 @@ func (this *Account) SetUserInfo(userInfo string) {
 }
 func (this *Account) SetBuddyIconPath(path string) {
 	C.purple_account_set_buddy_icon_path(this.account, CCString(path).Ptr)
+}
+
+func (this *Account) SetStatus(statusId string, active bool) {
+	C.gopurple_account_set_status(this.account, CCString(statusId).Ptr, go2cBool(active))
 }
 
 func (this *Account) GetProtocolId() string {
@@ -201,15 +213,39 @@ func (this *Account) SetCheckMail(value bool) {
 	C.purple_account_set_check_mail(this.account, go2cBool(value))
 }
 
+func (this *Account) SetUiInt(name string, value int) {
+	C.purple_account_set_ui_int(this.account, CCString(UI_ID).Ptr, CCString(name).Ptr, C.int(value))
+}
+func (this *Account) SetUiBool(name string, value bool) {
+	C.purple_account_set_ui_bool(this.account, CCString(UI_ID).Ptr, CCString(name).Ptr, go2cBool(value))
+}
+func (this *Account) SetUiString(name string, value string) {
+	C.purple_account_set_ui_string(this.account, CCString(UI_ID).Ptr, CCString(name).Ptr, CCString(value).Ptr)
+}
+func (this *Account) GetUiInt(name string) int {
+	ret := C.purple_account_get_ui_int(this.account, CCString(UI_ID).Ptr, CCString(name).Ptr, C.int(0))
+	return int(ret)
+}
+func (this *Account) GetUiBool(name string) bool {
+	ret := C.purple_account_get_ui_bool(this.account, CCString(UI_ID).Ptr, CCString(name).Ptr, C.FALSE)
+	return c2goBool(ret)
+}
+func (this *Account) GetUiString(name string) string {
+	ret := C.purple_account_get_ui_string(this.account, CCString(UI_ID).Ptr, CCString(name).Ptr, nil)
+	return C.GoString(ret)
+}
+
 // accounts
 func (this *Account) AccountsAdd() {
 	C.purple_accounts_add(this.account)
 }
 func (this *Account) AccountsRemove() {
 	C.purple_accounts_remove(this.account)
+	this.account = nil
 }
 func (this *Account) AccountsDelete() {
 	C.purple_accounts_delete(this.account)
+	this.account = nil
 }
 func (this *Account) AccountsReorder(newIndex int) {
 	C.purple_accounts_reorder(this.account, C.gint(newIndex))

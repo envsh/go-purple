@@ -42,3 +42,7 @@ func (this *SavedStatus) Activate() {
 func (this *SavedStatus) ActivateForAccount(ac *Account) {
 	C.purple_savedstatus_activate_for_account(this.ss, ac.account)
 }
+
+func SavedStatusSetIdleAway(idleaway bool) {
+	C.purple_savedstatus_set_idleaway(go2cBool(idleaway))
+}

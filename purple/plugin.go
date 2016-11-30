@@ -13,6 +13,35 @@ import "C"
 
 // import "unsafe"
 
+func (this *Plugin) GetId() string {
+	ret := C.purple_plugin_get_id(this.cpp)
+	return C.GoString((*C.char)(ret))
+}
+func (this *Plugin) GetName() string {
+	ret := C.purple_plugin_get_name(this.cpp)
+	return C.GoString((*C.char)(ret))
+}
+func (this *Plugin) GetVersion() string {
+	ret := C.purple_plugin_get_version(this.cpp)
+	return C.GoString((*C.char)(ret))
+}
+func (this *Plugin) GetAuthor() string {
+	ret := C.purple_plugin_get_author(this.cpp)
+	return C.GoString((*C.char)(ret))
+}
+func (this *Plugin) GetSummary() string {
+	ret := C.purple_plugin_get_summary(this.cpp)
+	return C.GoString((*C.char)(ret))
+}
+func (this *Plugin) GetDescription() string {
+	ret := C.purple_plugin_get_description(this.cpp)
+	return C.GoString((*C.char)(ret))
+}
+func (this *Plugin) GetHomepage() string {
+	ret := C.purple_plugin_get_homepage(this.cpp)
+	return C.GoString((*C.char)(ret))
+}
+
 func PluginsFindWithName(name string) *Plugin {
 	plugin := C.purple_plugins_find_with_name(CCString(name).Ptr)
 	return newPluginFrom(plugin)
