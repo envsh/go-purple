@@ -15,8 +15,11 @@ static uint64_t MyTid2() { return syscall(sizeof(void*)==4?224:186); }
 */
 import "C"
 import (
+	"fmt"
 	"log"
+	"runtime"
 	"strconv"
+	"strings"
 	"syscall"
 )
 
@@ -43,4 +46,15 @@ func MyTid3() uint64 {
 		log.Println(r1, r2, err)
 	}
 	return uint64(r1)
+}
+
+func GoID() int {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	idField := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
+	id, err := strconv.Atoi(idField)
+	if err != nil {
+		panic(fmt.Sprintf("cannot get goroutine id: %v", err))
+	}
+	return id
 }

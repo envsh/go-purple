@@ -222,10 +222,14 @@ func (this *ToxAgent) setupTox() {
 
 }
 
+// TODO multiple result and reverse order search,
+// for use new group, but not old unsable group
 func (this *ToxAgent) getToxGroupByName(name string) int {
 	chats := this._tox.GetChatList()
 	log.Println(len(chats), chats)
-	for _, groupNumber := range chats {
+	for idx, groupNumber := range chats {
+		// reverse order
+		groupNumber = chats[len(chats)-1-idx]
 		groupTitle, err := this._tox.GroupGetTitle(int(groupNumber))
 		if err != nil {
 			log.Println(err, groupNumber, groupTitle)

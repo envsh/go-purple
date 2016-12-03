@@ -3,12 +3,19 @@ package main
 import (
 	"fmt"
 	"log"
+	"reflect"
 	"strings"
 
 	"go-purple/purple"
 
 	"github.com/godbus/dbus"
 )
+
+type Context struct {
+	ctrls []ProtoController
+}
+
+var ctx = &Context{make([]ProtoController, 0)}
 
 type Controller struct {
 	conn  *dbus.Conn
@@ -18,6 +25,10 @@ type Controller struct {
 
 func NewController() *Controller {
 	this := &Controller{}
+	ctx.ctrls = append(ctx.ctrls, this)
+	ctx.ctrls = append(ctx.ctrls, &IrcController{})
+	ctx.ctrls = append(ctx.ctrls, &ToxController{})
+
 	return this
 }
 
@@ -44,7 +55,7 @@ func (this *Controller) init() {
 }
 
 func (this *Controller) serve() {
-	log.Println("waiting signals...")
+	log.Println("waiting signals...", purple.GoID())
 	for sig := range this.sigch {
 		// log.Println(sig)
 		this.dispatch(sig)
@@ -59,8 +70,9 @@ func (this *Controller) dispatch(sig *dbus.Signal) {
 	if strings.HasPrefix(name, "Irc") && strings.HasSuffix(name, "Text") {
 		return
 	}
-	log.Printf("name=%s, path=%v, iface=%s, %v\n", sig.Name, sig.Path, sig.Sender, sig.Body)
+	log.Printf("name=%s, path=%v, iface=%s, %+v\n", sig.Name, sig.Path, sig.Sender, sig.Body)
 
+	// TODO 根据事件名字，动态查找对应的处理函数
 	switch name {
 	case "AccountStatusChanged":
 		call := this.BusCall("PurpleStatusGetName", sig.Body[1])
@@ -71,6 +83,17 @@ func (this *Controller) dispatch(sig *dbus.Signal) {
 			log.Println("join...")
 		}
 	}
+
+	// 还是少用点动态特性吧，不然和python一样了
+	hname := "On" + name
+	for _, ctrl := range ctx.ctrls {
+		thisv := reflect.ValueOf(ctrl)
+		mthv := thisv.MethodByName(hname)
+		if mthv.IsValid() {
+			argsv := []reflect.Value{reflect.ValueOf(sig), reflect.ValueOf(name)}
+			mthv.Call(argsv)
+		}
+	}
 }
 
 func (this *Controller) BusCall(method string, args ...interface{}) *dbus.Call {
@@ -78,3 +101,35 @@ func (this *Controller) BusCall(method string, args ...interface{}) *dbus.Call {
 	call := this.ppobj.Call(fullMethod, 0, args...)
 	return call
 }
+
+func (this *Controller) OnAccountStatusChanged(sig *dbus.Signal, name string) {
+	call := this.BusCall("PurpleStatusGetName", sig.Body[1])
+	log.Println(sig, call.Err, call.Body)
+	switch call.Body[0].(string) {
+	case "Away":
+	case "Avaliable":
+		log.Println("join...")
+	}
+}
+
+func (this *Controller) OnSignedOn(sig *dbus.Signal, name string) {
+	log.Println(name)
+	call := this.BusCall("PurpleConnectionGetAccount", sig.Body[0])
+	log.Println(call.Err, call.Body)
+}
+
+func (this *Controller) getProto() string { return "roundtable" }
+
+type ProtoController interface {
+	getProto() string
+}
+
+type IrcController struct {
+}
+
+func (this *IrcController) getProto() string { return "irc" }
+
+type ToxController struct {
+}
+
+func (this *ToxController) getProto() string { return "gotox" }

@@ -129,13 +129,14 @@ func (this *RoundTable) handleEventIrc(e *irc.Event) {
 			chname = toname_
 		}
 
+		// TODO maybe multiple result
 		groupNumber := this.ctx.toxagt.getToxGroupByName(chname)
 		if groupNumber == -1 {
 			log.Println("group not exists:", chname)
 		} else {
 			_, err := this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message)
 			if err != nil {
-				// should be 0
+				// should be 1
 				pno := this.ctx.toxagt._tox.GroupNumberPeers(groupNumber)
 				log.Println(err, chname, groupNumber, message, pno)
 			}

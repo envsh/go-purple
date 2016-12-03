@@ -21,7 +21,7 @@ func main() {
 
 	log.Println(purple.UserDir())
 	purple.UtilSetUserDir("/home/gzleo/.purple-yobot")
-	log.Println(purple.UserDir())
+	log.Println(purple.UserDir(), purple.GoID())
 
 	pc := purple.NewPurpleCore()
 
@@ -30,7 +30,11 @@ func main() {
 	go ctrl.serve()
 
 	as := NewAccountServer(pc)
-	go as.run()
+	if false {
+		go as.run()
+	}
 
+	// go func() { pc.MainLoop() }()
 	pc.MainLoop()
+	// select {}
 }

@@ -31,6 +31,52 @@ func (this *ToxPlugin) setupSelfInfo(ac *purple.Account) {
 	}
 }
 
+type minictx struct {
+	gc *purple.Connection
+	s0 string
+}
+
+func (this *ToxPlugin) requestYescbForFriendRequest(d interface{}) {
+	ctx := d.(*minictx)
+	conn := ctx.gc
+	pubkey := ctx.s0
+	ac := conn.ConnGetAccount()
+	gc := ctx.gc
+
+	friendNumber, err := this._tox.FriendAddNorequest(pubkey)
+	if err != nil {
+		log.Println(err, friendNumber)
+	}
+	this.save_account(conn)
+	friendName, err := this._tox.FriendGetName(friendNumber)
+	if len(friendName) == 0 {
+		friendName = "GoTox User"
+	}
+	buddy := this.findBuddyEx(ac, pubkey)
+	// log.Println(buddy, buddy.GetName(), buddy.GetAliasOnly())
+	if buddy == nil {
+		buddy := purple.NewBuddy(ac, pubkey, friendName)
+		ac.AddBuddy(buddy)
+		buddy.BlistAdd(nil)
+	}
+	this.save_account(gc)
+}
+
+func (this *ToxPlugin) onFriendRequest(t *tox.Tox, pubkey, msg string, d interface{}) {
+	log.Println("hehhe", pubkey, msg)
+	ac := d.(*purple.Account)
+	conn := ac.GetConnection()
+
+	// TODO notice UI and then make desision
+	ctx := &minictx{conn, pubkey}
+	log.Println(purple.GoID())
+	purple.RequestAcceptCancel(ctx, conn, "New Friend Request", msg, pubkey,
+		this.requestYescbForFriendRequest, func(ud interface{}) {
+			// reject?
+			log.Println(ud)
+		})
+}
+
 func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 	conn := ac.GetConnection()
 	gc := conn
@@ -46,32 +92,7 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 		this.save_account(gc)
 	}, ac)
 
-	this._tox.CallbackFriendRequest(func(t *tox.Tox, pubkey, msg string, d interface{}) {
-		log.Println("hehhe", pubkey, msg)
-		// TODO notice UI and then make desision
-		purple.RequestAcceptCancel(this, conn, "New Friend Request", msg,
-			func(ud interface{}) {
-				friendNumber, err := this._tox.FriendAddNorequest(pubkey)
-				if err != nil {
-					log.Println(err, friendNumber)
-				}
-				this.save_account(conn)
-				friendName, err := this._tox.FriendGetName(friendNumber)
-				if len(friendName) == 0 {
-					friendName = "GoTox User"
-				}
-				buddy := this.findBuddyEx(ac, pubkey)
-				// log.Println(buddy, buddy.GetName(), buddy.GetAliasOnly())
-				if buddy == nil {
-					buddy := purple.NewBuddy(ac, pubkey, friendName)
-					ac.AddBuddy(buddy)
-					buddy.BlistAdd(nil)
-				}
-				this.save_account(gc)
-			}, func(ud interface{}) {
-				// reject?
-			})
-	}, ac)
+	this._tox.CallbackFriendRequest(this.onFriendRequest, ac)
 
 	this._tox.CallbackFriendConnectionStatus(func(t *tox.Tox, friendNumber uint32, status uint32, d interface{}) {
 		log.Println(friendNumber, status)
@@ -231,7 +252,7 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 				log.Println("wtf")
 			}
 			purple.RequestAcceptCancel(nil, conn, "New Group Invite",
-				fmt.Sprintf("Are you want to join %s's group?", friendName),
+				fmt.Sprintf("Are you want to join %s's group?", friendName), friendName,
 				acceptInvite, nil)
 		}
 	}, ac)

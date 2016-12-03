@@ -10,25 +10,25 @@ import (
 )
 
 type AccountServer struct {
-	pc    *purple.PurpleCore
-	cbs   purple.CoreCallbacks
-	csigs purple.CoreSignals
+	pc       *purple.PurpleCore
+	cbs      purple.CoreCallbacks
+	csigs    purple.CoreSignals
+	requiops *purple.RequestUiOps
 }
 
 func NewAccountServer(pc *purple.PurpleCore) *AccountServer {
 	this := &AccountServer{}
 	this.pc = pc
+	this.requiops = purple.NewRequestUiOpts()
+	this.requiops.RequestAction = this.RequestAction
+	purple.RequestSetUiOps(this.requiops)
 
 	this.init()
 	return this
 }
 
 func (this *AccountServer) init() {
-	this.csigs.SignedOn = func(gc *purple.Connection) {
-		msg := fmt.Sprintf("hello you @ %s", time.Now())
-		rc := gc.ServSendIM("kitech1", msg, 0)
-		log.Println(rc)
-	}
+	this.fillCallbacks()
 	this.pc.SetCallbacks(this.cbs)
 	this.pc.SetSignals(this.csigs)
 
@@ -103,7 +103,35 @@ func (this *AccountServer) init() {
 	// check all plugins
 	allplugs := purple.PluginsGetAll()
 	for _, plug := range allplugs {
-		log.Println(plug.GetId(), plug.GetName(), plug.GetSummary())
+		if false {
+			log.Println(plug.GetId(), plug.GetName(), plug.GetSummary())
+		}
+	}
+}
+
+func (this *AccountServer) fillCallbacks() {
+	this.csigs.SignedOn = this.onSignedOn
+}
+
+func (this *AccountServer) RequestAction(title string, primary string, secondary string,
+	default_action int, account *purple.Account, who string, conv *purple.Conversation,
+	user_data interface{}, action_count int) interface{} {
+	log.Println(title, primary, who)
+	// purple.RequestActionCB(user_data, 1)
+	return 1
+}
+
+func (this *AccountServer) onSignedOn(gc *purple.Connection) {
+	pid := gc.GetPrplInfo().Id[5:]
+	log.Println(pid)
+
+	switch pid {
+	case "irc":
+		msg := fmt.Sprintf("hello you @ %s", time.Now())
+		rc := gc.ServSendIM("kitech1", msg, 0)
+		log.Println(rc)
+	case "gotox":
+
 	}
 }
 

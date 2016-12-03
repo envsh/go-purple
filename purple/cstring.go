@@ -53,17 +53,19 @@ var triggerTick sync.Once
 func setFinalizerForCString(this *CString) {
 	runtime.SetFinalizer(this, freeCString)
 
-	triggerTick.Do(func() {
-		go func() {
-			tk := time.Tick(5 * time.Second)
-			for {
-				select {
-				case <-tk:
-					runtime.GC()
-				}
+	triggerTick.Do(finalIterate)
+}
+
+func finalIterate() {
+	go func() {
+		tk := time.Tick(5 * time.Second)
+		for {
+			select {
+			case <-tk:
+				runtime.GC()
 			}
-		}()
-	})
+		}
+	}()
 }
 
 func freeCString(cs *CString) {

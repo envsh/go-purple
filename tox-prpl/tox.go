@@ -30,14 +30,14 @@ type ToxPlugin struct {
 
 // plugin functions
 func (this *ToxPlugin) init_tox(p *purple.Plugin) {
-	log.Println("called")
+	log.Println("called", purple.GoID())
 
 }
 
 // should malloc some resource for use?
 // and what resource here allocated is acceptable
 func (this *ToxPlugin) load_tox(p *purple.Plugin) bool {
-	log.Println("called")
+	log.Println("called", purple.GoID())
 	rand.Seed(time.Now().UnixNano())
 	return true
 }
@@ -73,6 +73,7 @@ var bsnodes = []string{
 }
 
 func (this *ToxPlugin) tox_login(ac *purple.Account) {
+	log.Println("called", purple.GoID())
 	this.stopch = make(chan struct{}, 0)
 	this._toxopts = tox.NewToxOptions()
 	this._toxopts.Tcp_port = uint16(rand.Uint32()%55536) + 10000
@@ -119,6 +120,7 @@ func (this *ToxPlugin) tox_login(ac *purple.Account) {
 	}
 
 	// go this.Iterate()
+	log.Println(purple.GoID())
 	this.iterTimerHandler = purple.TimeoutAdd(100, this, this.itercb)
 }
 
@@ -138,6 +140,7 @@ func (this *ToxPlugin) tox_close(gc *purple.Connection) {
 
 ////////
 func (this *ToxPlugin) itercb(d interface{}) {
+	// log.Println(purple.GoID())
 	this._tox.Iterate()
 }
 

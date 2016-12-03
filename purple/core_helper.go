@@ -204,8 +204,9 @@ func (this *PurpleCore) setupCore() {
 }
 
 func (this *PurpleCore) MainLoop() {
-	go func() { C.g_main_loop_run(this.loop) }()
-	select {}
+	C.g_main_loop_run(this.loop)
+	// go func() { C.g_main_loop_run(this.loop) }()
+	// select {}
 }
 
 // get all accout
