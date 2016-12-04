@@ -24,7 +24,10 @@ void gopurple_signed_on(PurpleConnection *gc, void *data);
 void gopurple_signed_off(PurpleConnection *gc, void *data);
 void gopurple_buddy_signed_on(PurpleBuddy *buddy);
 void gopurple_buddy_signed_off(PurpleBuddy *buddy);
+
 void gopurple_received_im_msg(PurpleAccount *account, char *sender, char *message, PurpleConversation *conv, PurpleMessageFlags flags);
 void gopurple_received_chat_msg(PurpleAccount *account, char *sender, char *message, PurpleConversation *conv, PurpleMessageFlags flags, void *data);
+void gopurple_chat_joined(PurpleConversation *conv);
+void gopurple_chat_left(PurpleConversation *conv);
 
 #endif

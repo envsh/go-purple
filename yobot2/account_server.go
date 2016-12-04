@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/rand"
+	"strings"
 	"time"
 
 	"go-purple/purple"
@@ -75,6 +77,13 @@ func (this *AccountServer) init() {
 			ac = purple.NewAccountCreate(username, protoName, "")
 		}
 		ac.SetEnabled(false) // too late, why?
+
+		// more settings
+		switch proto {
+		case "irc":
+			ac.SetInt("port", 6697) // ssl 6697/7000, no-ssl 8001
+			ac.SetBool("ssl", true)
+		}
 	}
 
 	// 连接账号
@@ -111,6 +120,11 @@ func (this *AccountServer) init() {
 
 func (this *AccountServer) fillCallbacks() {
 	this.csigs.SignedOn = this.onSignedOn
+	this.csigs.SignedOff = this.onSignedOff
+	this.csigs.ReceivedIMMsg = this.onReceivedImMsg
+	this.csigs.ReceivedChatMsg = this.onReceivedChatMsg
+	this.csigs.ChatJoined = this.onChatJoined
+	this.csigs.ChatLeft = this.onChatLeft
 }
 
 func (this *AccountServer) RequestAction(title string, primary string, secondary string,
@@ -133,6 +147,144 @@ func (this *AccountServer) onSignedOn(gc *purple.Connection) {
 	case "gotox":
 
 	}
+}
+
+func (this *AccountServer) onSignedOff(gc *purple.Connection) {
+	pid := gc.GetPrplInfo().Id[5:]
+	ac := gc.ConnGetAccount()
+	log.Println(pid, ac, ac.GetAlias())
+	switch pid {
+	case "irc":
+		/*
+			if ac.IsConnected() {
+				ac.SetEnabled(false)
+				ac.Disconnect()
+			}
+			if !ac.GetEnabled() {
+				ac.SetEnabled(true)
+			}
+		*/
+		log.Println(ac.IsConnecting(), ac.IsConnected(), ac.IsDisconnected(), ac.GetEnabled())
+		ac.SetEnabled(true)
+		// ac.Connect()
+	}
+}
+
+func (this *AccountServer) onReceivedImMsg(ac *purple.Account, sender, msg string,
+	conv *purple.Conversation, flags int) {
+	gc := ac.GetConnection()
+	pid := gc.GetPrplInfo().Id[5:]
+	log.Println(pid, ac, ac.GetAlias())
+	log.Println(ac, sender, msg, conv, flags, conv.GetName())
+
+	switch pid {
+	case "irc":
+	case "gotox":
+
+	}
+}
+
+func (this *AccountServer) onReceivedChatMsg(ac *purple.Account, sender, msg string,
+	conv *purple.Conversation, flags int) {
+	gc := ac.GetConnection()
+	pid := gc.GetPrplInfo().Id[5:]
+	log.Println(pid, ac, ac.GetAlias(), ac.GetUserName())
+	log.Println(ac, sender, msg, conv, flags, conv.GetName())
+
+	nmsg := fmt.Sprintf("%s: %s", sender, msg)
+	switch pid {
+	case "irc":
+		if sender == strings.Split(ac.GetUserName(), "@")[0] {
+			// log.Println("self msg, break")
+			break // self msg, break
+		}
+		realConvName := conv.GetName()
+		if v, ok := chmap.Get(conv.GetName()); ok {
+			realConvName = v.(string)
+		}
+		convs := purple.GetConversations()
+		for _, c := range convs {
+			log.Println(c.GetName(), c.GetConnection().GetPrplInfo().Id)
+			if c.GetConnection().GetPrplInfo().Id[5:] == "gotox" && c.GetName() == realConvName {
+				log.Println("found", c)
+				c.GetChatData().Send(nmsg)
+				break
+			}
+		}
+
+	case "gotox":
+		if sender == ac.GetUserName() {
+			// log.Println("self msg, break")
+			break
+		}
+		acdst := purple.AccountsFind(cfg.getIrc(""), "prpl-irc")
+		condst := acdst.GetConnection()
+		if acdst == nil {
+			log.Println("can't find:", cfg.getIrc(""))
+		}
+		if condst == nil {
+			log.Println("conv dest nil")
+		} else {
+			log.Println(acdst.IsConnected(), acdst.IsDisconnected(), acdst.IsConnecting(), acdst.GetEnabled())
+		}
+		ht := purple.NewGHashTable()
+		ht.Insert("channel", conv.GetName())
+		if k, ok := chmap.GetKey(conv.GetName()); ok {
+			ht.Insert("channel", k.(string))
+		}
+		condst.ServJoinChat(ht)
+
+		realConvName := ht.Lookup("channel")
+		convdst := purple.FindConversationWithAccount(purple.CONV_TYPE_CHAT, realConvName, acdst)
+		if convdst == nil {
+			convs := purple.GetConversations()
+			for _, c := range convs {
+				log.Println(c.GetName())
+			}
+		} else {
+			// 不同的发送消息方式，区别在吗呢？
+			if rand.Int()%2 == 0 {
+				convdst.GetChatData().Send(nmsg + " from chat send")
+			} else {
+				chatid := convdst.GetChatData().GetId()
+				condst.ServChatSend(chatid, nmsg+" from serv chat send", 0)
+			}
+			convdst.GetChatData().Write(sender, nmsg+" from chat write", 0) // ??? 发送不了消息？？？
+		}
+	}
+}
+
+func (this *AccountServer) onChatJoined(conv *purple.Conversation) {
+	gc := conv.GetConnection()
+	pid := gc.GetPrplInfo().Id[5:]
+	log.Println(conv, conv.GetName(), pid)
+
+	switch pid {
+	case "irc":
+	case "gotox":
+		acdst := purple.AccountsFind(cfg.getIrc(""), "prpl-irc")
+		condst := acdst.GetConnection()
+		if acdst == nil {
+			log.Println("can't find:", cfg.getIrc(""))
+		}
+		if condst == nil {
+			log.Println("conv dest nil")
+		} else {
+			log.Println(acdst.IsConnected(), acdst.IsDisconnected(), acdst.IsConnecting(), acdst.GetEnabled())
+		}
+		ht := purple.NewGHashTable()
+		ht.Insert("channel", conv.GetName())
+
+		if k, ok := chmap.GetKey(conv.GetName()); ok {
+			ht.Insert("channel", k.(string))
+		}
+		condst.ServJoinChat(ht)
+	}
+}
+func (this *AccountServer) onChatLeft(conv *purple.Conversation) {
+	gc := conv.GetConnection()
+	pid := gc.GetPrplInfo().Id[5:]
+	log.Println(conv, conv.GetName(), pid)
 }
 
 func (this *AccountServer) run() {

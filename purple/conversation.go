@@ -7,6 +7,9 @@ import "C"
 import "unsafe"
 
 import _ "log"
+import (
+	"time"
+)
 
 const (
 	NOT_TYPING = int(C.PURPLE_NOT_TYPING)
@@ -14,12 +17,34 @@ const (
 	TYPED      = int(C.PURPLE_TYPED)
 )
 
+type ConvType int
+
 const (
 	CONV_TYPE_UNKNOWN = int(C.PURPLE_CONV_TYPE_UNKNOWN) /**< Unknown conversation type. */
 	CONV_TYPE_IM      = int(C.PURPLE_CONV_TYPE_IM)      /**< Instant Message.           */
 	CONV_TYPE_CHAT    = int(C.PURPLE_CONV_TYPE_CHAT)    /**< Chat room.                 */
 	CONV_TYPE_MISC    = int(C.PURPLE_CONV_TYPE_MISC)    /**< A misc. conversation.      */
 	CONV_TYPE_ANY     = int(C.PURPLE_CONV_TYPE_ANY)     /**< Any type of conversation.  */
+)
+
+type MessageFlags int
+
+const (
+	MESSAGE_SEND        MessageFlags = C.PURPLE_MESSAGE_SEND
+	MESSAGE_RECV                     = C.PURPLE_MESSAGE_RECV
+	MESSAGE_SYSTEM                   = C.PURPLE_MESSAGE_SYSTEM
+	MESSAGE_AUTO_RESP                = C.PURPLE_MESSAGE_AUTO_RESP
+	MESSAGE_ACTIVE_ONLY              = C.PURPLE_MESSAGE_ACTIVE_ONLY
+	MESSAGE_NICK                     = C.PURPLE_MESSAGE_NICK
+	MESSAGE_NO_LOG                   = C.PURPLE_MESSAGE_NO_LOG
+	MESSAGE_WHISPER                  = C.PURPLE_MESSAGE_WHISPER
+	MESSAGE_ERROR                    = C.PURPLE_MESSAGE_ERROR
+	MESSAGE_DELAYED                  = C.PURPLE_MESSAGE_DELAYED
+	MESSAGE_RAW                      = C.PURPLE_MESSAGE_RAW
+	MESSAGE_IMAGES                   = C.PURPLE_MESSAGE_IMAGES
+	MESSAGE_NOTIFY                   = C.PURPLE_MESSAGE_NOTIFY
+	MESSAGE_NO_LINKIFY               = C.PURPLE_MESSAGE_NO_LINKIFY
+	MESSAGE_INVISIBLE                = C.PURPLE_MESSAGE_INVISIBLE
 )
 
 type Conversation struct {
@@ -81,6 +106,22 @@ func (this *Conversation) GetData(key string) string {
 	return C.GoString((*C.char)(data))
 }
 
+func (this *Conversation) GetAccount() *Account {
+	ac := C.purple_conversation_get_account(this.conv)
+	if ac == nil {
+		return nil
+	}
+	return newAccountFrom(ac)
+}
+
+func (this *Conversation) GetConnection() *Connection {
+	gc := C.purple_conversation_get_gc(this.conv)
+	if gc == nil {
+		return nil
+	}
+	return newConnectionFrom(gc)
+}
+
 func (this *Conversation) SetLogging(logging bool) {
 	C.purple_conversation_set_logging(this.conv, go2cBool(logging))
 }
@@ -120,7 +161,8 @@ func (this *ConvChat) Send(message string) {
 }
 
 func (this *ConvChat) Write(who string, message string, flags int) {
-	// C.purple_conv_chat_write(this.chat, CCString(message).Ptr)
+	C.purple_conv_chat_write(this.chat, CCString(who).Ptr,
+		CCString(message).Ptr, C.PurpleMessageFlags(flags), C.time_t(time.Now().Unix()))
 }
 
 func (this *ConvChat) SendWithFlag(message string, flags int) {
@@ -130,6 +172,21 @@ func (this *ConvChat) SendWithFlag(message string, flags int) {
 func (this *ConvChat) FindBuddy(name string) *ConvChatBuddy {
 	cbbudy := C.purple_conv_chat_cb_find(this.chat, CCString(name).Ptr)
 	return newConvChatBuddyFrom(cbbudy)
+}
+
+func (this *ConvChat) SetTopic(who, topic string) {
+	C.purple_conv_chat_set_topic(this.chat, CCString(who).Ptr, CCString(topic).Ptr)
+}
+func (this *ConvChat) GetTopic() string {
+	r := C.purple_conv_chat_get_topic(this.chat)
+	return C.GoString(r)
+}
+func (this *ConvChat) SetId(id int) {
+	C.purple_conv_chat_set_id(this.chat, C.int(id))
+}
+func (this *ConvChat) GetId() int {
+	r := C.purple_conv_chat_get_id(this.chat)
+	return int(r)
 }
 
 func (this *ConvChatBuddy) GetName() string {
@@ -192,4 +249,13 @@ func (this *Connection) FindChat(id int) *Conversation {
 
 func ConversationsGetHandle() unsafe.Pointer {
 	return C.purple_conversations_get_handle()
+}
+
+func FindConversationWithAccount(ctype int, name string, ac *Account) *Conversation {
+	conv := C.purple_find_conversation_with_account(C.PurpleConversationType(ctype),
+		CCString(name).Ptr, ac.account)
+	if conv == nil {
+		return nil
+	}
+	return newConversationFrom(conv)
 }

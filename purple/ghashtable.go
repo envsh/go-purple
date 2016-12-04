@@ -21,6 +21,7 @@ func newGHashTableFrom(ht *C.GHashTable) *GHashTable {
 	return this
 }
 
+// TODO when to free
 func NewGHashTable() *GHashTable {
 	this := &GHashTable{}
 	this.ht = C.go_g_hash_table_new_full()
@@ -37,7 +38,8 @@ func (this *GHashTable) Lookup(key string) string {
 }
 
 func (this *GHashTable) Insert(key string, value string) bool {
-	ret := C.g_hash_table_insert(this.ht, CCString(key).Ptr, CCString(value).Ptr)
+	// hash table will manange it, don't use CCString
+	ret := C.g_hash_table_insert(this.ht, C.CString(key), C.CString(value))
 	if ret == C.TRUE {
 		return true
 	} else {
@@ -46,7 +48,8 @@ func (this *GHashTable) Insert(key string, value string) bool {
 }
 
 func (this *GHashTable) Replace(key string, value string) bool {
-	ret := C.g_hash_table_replace(this.ht, CCString(key).Ptr, CCString(value).Ptr)
+	// hash table will manange it, don't use CCString
+	ret := C.g_hash_table_replace(this.ht, C.CString(key), C.CString(value))
 	if ret == C.TRUE {
 		return true
 	} else {
@@ -55,7 +58,7 @@ func (this *GHashTable) Replace(key string, value string) bool {
 }
 
 func (this *GHashTable) Add(key string) bool {
-	ret := C.g_hash_table_add(this.ht, CCString(key).Ptr)
+	ret := C.g_hash_table_add(this.ht, C.CString(key))
 	if ret == C.TRUE {
 		return true
 	} else {

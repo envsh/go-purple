@@ -69,6 +69,13 @@ func finalIterate() {
 }
 
 func freeCString(cs *CString) {
+	if cs == nil {
+		log.Panicln("wtf")
+	}
+	if cs.Ptr == nil {
+		log.Panicln("wtf", cs)
+	}
+
 	if false {
 		ostr := cs.Str
 		if len(ostr) > 67 {

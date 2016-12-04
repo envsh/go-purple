@@ -59,6 +59,8 @@ type BlistSignals struct {
 type ConvSignals struct {
 	ReceivedIMMsg   func(ac *Account, sender, message string, conv *Conversation, flags int)
 	ReceivedChatMsg func(ac *Account, sender, message string, conv *Conversation, flags int)
+	ChatJoined      func(conv *Conversation)
+	ChatLeft        func(conv *Conversation)
 }
 type AccountSignals struct{}
 
@@ -187,10 +189,15 @@ func (this *PurpleCore) connect_to_signals() {
 			(unsafe.Pointer)(C.gopurple_buddy_signed_on))
 		signalConnect(C.purple_blist_get_handle(), "buddy-signed-off",
 			(unsafe.Pointer)(C.gopurple_buddy_signed_off))
+
 		signalConnect(C.purple_conversations_get_handle(), "received-im-msg",
 			(unsafe.Pointer)(C.gopurple_received_im_msg))
 		signalConnect(C.purple_conversations_get_handle(), "received-chat-msg",
 			(unsafe.Pointer)(C.gopurple_received_chat_msg))
+		signalConnect(C.purple_conversations_get_handle(), "chat-joined",
+			(unsafe.Pointer)(C.gopurple_chat_joined))
+		signalConnect(C.purple_conversations_get_handle(), "chat-left",
+			(unsafe.Pointer)(C.gopurple_chat_left))
 	}
 }
 
@@ -366,5 +373,21 @@ func gopurple_received_chat_msg(ac *C.PurpleAccount, sender *C.char, buffer *C.c
 	if csigs.ReceivedChatMsg != nil {
 		csigs.ReceivedChatMsg(newAccountFrom(ac), C.GoString(sender),
 			C.GoString(buffer), newConversationFrom(chat), int(flags))
+	}
+}
+
+//export gopurple_chat_joined
+func gopurple_chat_joined(conv *C.PurpleConversation) {
+	log.Println("hehhe")
+	if csigs.ChatJoined != nil {
+		csigs.ChatJoined(newConversationFrom(conv))
+	}
+}
+
+//export gopurple_chat_left
+func gopurple_chat_left(conv *C.PurpleConversation) {
+	log.Println("hehhe")
+	if csigs.ChatLeft != nil {
+		csigs.ChatLeft(newConversationFrom(conv))
 	}
 }

@@ -266,6 +266,10 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 				conv.SetName(title)
 			}
 		}
+		conv2 := conn.ServGotJoinedChat(groupNumber, title)
+		if conv != conv2 {
+			log.Println("wtf, maybe remove one")
+		}
 	}, ac)
 }
 

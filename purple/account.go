@@ -47,6 +47,9 @@ func (this *Account) Destroy() {
 func (this *Account) Connect() {
 	C.purple_account_connect(this.account)
 }
+func (this *Account) Disconnect() {
+	C.purple_account_disconnect(this.account)
+}
 
 func (this *Account) GetConnection() *Connection {
 	cgc := C.purple_account_get_connection(this.account)
