@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <!-- 引入样式 -->
+        <link rel="stylesheet" href="https://unpkg.com/element-ui/lib/theme-default/index.css">
+    </head>
+    <body>
+        <div id="app">
+            <el-button @click="visible = true">按钮</el-button>
+            <el-dialog v-model="visible" title="Hello world">
+                <p>欢迎使用 Element</p>
+            </el-dialog>
+            <p> {% verbatim %} {{ message }} {% endverbatim %} </p>
+
+        <template>
+            <el-table  :data="tableData"  border style="width: 100%">
+                <el-table-column    prop="name"     label="名字"            width="280">
+                </el-table-column>
+                <el-table-column    prop="alias"   label="昵称"    width="280">
+                </el-table-column>
+                <el-table-column    prop="protocol"   label="协议类型">
+                </el-table-column>
+            </el-table>
+        </template>
+
+        {% for account in accounts %}
+        <!-- <p>name: {{account.UserName}} alias: {{account.UserName}} proto: {{account.ProtocolId}}</p>
+           -->
+        {% endfor %}
+
+        </div>
+    </body>
+
+    <!-- 先引入 Vue -->
+    <script src="https://unpkg.com/vue/dist/vue.js"></script>
+    <!-- 引入组件库 -->
+    <script src="https://unpkg.com/element-ui/lib/index.js"></script>
+    <script>
+
+     var app = new Vue({
+         el: '#app',
+         // render: h => h(App),
+         data:  { visible: false,
+                  message: 'aaa',
+                  tableData: [
+                      {% for account in accounts %}
+                      {name: '{{account.UserName}}', alias: '{{account.UserName}}',
+                       protocol: '{{account.ProtocolId}}'},
+                      {% endfor %}
+                  ]
+         }
+     })
+     app.$data.message = 'bbb'
+     app.$data.nmessage = 'ccc'
+     app.$data.nmessage += 'ccc'
+    </script>
+</html>
+

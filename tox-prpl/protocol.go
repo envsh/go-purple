@@ -81,7 +81,7 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 	conn := ac.GetConnection()
 	gc := conn
 
-	this._tox.CallbackSelfConnectionStatus(func(t *tox.Tox, status uint32, d interface{}) {
+	this._tox.CallbackSelfConnectionStatus(func(t *tox.Tox, status int, d interface{}) {
 		if status > tox.CONNECTION_NONE {
 			conn.ConnSetState(purple.CONNECTED) // 设置为已连接状态，则好友会显示。
 			// a helper for help me
@@ -94,7 +94,7 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 
 	this._tox.CallbackFriendRequest(this.onFriendRequest, ac)
 
-	this._tox.CallbackFriendConnectionStatus(func(t *tox.Tox, friendNumber uint32, status uint32, d interface{}) {
+	this._tox.CallbackFriendConnectionStatus(func(t *tox.Tox, friendNumber uint32, status int, d interface{}) {
 		log.Println(friendNumber, status)
 		pubkey, _ := t.FriendGetPublicKey(friendNumber)
 		name, _ := t.FriendGetName(friendNumber)

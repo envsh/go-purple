@@ -1,6 +1,8 @@
 package main
 
 import (
+	"go-purple/purple"
+
 	"github.com/emirpasic/gods/maps/hashbidimap"
 )
 
@@ -41,4 +43,9 @@ func (this *Config) getIrc(from string) string {
 		}
 	}
 	return ""
+}
+
+// 是否是config中定义的root用户。为以后自动创建的衍生用户做准备。
+func isRootUser(ac *purple.Account) bool {
+	return true
 }

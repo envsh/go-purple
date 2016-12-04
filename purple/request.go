@@ -25,13 +25,10 @@ static void gopurple_request_ok_cancel(void *handle, char *title, char *primary,
      purple_request_ok_cancel(handle, title, primary, secondary, default_action,
 		 ac, who, conv, user_data, gopurple_request_action_cb, gopurple_request_action_cb);
 }
-extern void test_get_reqlen_123();
 static void *gopurple_request_accept_cancel(void *handle, char *title, char *primary, char *secondary,
                                     int default_action, PurpleAccount *ac, char *who,
                                     PurpleConversation *conv, char *user_data)
 {
-     printf("333len: %d \n", get_reqlen());
-     test_get_reqlen_123();
      void *r = purple_request_accept_cancel(handle, title, primary, secondary, default_action,
 		 ac, who, conv, user_data, gopurple_request_action_cb, gopurple_request_action_cb);
      return r;
@@ -60,7 +57,6 @@ static void *gopurple_request_action_fn_bridge(const char *title, const char *pr
 	                        PurpleAccount *account, const char *who,
 	                        PurpleConversation *conv, void *user_data,
 	                        size_t action_count, va_list actions) {
-    printf("222len: %d \n", get_reqlen());
     // strcpy(0x1, "abccd");
     void *r = gopurple_request_action_fn(title, primary, secondary, default_action,
                             account, who, conv, user_data, action_count, &actions);
@@ -72,11 +68,6 @@ static void gopurple_request_ui_ops_setfns(PurpleRequestUiOps *ops) {
     ops->request_action = gopurple_request_action_fn_bridge;
 }
 
-extern void set_get_reqlen_fn(int (*f)());
-
-static int test_cscope_var = 3;
-static void set_test_cscope_var(int n) {test_cscope_var = n;}
-static int get_test_cscope_var() {return test_cscope_var;}
 */
 import "C"
 import "unsafe"
@@ -101,8 +92,6 @@ type Request struct {
 
 var requests = make(map[*C.char]*Request)
 var reqno uint64 = 0
-var requests2_v = make(map[uint64]*Request)
-var requests2 = &requests2_v
 
 func nxtReqNo() uint64 {
 	reqno += 1
@@ -169,8 +158,8 @@ func RequestOkCancelDemo(userData interface{}, gc *Connection,
 
 //export get_reqlen
 func get_reqlen() C.int {
-	log.Println(len(requests), len(*requests2))
-	log.Printf("%p, %p, %p, %d, %d\n", requests, requests2, *requests2, MyTid3(), GoID())
+	log.Println(len(requests))
+	log.Printf("%p, %d, %d\n", requests, MyTid3(), GoID())
 	return (C.int)(len(requests))
 }
 
@@ -180,10 +169,7 @@ func RequestAcceptCancel(userData interface{}, gc *Connection, title, primary st
 	cseq := (*C.char)(C.calloc(1, 1))
 	req := &Request{seq: cseq, userData: userData, yescb: yescb, nocb: nocb}
 	requests[cseq] = req
-	C.set_test_cscope_var(56)
-	log.Println(C.get_test_cscope_var())
-	(*requests2)[nxtReqNo()] = req
-	log.Printf("%p, %p, %p, %d, %d\n", requests, requests2, *requests2, MyTid3(), GoID())
+	log.Printf("%p, %d, %d\n", requests, MyTid3(), GoID())
 	// log.Panicln(123)
 
 	var handle unsafe.Pointer
@@ -337,7 +323,6 @@ func RequestSetUiOps(requiops *RequestUiOps) {
 func (this *RequestUiOps) setfns() {
 	// this.requiops.request_action = go2cfn(C.gopurple_request_action_fn_bridge)
 	// this.requiops.request_action = C.gopurple_request_action_fn_bridge
-	C.set_get_reqlen_fn(go2cfn(C.get_reqlen))
 	C.gopurple_request_ui_ops_setfns(this.requiops)
 }
 
@@ -369,7 +354,6 @@ func gopurple_request_action_fn(title *C.char, primary *C.char, secondary *C.cha
 	_, ok := requests[(*C.char)(user_data)]
 	log.Println(ok, user_data, (*C.char)(user_data), len(requests))
 	log.Printf("%+v, %p\n", user_data, requests)
-	log.Println(C.get_test_cscope_var())
 	// log.Panicln(123)
 
 	this := _instance_requiops

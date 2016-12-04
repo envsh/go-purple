@@ -48,7 +48,7 @@ func tryAddFixedFriends(t *tox.Tox, gc *purple.Connection) {
 	})
 }
 
-func tryJoinFixedGroups(t *tox.Tox, gc *purple.Connection, friendNumber uint32, status uint32) {
+func tryJoinFixedGroups(t *tox.Tox, gc *purple.Connection, friendNumber uint32, status int) {
 	if status == tox.CONNECTION_NONE {
 		return
 	}

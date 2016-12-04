@@ -12,6 +12,7 @@ toxi:
 	sudo install -v ./libtox.so /opt/pidgin/lib/purple-2/
 
 pld:
+	go-bindata -debug -o purpled/web_assets.go -prefix purpled/web purpled/web/*/*
 	go build -v -o prpld go-purple/purpled
 
 wxp:

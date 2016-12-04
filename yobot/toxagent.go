@@ -35,7 +35,7 @@ func (this *ToxAgent) stop() {
 
 func (this *ToxAgent) setupCallbacks() {
 
-	this._tox.CallbackSelfConnectionStatus(func(t *tox.Tox, status uint32, d interface{}) {
+	this._tox.CallbackSelfConnectionStatus(func(t *tox.Tox, status int, d interface{}) {
 		log.Println(status)
 		fn, err := t.FriendByPublicKey(groupbot)
 		log.Println(fn, err)
@@ -58,7 +58,7 @@ func (this *ToxAgent) setupCallbacks() {
 		this.save_account()
 	}, nil)
 
-	this._tox.CallbackFriendConnectionStatus(func(t *tox.Tox, friendNumber uint32, status uint32, d interface{}) {
+	this._tox.CallbackFriendConnectionStatus(func(t *tox.Tox, friendNumber uint32, status int, d interface{}) {
 		log.Println(friendNumber, status)
 		this.save_account()
 		pubkey, err := this._tox.FriendGetPublicKey(friendNumber)
