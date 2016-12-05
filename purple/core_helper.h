@@ -9,12 +9,13 @@ void gopurple_connect_progress(PurpleConnection *gc,
 void gopurple_connected(PurpleConnection *gc);
 void gopurple_disconnected(PurpleConnection *gc);
 void gopurple_notice(PurpleConnection *gc, char *text);
-void gopurple_report_disconnect(PurpleConnection *gc, char *text);
-void gopurple_network_connected(void);
-void gopurple_network_disconnected(void);
 void gopurple_report_disconnect_reason(PurpleConnection *gc,
                                  PurpleConnectionError reason,
                                  char *text);
+void gopurple_report_disconnect(PurpleConnection *gc, char *text);
+void gopurple_network_connected(void);
+void gopurple_network_disconnected(void);
+
 
 void *gopurple_request_authorize(PurpleAccount *account, char *remote_user, char *id, char *alias, char *message, gboolean on_list,
                         PurpleAccountRequestAuthorizationCb authorize_cb, PurpleAccountRequestAuthorizationCb deny_cb, void *user_data);

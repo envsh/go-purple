@@ -189,6 +189,11 @@ func (this *ConvChat) GetId() int {
 	return int(r)
 }
 
+func (this *ConvChat) HasLeft() bool {
+	r := C.purple_conv_chat_has_left(this.chat)
+	return c2goBool(r)
+}
+
 func (this *ConvChatBuddy) GetName() string {
 	return C.GoString(this.buddy.name)
 }

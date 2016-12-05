@@ -70,20 +70,36 @@ func (this *Connection) GetPrplInfo() *PluginInfo {
 	return newPluginInfoFrom((*C.PurplePluginInfo)(plugin.info))
 }
 
-// error info
+// connection error info
+type ConnectionError int
+
+const (
+	CONNECTION_ERROR_NETWORK_ERROR ConnectionError = C.PURPLE_CONNECTION_ERROR_NETWORK_ERROR
+)
+
 type ConnectionErrorInfo struct {
 	// private
 	cei *C.PurpleConnectionErrorInfo
 }
 
 func newConnectionErrorInfoFrom(cei *C.PurpleConnectionErrorInfo) *ConnectionErrorInfo {
+	if cei == nil {
+		return nil
+	}
 	this := &ConnectionErrorInfo{}
 	this.cei = cei
 	return this
 }
 
 func (this *ConnectionErrorInfo) Get() (int, string) {
-	return 0, C.GoString(this.cei.description)
+	return int(this.cei._type), C.GoString(this.cei.description)
+}
+
+func (this *ConnectionErrorInfo) Code() int {
+	return int(this.cei._type)
+}
+func (this *ConnectionErrorInfo) Error() string {
+	return C.GoString(this.cei.description)
 }
 
 func ConnectionsGetHandle() unsafe.Pointer {

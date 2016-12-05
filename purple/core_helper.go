@@ -110,10 +110,10 @@ func (this *PurpleCore) initUiOps() {
 		this.connUiOps.connected = (*[0]byte)((unsafe.Pointer)(C.gopurple_connected))
 		this.connUiOps.disconnected = (*[0]byte)((unsafe.Pointer)(C.gopurple_disconnected))
 		this.connUiOps.notice = (*[0]byte)((unsafe.Pointer)(C.gopurple_notice))
+		this.connUiOps.report_disconnect_reason = (*[0]byte)((unsafe.Pointer)(C.gopurple_report_disconnect_reason))
 		this.connUiOps.report_disconnect = (*[0]byte)((unsafe.Pointer)(C.gopurple_report_disconnect))
 		this.connUiOps.network_connected = (*[0]byte)((unsafe.Pointer)(C.gopurple_network_connected))
 		this.connUiOps.network_disconnected = (*[0]byte)((unsafe.Pointer)(C.gopurple_network_disconnected))
-		this.connUiOps.report_disconnect_reason = (*[0]byte)((unsafe.Pointer)(C.gopurple_report_disconnect_reason))
 		// log.Printf("%+v\n", this.connUiOps)
 	}
 

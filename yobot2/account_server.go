@@ -12,10 +12,11 @@ import (
 )
 
 type AccountServer struct {
-	pc       *purple.PurpleCore
-	cbs      purple.CoreCallbacks
-	csigs    purple.CoreSignals
-	requiops *purple.RequestUiOps
+	pc           *purple.PurpleCore
+	cbs          purple.CoreCallbacks
+	csigs        purple.CoreSignals
+	requiops     *purple.RequestUiOps
+	promiseClose map[string]int
 }
 
 func NewAccountServer(pc *purple.PurpleCore) *AccountServer {
@@ -24,6 +25,7 @@ func NewAccountServer(pc *purple.PurpleCore) *AccountServer {
 	this.requiops = purple.NewRequestUiOpts()
 	this.requiops.RequestAction = this.RequestAction
 	purple.RequestSetUiOps(this.requiops)
+	this.promiseClose = make(map[string]int, 0)
 
 	this.init()
 	return this
@@ -119,6 +121,14 @@ func (this *AccountServer) init() {
 }
 
 func (this *AccountServer) fillCallbacks() {
+	this.cbs.ConnectProgress = this.onConnectProgress
+	this.cbs.Connected = this.onConnected
+	this.cbs.Disconnected = this.onDisconnected
+	this.cbs.ReportDisconnectReason = this.onReportDisconnectReason
+	this.cbs.ReportDisconnect = this.onReportDisconnect
+	this.cbs.NetworkConnected = this.onNetworkConnected
+	this.cbs.NetworkDisconnected = this.onNetworkDisconnected
+
 	this.csigs.SignedOn = this.onSignedOn
 	this.csigs.SignedOff = this.onSignedOff
 	this.csigs.ReceivedIMMsg = this.onReceivedImMsg
@@ -135,9 +145,87 @@ func (this *AccountServer) RequestAction(title string, primary string, secondary
 	return 1
 }
 
+func (this *AccountServer) onConnectProgress(gc *purple.Connection, text string, step, step_count int) {
+	pid := gc.GetPrplInfo().Id[5:]
+	ac := gc.ConnGetAccount()
+	log.Println(pid, ac, ac.GetUserName(), ac.GetAlias(), text, step, step_count)
+
+}
+func (this *AccountServer) onConnected(gc *purple.Connection) {
+	pid := gc.GetPrplInfo().Id[5:]
+	ac := gc.ConnGetAccount()
+	log.Println(pid, ac, ac.GetUserName(), ac.GetAlias())
+
+}
+func (this *AccountServer) onDisconnected(gc *purple.Connection) {
+	pid := gc.GetPrplInfo().Id[5:]
+	ac := gc.ConnGetAccount()
+	log.Println(pid, ac, ac.GetUserName(), ac.GetAlias())
+
+	this.promiseDisconnect(ac)
+}
+
+func (this *AccountServer) onReportDisconnectReason(gc *purple.Connection, reason int, text string) {
+	pid := gc.GetPrplInfo().Id[5:]
+	ac := gc.ConnGetAccount()
+	log.Println(pid, ac, ac.GetUserName(), ac.GetAlias())
+}
+func (this *AccountServer) onReportDisconnect(gc *purple.Connection, text string) {
+	pid := gc.GetPrplInfo().Id[5:]
+	ac := gc.ConnGetAccount()
+	log.Println(pid, ac, ac.GetUserName(), ac.GetAlias())
+
+	this.promiseDisconnect(ac)
+}
+
+func (this *AccountServer) accountHash(ac *purple.Account) string {
+	return fmt.Sprintf("%s://%s", ac.GetProtocolId(), ac.GetUserName())
+}
+
+func (this *AccountServer) promiseDisconnect(ac *purple.Account) {
+	hh := this.accountHash(ac)
+	if _, ok := this.promiseClose[hh]; ok {
+		this.promiseClose[hh] += 1
+	} else {
+		this.promiseClose[hh] = 1
+	}
+	// 2 == onReportDisconnect + onDisconnected
+	if pv, ok := this.promiseClose[hh]; ok && pv == 2 {
+		delete(this.promiseClose, hh)
+
+		// 本次回调中重连接像是有问题，使用go进入下一次事件调试中再执行。
+		go func() {
+			log.Println("reconnect after 300ms...", hh)
+			time.Sleep(300 * time.Millisecond)
+			pid := ac.GetProtocolId()[5:]
+			switch pid {
+			case "irc":
+				/*
+					if ac.IsConnected() {
+						ac.SetEnabled(false)
+						ac.Disconnect()
+					}
+				*/
+				log.Println(ac.IsConnecting(), ac.IsConnected(), ac.IsDisconnected(), ac.GetEnabled())
+				if !ac.IsConnecting() && !ac.IsConnected() {
+					if !ac.GetEnabled() {
+						ac.SetEnabled(true)
+					} else {
+						ac.Connect()
+					}
+				}
+			}
+		}()
+	}
+}
+
+func (this *AccountServer) onNetworkConnected()    { log.Println("hehrere") }
+func (this *AccountServer) onNetworkDisconnected() { log.Println("hehrere") }
+
 func (this *AccountServer) onSignedOn(gc *purple.Connection) {
 	pid := gc.GetPrplInfo().Id[5:]
-	log.Println(pid)
+	ac := gc.ConnGetAccount()
+	log.Println(pid, ac, ac.GetUserName(), ac.GetAlias())
 
 	switch pid {
 	case "irc":
@@ -152,29 +240,15 @@ func (this *AccountServer) onSignedOn(gc *purple.Connection) {
 func (this *AccountServer) onSignedOff(gc *purple.Connection) {
 	pid := gc.GetPrplInfo().Id[5:]
 	ac := gc.ConnGetAccount()
-	log.Println(pid, ac, ac.GetAlias())
-	switch pid {
-	case "irc":
-		/*
-			if ac.IsConnected() {
-				ac.SetEnabled(false)
-				ac.Disconnect()
-			}
-			if !ac.GetEnabled() {
-				ac.SetEnabled(true)
-			}
-		*/
-		log.Println(ac.IsConnecting(), ac.IsConnected(), ac.IsDisconnected(), ac.GetEnabled())
-		ac.SetEnabled(true)
-		// ac.Connect()
-	}
+	log.Println(pid, ac, ac.GetUserName(), ac.GetAlias())
+
 }
 
 func (this *AccountServer) onReceivedImMsg(ac *purple.Account, sender, msg string,
 	conv *purple.Conversation, flags int) {
 	gc := ac.GetConnection()
 	pid := gc.GetPrplInfo().Id[5:]
-	log.Println(pid, ac, ac.GetAlias())
+	log.Println(pid, ac, ac.GetUserName(), ac.GetAlias())
 	log.Println(ac, sender, msg, conv, flags, conv.GetName())
 
 	switch pid {
@@ -188,7 +262,7 @@ func (this *AccountServer) onReceivedChatMsg(ac *purple.Account, sender, msg str
 	conv *purple.Conversation, flags int) {
 	gc := ac.GetConnection()
 	pid := gc.GetPrplInfo().Id[5:]
-	log.Println(pid, ac, ac.GetAlias(), ac.GetUserName())
+	log.Println(pid, ac, ac.GetUserName(), ac.GetAlias())
 	log.Println(ac, sender, msg, conv, flags, conv.GetName())
 
 	nmsg := fmt.Sprintf("%s: %s", sender, msg)
@@ -243,11 +317,21 @@ func (this *AccountServer) onReceivedChatMsg(ac *purple.Account, sender, msg str
 			}
 		} else {
 			// 不同的发送消息方式，区别在吗呢？
-			if rand.Int()%2 == 0 {
-				convdst.GetChatData().Send(nmsg + " from chat send")
+			conerr := ac.GetCurrentError()
+			if conerr != nil {
+				log.Println(conerr.Code(), conerr.Error())
+			}
+			if convdst.GetChatData().HasLeft() {
+				log.Println("has left:", convdst.GetName(), convdst.GetChatData().HasLeft())
+			}
+			if rand.Int()%2 == 0 && false { // this function has not return value, drop it.
+				convdst.GetChatData().Send(nmsg)
 			} else {
 				chatid := convdst.GetChatData().GetId()
-				condst.ServChatSend(chatid, nmsg+" from serv chat send", 0)
+				ret := condst.ServChatSend(chatid, nmsg, 0)
+				if ret < 0 {
+					log.Println("wtf", ret)
+				}
 			}
 			convdst.GetChatData().Write(sender, nmsg+" from chat write", 0) // ??? 发送不了消息？？？
 		}
@@ -268,7 +352,9 @@ func (this *AccountServer) onChatJoined(conv *purple.Conversation) {
 			log.Println("can't find:", cfg.getIrc(""))
 		}
 		if condst == nil {
-			log.Println("conv dest nil")
+			log.Println("conn dest nil")
+			log.Println(acdst.IsConnected(), acdst.IsDisconnected(), acdst.IsConnecting(), acdst.GetEnabled())
+			break
 		} else {
 			log.Println(acdst.IsConnected(), acdst.IsDisconnected(), acdst.IsConnecting(), acdst.GetEnabled())
 		}
