@@ -167,6 +167,9 @@ func (this *Account) SetBuddyIconPath(path string) {
 func (this *Account) SetStatus(statusId string, active bool) {
 	C.gopurple_account_set_status(this.account, CCString(statusId).Ptr, go2cBool(active))
 }
+func (this *Account) GetStatus(statusId string) {
+	C.purple_account_get_status(this.account, CCString(statusId).Ptr)
+}
 
 func (this *Account) GetProtocolId() string {
 	id := C.purple_account_get_protocol_id(this.account)

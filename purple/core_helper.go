@@ -164,6 +164,7 @@ func (this *PurpleCore) initLibpurple() {
 		os.Exit(-1)
 	}
 
+	// TODO 是否把这些加载分开到其他函数，这样子灵活性有点差
 	C.purple_set_blist(C.purple_blist_new())
 	C.purple_blist_load()
 	C.purple_prefs_load()

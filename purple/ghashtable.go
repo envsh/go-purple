@@ -28,6 +28,17 @@ func NewGHashTable() *GHashTable {
 	return this
 }
 
+func NewGHashTableFromMap(d map[string]string) *GHashTable {
+	this := &GHashTable{}
+	this.ht = C.go_g_hash_table_new_full()
+
+	for k, v := range d {
+		this.Insert(k, v)
+	}
+
+	return this
+}
+
 func (this *GHashTable) Destroy() {
 	C.g_hash_table_destroy(this.ht)
 }

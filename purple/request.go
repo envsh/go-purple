@@ -8,7 +8,6 @@ package purple
 #define _(str) gettext((str))
 
 extern void gopurple_request_action_cb(char *user_data, int choice);
-extern int get_reqlen();
 
 static void gopurple_request_yes_no(void *handle, char *title, char *primary, char *secondary,
                                     int default_action, PurpleAccount *ac, char *who,
@@ -64,7 +63,6 @@ static void *gopurple_request_action_fn_bridge(const char *title, const char *pr
 }
 
 static void gopurple_request_ui_ops_setfns(PurpleRequestUiOps *ops) {
-    printf("111len: %d \n", get_reqlen());
     ops->request_action = gopurple_request_action_fn_bridge;
 }
 
@@ -154,13 +152,6 @@ func RequestOkCancelDemo(userData interface{}, gc *Connection,
 	title := "it's title"
 	primary := "it's primary"
 	RequestOkCancel(userData, gc, title, primary, yescb, nocb)
-}
-
-//export get_reqlen
-func get_reqlen() C.int {
-	log.Println(len(requests))
-	log.Printf("%p, %d, %d\n", requests, MyTid3(), GoID())
-	return (C.int)(len(requests))
 }
 
 func RequestAcceptCancel(userData interface{}, gc *Connection, title, primary string,

@@ -77,8 +77,8 @@ func (this *AccountServer) init() {
 		ac := purple.AccountsFind(username, protoName)
 		if ac == nil {
 			ac = purple.NewAccountCreate(username, protoName, "")
+			ac.SetEnabled(true)
 		}
-		ac.SetEnabled(false) // too late, why?
 
 		// more settings
 		switch proto {
@@ -92,16 +92,23 @@ func (this *AccountServer) init() {
 	purple.SavedStatusSetIdleAway(false)
 	acs = purple.AccountsGetAll()
 	for _, ac := range acs {
-		ac.SetEnabled(true)
+		if false {
+			ac.SetEnabled(true)
+		}
 		ac.SetStatus("ONLINE", true)
-		log.Println(ac.IsConnecting(), ac.IsConnected(), ac.IsDisconnected())
+		log.Println(ac.IsConnecting(), ac.IsConnected(), ac.IsDisconnected(), ac.GetEnabled())
 	}
 
-	// 设置账号auto-login = false
+	// 设置账号auto-login = true，还是让purple自动管理重连
 	for _, ac := range acs {
-		ac.SetUiBool("auto-login", false)
+		if !ac.GetUiBool("auto-login") {
+			ac.SetUiBool("auto-login", true)
+		}
 		// TODO
-		log.Println(ac.IsConnecting(), ac.IsConnected(), ac.IsDisconnected())
+		log.Println(ac.IsConnecting(), ac.IsConnected(), ac.IsDisconnected(), ac.GetEnabled())
+		if !ac.IsConnecting() && ac.IsDisconnected() {
+			ac.Connect()
+		}
 	}
 
 	// prefs set auto reply off. 为啥不管用
@@ -179,7 +186,7 @@ func (this *AccountServer) onReportDisconnect(gc *purple.Connection, text string
 }
 
 func (this *AccountServer) accountHash(ac *purple.Account) string {
-	return fmt.Sprintf("%s://%s", ac.GetProtocolId(), ac.GetUserName())
+	return fmt.Sprintf("%s://%s", ac.GetProtocolName(), ac.GetUserName())
 }
 
 func (this *AccountServer) promiseDisconnect(ac *purple.Account) {
@@ -190,32 +197,49 @@ func (this *AccountServer) promiseDisconnect(ac *purple.Account) {
 		this.promiseClose[hh] = 1
 	}
 	// 2 == onReportDisconnect + onDisconnected
+	// !!! 竟然 onReportDisconnect 发起了两次，用=2判断又不行了。
 	if pv, ok := this.promiseClose[hh]; ok && pv == 2 {
 		delete(this.promiseClose, hh)
 
 		// 本次回调中重连接像是有问题，使用go进入下一次事件调试中再执行。
-		go func() {
-			log.Println("reconnect after 300ms...", hh)
-			time.Sleep(300 * time.Millisecond)
-			pid := ac.GetProtocolId()[5:]
-			switch pid {
-			case "irc":
-				/*
-					if ac.IsConnected() {
-						ac.SetEnabled(false)
-						ac.Disconnect()
-					}
-				*/
-				log.Println(ac.IsConnecting(), ac.IsConnected(), ac.IsDisconnected(), ac.GetEnabled())
-				if !ac.IsConnecting() && !ac.IsConnected() {
-					if !ac.GetEnabled() {
-						ac.SetEnabled(true)
-					} else {
-						ac.Connect()
-					}
-				}
+		pid := ac.GetProtocolId()[5:]
+		switch pid {
+		case "irc":
+			log.Println(ac.IsConnecting(), ac.IsConnected(), ac.IsDisconnected(), ac.GetEnabled())
+			if !ac.IsConnecting() && !ac.IsConnected() {
+				log.Println("reconnect after 300ms...", hh)
+				time.AfterFunc(300*time.Millisecond, func() { this.reconnectAccount(ac) })
 			}
-		}()
+		}
+	}
+}
+
+// 现在依赖Disconnect与ReportDisconnect事件
+// 但是当电脑睡眠，网络关闭并重新开启网络后，这个事件的响应延迟很大，
+// 可能10-20min都有。虽然最终能够重新连接。
+// 然而实然想到服务器没有休眠。。。改呢还是不改呢
+// 基于libpurple的状态控制有点复杂啊？？？要放弃了吗？
+// 理想中这是一种很好的统一，实际上引入了太复杂的包装层了。。。？？？
+// 或者是不太会使用的原因吗，想起来pidgin能够在睡眠醒来后快速重连接到网络啊。。。
+func (this *AccountServer) reconnectAccount(ac *purple.Account) {
+	if true {
+		return // 让purple自动管理重连接。。。
+	}
+	/*
+		if ac.IsConnected() {
+			ac.SetEnabled(false)
+			ac.Disconnect()
+		}
+	*/
+
+	if ac.IsConnecting() || ac.IsConnected() {
+		log.Println("wtf, maybe not need reconnect")
+	}
+
+	if !ac.GetEnabled() {
+		ac.SetEnabled(true)
+	} else {
+		ac.Connect()
 	}
 }
 
@@ -295,12 +319,22 @@ func (this *AccountServer) onReceivedChatMsg(ac *purple.Account, sender, msg str
 		condst := acdst.GetConnection()
 		if acdst == nil {
 			log.Println("can't find:", cfg.getIrc(""))
+			break
 		}
+		if (!acdst.IsConnecting() && !acdst.IsConnected()) ||
+			(!acdst.GetEnabled() && acdst.IsConnected()) {
+			log.Println(acdst.IsConnected(), acdst.IsDisconnected(), acdst.IsConnecting(), acdst.GetEnabled())
+			time.AfterFunc(1*time.Millisecond, func() { this.reconnectAccount(acdst) })
+			break
+		}
+
 		if condst == nil {
-			log.Println("conv dest nil")
+			log.Println("conn dest nil")
+			break
 		} else {
 			log.Println(acdst.IsConnected(), acdst.IsDisconnected(), acdst.IsConnecting(), acdst.GetEnabled())
 		}
+
 		ht := purple.NewGHashTable()
 		ht.Insert("channel", conv.GetName())
 		if k, ok := chmap.GetKey(conv.GetName()); ok {
@@ -323,6 +357,8 @@ func (this *AccountServer) onReceivedChatMsg(ac *purple.Account, sender, msg str
 			}
 			if convdst.GetChatData().HasLeft() {
 				log.Println("has left:", convdst.GetName(), convdst.GetChatData().HasLeft())
+				convdst.Destroy()
+				break
 			}
 			if rand.Int()%2 == 0 && false { // this function has not return value, drop it.
 				convdst.GetChatData().Send(nmsg)

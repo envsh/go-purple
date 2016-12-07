@@ -129,6 +129,12 @@ func (this *Conversation) IsLogging() bool {
 	return c2goBool(C.purple_conversation_is_logging(this.conv))
 }
 
+func (this *Conversation) Destroy() {
+	C.purple_conversation_destroy(this.conv)
+	this.conv = nil
+	this = nil
+}
+
 func (this *ConvChat) AddUser(user string) {
 	C.purple_conv_chat_add_user(this.chat, CCString(user).Ptr, nil, 0, C.TRUE)
 }
