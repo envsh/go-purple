@@ -72,9 +72,9 @@ func (this *RoundTable) handleEventTox(e *Event) {
 		groupTitle := e.Chan
 		message := e.Args[0].(string)
 		var chname string = groupTitle
-		if _, ok := chanMap[groupTitle]; ok {
+		if key, found := chmap.GetKey(groupTitle); found {
 			// forward message to...
-			chname = chanMap[groupTitle]
+			chname = key.(string)
 		}
 		if !this.ctx.acpool.has(ircname) {
 			this.ctx.acpool.add(ircname)
@@ -94,9 +94,9 @@ func (this *RoundTable) handleEventTox(e *Event) {
 		} else {
 			groupTitle := e.Chan
 			chname := groupTitle
-			if _, ok := chanMap[groupTitle]; ok {
+			if key, found := chmap.GetKey(groupTitle); found {
 				// forward message to...
-				chname = chanMap[groupTitle]
+				chname = key.(string)
 			}
 			ircon := this.ctx.acpool.get(ircname).ircon
 			ircon.Join(chname)
@@ -125,8 +125,8 @@ func (this *RoundTable) handleEventIrc(e *irc.Event) {
 		chname := e.Arguments[0]
 		message := e.Arguments[1]
 
-		if toname_, ok := chanMap2[chname]; ok {
-			chname = toname_
+		if val, found := chmap.Get(chname); found {
+			chname = val.(string)
 		}
 
 		// TODO maybe multiple result

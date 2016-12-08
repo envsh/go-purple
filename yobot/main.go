@@ -6,6 +6,7 @@ import (
 	// "strings"
 	"time"
 
+	"github.com/emirpasic/gods/maps/hashbidimap"
 	"github.com/kitech/colog"
 )
 
@@ -46,11 +47,11 @@ const serverssl = "weber.freenode.net:6697"
 const toxname = "zuck07"
 const ircname = toxname
 
-var chanMap = map[string]string{
-	"testks": "#tox-cn123", "Chinese 中文": "#tox-cn",
-	"#tox": "tox-en",
-}
+var chmap = hashbidimap.New()
 
-var chanMap2 = map[string]string{
-	"#tox-cn123": "testks", "#tox-cn": "Chinese 中文", "#tox-en": "#Tox",
+func init() {
+	// irc <=> tox
+	chmap.Put("#tox-cn123", "testks")
+	chmap.Put("#tox-cn", "Chinese 中文")
+	chmap.Put("#tox-en", "#tox")
 }
