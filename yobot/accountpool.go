@@ -14,8 +14,10 @@ const (
 )
 
 type Account struct {
-	proto int
-	ircon *irc.Connection
+	proto  int
+	ircon  *irc.Connection
+	becon  Backend
+	conque chan *Event
 }
 
 type AccountPool struct {
@@ -51,16 +53,22 @@ func (this *AccountPool) add(name string) *Account {
 	ircon.UseTLS = true
 	ircon.Debug = false
 
-	ircon.AddCallback("*", func(e *irc.Event) { this.ctx.busch <- e })
+	ircon.AddCallback("*", func(e *irc.Event) {
+		ce := NewEvent(PROTO_IRC, 0, "", e.Arguments)
+		ce.RawEvent = e
+		this.ctx.busch <- ce
+	})
 
 	ac := &Account{}
 	ac.ircon = ircon
+	ac.conque = make(chan *Event, 123)
 	this.acs[name] = ac
 
 	go func() {
 		err := ac.ircon.Connect(serverssl)
 		if err != nil {
-			log.Println(err)
+			// TODO 怎么处理
+			log.Println(err, name)
 		}
 	}()
 

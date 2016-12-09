@@ -20,8 +20,9 @@ func init() {
 }
 
 type Context struct {
-	busch  chan interface{}
-	toxagt *ToxAgent
+	// busch  chan interface{}
+	busch  chan *Event
+	toxagt *ToxAgent // it's root tox
 	acpool *AccountPool
 	rtab   *RoundTable
 }
@@ -32,7 +33,8 @@ func main() {
 	flag.Parse()
 
 	ctx = &Context{}
-	ctx.busch = make(chan interface{}, 123)
+	// ctx.busch = make(chan interface{}, 123)
+	ctx.busch = make(chan *Event, 123)
 	ctx.acpool = NewAccountPool()
 	ctx.toxagt = NewToxAgent()
 	ctx.toxagt.start()

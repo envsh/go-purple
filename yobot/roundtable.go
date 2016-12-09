@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"strings"
 	// "time"
@@ -20,10 +21,12 @@ const (
 )
 
 type Event struct {
-	Proto int
-	EType int
-	Chan  string
-	Args  []interface{}
+	Proto    int
+	EType    int
+	Chan     string
+	Args     []interface{}
+	RawEvent interface{}
+	Be       Backend
 }
 
 func NewEvent(proto int, etype int, ch string, args ...interface{}) *Event {
@@ -36,31 +39,28 @@ func NewEvent(proto int, etype int, ch string, args ...interface{}) *Event {
 }
 
 type RoundTable struct {
-	ctx        *Context
-	irconQueue chan interface{}
+	ctx *Context
 }
 
 func NewRoundTable() *RoundTable {
 	this := &RoundTable{}
 	this.ctx = ctx
-	this.irconQueue = make(chan interface{}, 123)
 	return this
 }
 
 func (this *RoundTable) run() {
 	go this.handleEvent()
-	// this.ctx.acpool.add(ircname)
 	select {}
 }
 
 func (this *RoundTable) handleEvent() {
 	for ie := range this.ctx.busch {
 		// log.Println(ie)
-		switch e := ie.(type) {
-		case *irc.Event:
-			this.handleEventIrc(e)
-		case *Event:
-			this.handleEventTox(e)
+		switch ie.Proto {
+		case PROTO_IRC:
+			this.handleEventIrc(ie.RawEvent.(*irc.Event))
+		case PROTO_TOX:
+			this.handleEventTox(ie)
 		}
 	}
 }
@@ -69,6 +69,11 @@ func (this *RoundTable) handleEventTox(e *Event) {
 	log.Printf("%+v", e)
 	switch e.EType {
 	case EVT_GROUP_MESSAGE:
+		peerName, err := this.ctx.toxagt._tox.GroupPeerName(e.Args[1].(int), e.Args[2].(int))
+		if err != nil {
+			log.Println(err)
+		}
+		var fromUser = fmt.Sprintf("%s[t]", peerName)
 		groupTitle := e.Chan
 		message := e.Args[0].(string)
 		var chname string = groupTitle
@@ -76,21 +81,44 @@ func (this *RoundTable) handleEventTox(e *Event) {
 			// forward message to...
 			chname = key.(string)
 		}
+
+		// root user
 		if !this.ctx.acpool.has(ircname) {
-			this.ctx.acpool.add(ircname)
-			this.irconQueue <- e
+			log.Println("wtf, try fix")
+			rac := this.ctx.acpool.add(ircname)
+			rac.conque <- e
 		} else {
-			ircon := this.ctx.acpool.get(ircname).ircon
+			rac := this.ctx.acpool.get(ircname)
+			ircon := rac.ircon
+			if !ircon.Connected() {
+				log.Println("Oh, maybe unexpected")
+			}
 			ircon.Join(chname)
-			messages := strings.Split(message, "\n") // fix multiple line message
-			for _, m := range messages {
-				ircon.Privmsg(chname, m)
+
+			// agent user
+			var ac *Account
+			if !this.ctx.acpool.has(fromUser) {
+				ac = this.ctx.acpool.add(fromUser)
+				ac.conque <- e
+			} else {
+				ircon := this.ctx.acpool.get(fromUser).ircon
+				if !ircon.Connected() {
+					log.Println("Oh, connection broken, ", chname)
+					ircon.Reconnect()
+				}
+				ircon.Join(chname)
+				messages := strings.Split(message, "\n") // fix multiple line message
+				for _, m := range messages {
+					ircon.Privmsg(chname, m)
+				}
 			}
 		}
+
 	case EVT_JOIN_GROUP:
+
 		if !this.ctx.acpool.has(ircname) {
-			this.ctx.acpool.add(ircname)
-			this.irconQueue <- e
+			ac := this.ctx.acpool.add(ircname)
+			ac.conque <- e
 		} else {
 			groupTitle := e.Chan
 			chname := groupTitle
@@ -101,29 +129,53 @@ func (this *RoundTable) handleEventTox(e *Event) {
 			ircon := this.ctx.acpool.get(ircname).ircon
 			ircon.Join(chname)
 		}
+
 	}
 }
 
 func (this *RoundTable) handleEventIrc(e *irc.Event) {
-	// filter
+	// filter logout
 	switch e.Code {
+	case "332": // channel title
+	case "353": // channel users
 	case "372":
+	// case "376":
+	// log.Printf("%s<- %+v", e.Connection.GetNick(), e)
 	default:
-		log.Printf("%+v", e)
+		log.Printf("%s<- %+v", e.Connection.GetNick(), e)
 	}
 
-	// ircon := e.Connection
+	ircon := e.Connection
 	switch e.Code {
 	case "376": // MOTD end
 		// ircon.Join("#tox-cn123")
-		for len(this.irconQueue) > 0 {
-			e := <-this.irconQueue
+		ac := this.ctx.acpool.get(ircon.GetNick())
+		for len(ac.conque) > 0 {
+			e := <-ac.conque
 			this.ctx.busch <- e
 		}
+
 	case "PING":
 	case "PRIVMSG":
+		// 检查是否是root用户连接
+		if ircon.GetNick() != ircname {
+			break // forward message only by root user
+		}
+		// 检查来源是否是我们自己的连接
+		isourcon := false
+		for name, _ := range this.ctx.acpool.acs {
+			if e.Nick == name {
+				isourcon = true
+				break
+			}
+		}
+		if isourcon {
+			break
+		}
+
 		chname := e.Arguments[0]
 		message := e.Arguments[1]
+		message = fmt.Sprintf("[%s] %s", e.Nick, message)
 
 		if val, found := chmap.Get(chname); found {
 			chname = val.(string)

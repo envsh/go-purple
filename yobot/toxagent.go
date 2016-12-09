@@ -94,7 +94,6 @@ func (this *ToxAgent) setupCallbacks() {
 			log.Println(err, groupTitle)
 		}
 		pubkeys := t.GroupGetPeerPubkeys(groupNumber)
-		log.Println(pubkeys)
 		groupbotIn := false
 		for _, pubkey := range pubkeys {
 			if strings.HasPrefix(groupbot, pubkey) {
@@ -107,7 +106,11 @@ func (this *ToxAgent) setupCallbacks() {
 			selfMessage = true
 		}
 		if selfMessage {
+			// log.Println("omit self message forward", groupTitle)
 			return
+		}
+		if len(this.ctx.busch) >= 123 {
+			log.Println("busch full, will blocked")
 		}
 		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_GROUP_MESSAGE, groupTitle,
 			message, groupNumber, peerNumber)
@@ -201,7 +204,7 @@ func (this *ToxAgent) setupTox() {
 		toxops.Tcp_port = uint16(rand.Uint32()%55536) + 10000
 		this._tox = tox.NewTox(toxops)
 		if this._tox != nil {
-			log.Println("TOXID:", this._tox.SelfGetAddress())
+			log.Println("TOXID:", this._tox.SelfGetAddress(), port)
 			break
 		}
 	}
