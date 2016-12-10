@@ -6,6 +6,6 @@ type Backend interface {
 type BackendBase struct {
 	ctx    *Context
 	conque chan interface{}
-	proto  int
+	proto  string
 	name   string
 }

@@ -5,31 +5,32 @@ import (
 	"log"
 	"strings"
 	// "time"
-
-	"github.com/thoj/go-ircevent"
+	// "github.com/thoj/go-ircevent"
 )
 
 const (
-	EVT_NONE = iota
-	EVT_CONNECTED
-	EVT_DISCONNECTED
-	EVT_FRIEND_CONNECTED
-	EVT_FRIEND_DISCONNECTED
-	EVT_FRIEND_MESSAGE
-	EVT_JOIN_GROUP
-	EVT_GROUP_MESSAGE
+	EVT_NONE                = "none"
+	EVT_CONNECTED           = "connected"
+	EVT_DISCONNECTED        = "disconnected"
+	EVT_FRIEND_CONNECTED    = "friend_connected"
+	EVT_FRIEND_DISCONNECTED = "friend_disconnected"
+	EVT_FRIEND_MESSAGE      = "friend_message"
+	EVT_JOIN_GROUP          = "join_group"
+	EVT_GROUP_MESSAGE       = "group_message"
 )
 
+const MAX_BUS_QUEUE_LEN = 123
+
 type Event struct {
-	Proto    int
-	EType    int
-	Chan     string
-	Args     []interface{}
-	RawEvent interface{}
-	Be       Backend
+	Proto string
+	EType string
+	Chan  string
+	Args  []interface{}
+	// RawEvent interface{}
+	Be Backend
 }
 
-func NewEvent(proto int, etype int, ch string, args ...interface{}) *Event {
+func NewEvent(proto string, etype string, ch string, args ...interface{}) *Event {
 	this := &Event{}
 	this.Proto = proto
 	this.EType = etype
@@ -58,7 +59,8 @@ func (this *RoundTable) handleEvent() {
 		// log.Println(ie)
 		switch ie.Proto {
 		case PROTO_IRC:
-			this.handleEventIrc(ie.RawEvent.(*irc.Event))
+			// this.handleEventIrc(ie.RawEvent.(*irc.Event))
+			this.handleEventIrc(ie)
 		case PROTO_TOX:
 			this.handleEventTox(ie)
 		}
@@ -89,11 +91,11 @@ func (this *RoundTable) handleEventTox(e *Event) {
 			rac.conque <- e
 		} else {
 			rac := this.ctx.acpool.get(ircname)
-			ircon := rac.ircon
-			if !ircon.Connected() {
+			be := rac.becon.(*IrcBackend)
+			if !be.isconnected() {
 				log.Println("Oh, maybe unexpected")
 			}
-			ircon.Join(chname)
+			be.join(chname)
 
 			// agent user
 			var ac *Account
@@ -101,15 +103,19 @@ func (this *RoundTable) handleEventTox(e *Event) {
 				ac = this.ctx.acpool.add(fromUser)
 				ac.conque <- e
 			} else {
-				ircon := this.ctx.acpool.get(fromUser).ircon
-				if !ircon.Connected() {
+				ac := this.ctx.acpool.get(fromUser)
+				be := ac.becon.(*IrcBackend)
+				if !be.isconnected() {
 					log.Println("Oh, connection broken, ", chname)
-					ircon.Reconnect()
+					err := be.reconnect()
+					if err != nil {
+						log.Println(err)
+					}
 				}
-				ircon.Join(chname)
+				be.join(chname)
 				messages := strings.Split(message, "\n") // fix multiple line message
 				for _, m := range messages {
-					ircon.Privmsg(chname, m)
+					be.sendGroupMessage(m, chname)
 				}
 			}
 		}
@@ -126,56 +132,40 @@ func (this *RoundTable) handleEventTox(e *Event) {
 				// forward message to...
 				chname = key.(string)
 			}
-			ircon := this.ctx.acpool.get(ircname).ircon
-			ircon.Join(chname)
+			ac := this.ctx.acpool.get(ircname)
+			be := ac.becon.(*IrcBackend)
+			be.join(chname)
 		}
 
 	}
 }
 
-func (this *RoundTable) handleEventIrc(e *irc.Event) {
-	// filter logout
-	switch e.Code {
-	case "332": // channel title
-	case "353": // channel users
-	case "372":
-	// case "376":
-	// log.Printf("%s<- %+v", e.Connection.GetNick(), e)
-	default:
-		log.Printf("%s<- %+v", e.Connection.GetNick(), e)
-	}
+func (this *RoundTable) handleEventIrc(e *Event) {
+	be := e.Be.(*IrcBackend)
 
-	ircon := e.Connection
-	switch e.Code {
-	case "376": // MOTD end
+	switch e.EType {
+	case EVT_CONNECTED: // MOTD end
 		// ircon.Join("#tox-cn123")
-		ac := this.ctx.acpool.get(ircon.GetNick())
+		ac := this.ctx.acpool.get(be.getName())
 		for len(ac.conque) > 0 {
 			e := <-ac.conque
 			this.ctx.busch <- e
 		}
 
-	case "PING":
-	case "PRIVMSG":
+	case EVT_GROUP_MESSAGE:
+		nick := e.Args[0].(string)
 		// 检查是否是root用户连接
-		if ircon.GetNick() != ircname {
+		if be.getName() != ircname {
 			break // forward message only by root user
 		}
-		// 检查来源是否是我们自己的连接
-		isourcon := false
-		for name, _ := range this.ctx.acpool.acs {
-			if e.Nick == name {
-				isourcon = true
-				break
-			}
-		}
-		if isourcon {
+		// 检查来源是否是我们自己的连接发的消息
+		if _, ok := this.ctx.acpool.acs[e.Args[0].(string)]; ok {
 			break
 		}
 
-		chname := e.Arguments[0]
-		message := e.Arguments[1]
-		message = fmt.Sprintf("[%s] %s", e.Nick, message)
+		chname := e.Args[1].(string)
+		message := e.Args[2].(string)
+		message = fmt.Sprintf("[%s] %s", nick, message)
 
 		if val, found := chmap.Get(chname); found {
 			chname = val.(string)
@@ -194,11 +184,12 @@ func (this *RoundTable) handleEventIrc(e *irc.Event) {
 			}
 		}
 
-	case "JOIN":
-	case "ERROR":
+	case EVT_JOIN_GROUP:
+	case EVT_DISCONNECTED:
 		// close reconnect/ by Excess Flood/
 		this.ctx.acpool.remove(ircname)
-	case "QUIT":
+	default:
+		log.Println("unknown evt:", e.EType)
 
 	}
 

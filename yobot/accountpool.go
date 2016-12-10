@@ -3,19 +3,18 @@ package main
 import (
 	"log"
 	"sync"
-
-	"github.com/thoj/go-ircevent"
+	// "github.com/thoj/go-ircevent"
 )
 
 const (
-	PROTO_NONE = iota
-	PROTO_IRC
-	PROTO_TOX
+	PROTO_NONE = "none"
+	PROTO_IRC  = "irc"
+	PROTO_TOX  = "tox"
 )
 
 type Account struct {
-	proto  int
-	ircon  *irc.Connection
+	proto int
+	// ircon  *irc.Connection
 	becon  Backend
 	conque chan *Event
 }
@@ -48,38 +47,29 @@ func (this *AccountPool) get(name string) *Account {
 }
 
 func (this *AccountPool) add(name string) *Account {
-	ircon := irc.IRC(name, name)
-	ircon.VerboseCallbackHandler = false
-	ircon.UseTLS = true
-	ircon.Debug = false
-
-	ircon.AddCallback("*", func(e *irc.Event) {
-		ce := NewEvent(PROTO_IRC, 0, "", e.Arguments)
-		ce.RawEvent = e
-		this.ctx.busch <- ce
-	})
+	be := NewIrcBackend(this.ctx, name)
 
 	ac := &Account{}
-	ac.ircon = ircon
+	// ac.ircon = ircon
+	ac.becon = be
 	ac.conque = make(chan *Event, 123)
 	this.acs[name] = ac
 
-	go func() {
-		err := ac.ircon.Connect(serverssl)
-		if err != nil {
-			// TODO 怎么处理
-			log.Println(err, name)
-		}
-	}()
+	be.connect()
 
 	return ac
 }
 
 func (this *AccountPool) remove(name string) {
-	ac, _ := this.acs[name]
-	delete(this.acs, name)
-	ac.ircon.ClearCallback("*")
-	if ac.ircon.Connected() {
-		ac.ircon.Disconnect()
+	if ac, ok := this.acs[name]; ok {
+		delete(this.acs, name)
+	} else {
+		log.Println("not found:", name, ac)
 	}
+	/*
+		ac.ircon.ClearCallback("*")
+		if ac.ircon.Connected() {
+			ac.ircon.Disconnect()
+		}
+	*/
 }
