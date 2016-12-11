@@ -3,8 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
-	// "time"
+	"time"
 	// "github.com/thoj/go-ircevent"
 )
 
@@ -71,6 +72,10 @@ func (this *RoundTable) handleEventTox(e *Event) {
 	log.Printf("%+v", e)
 	switch e.EType {
 	case EVT_GROUP_MESSAGE:
+		if this.processGroupCmd(e.Args[0].(string), e.Args[1].(int), e.Args[2].(int)) {
+			break
+		}
+
 		peerName, err := this.ctx.toxagt._tox.GroupPeerName(e.Args[1].(int), e.Args[2].(int))
 		if err != nil {
 			log.Println(err)
@@ -137,7 +142,169 @@ func (this *RoundTable) handleEventTox(e *Event) {
 			be.join(chname)
 		}
 
+	case EVT_FRIEND_MESSAGE:
+		friendNumber := e.Args[1].(uint32)
+		cmd := e.Args[0].(string)
+		segs := strings.Split(cmd, " ")
+
+		switch segs[0] {
+		case "info": // show friends count, groups count and group list info
+			this.processInfoCmd(friendNumber)
+		case "invite":
+			if len(segs) > 1 {
+				this.processInviteCmd(segs[1:], friendNumber)
+			} else {
+				this.ctx.toxagt._tox.FriendSendMessage(friendNumber, "invite what?")
+			}
+		case "id":
+			this.ctx.toxagt._tox.FriendSendMessage(friendNumber,
+				this.ctx.toxagt._tox.SelfGetAddress())
+		case "help":
+			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, cmdhelp)
+		default:
+			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, invalidcmd)
+		}
 	}
+}
+
+func (this *RoundTable) processInviteCmd(channels []string, friendNumber uint32) {
+	t := this.ctx.toxagt._tox
+
+	// for groupbot groups
+
+	// for irc groups
+	for _, chname := range channels {
+		if chname == "" {
+			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, invalidcmd)
+			continue
+		}
+
+		groupNumbers := this.ctx.toxagt._tox.GetChatList()
+		found := false
+		var groupNumber int
+		for _, gn := range groupNumbers {
+			groupTitle, err := this.ctx.toxagt._tox.GroupGetTitle(int(gn))
+			if err != nil {
+				log.Println("wtf")
+			} else {
+				if groupTitle == chname {
+					found = true
+					groupNumber = int(gn)
+				}
+			}
+		}
+		if found {
+			log.Println("already exists:", chname)
+			_, err := t.InviteFriend(friendNumber, groupNumber)
+			if err != nil {
+				log.Println("wtf")
+			}
+			continue
+		}
+
+		_, err := strconv.Atoi(chname)
+		if err == nil {
+			// for groupbot groups
+			friendNumber, err := this.ctx.toxagt._tox.FriendByPublicKey(groupbot)
+			if err != nil {
+				log.Println(err)
+			}
+			invcmd := fmt.Sprintf("invite %s", chname)
+			ret, err := this.ctx.toxagt._tox.FriendSendMessage(friendNumber, invcmd)
+			if err != nil {
+				log.Println(err, ret)
+			}
+			go func() {
+			}()
+		} else {
+			// for irc groups
+			groupNumber, err := this.ctx.toxagt._tox.AddGroupChat()
+			if err != nil {
+				log.Println("wtf")
+			} else {
+				_, err := t.GroupSetTitle(groupNumber, chname)
+				_, err = t.InviteFriend(friendNumber, groupNumber)
+				if err != nil {
+					log.Println("wtf")
+				}
+			}
+		}
+		// ac := this.ctx.acpool.get(chname)
+	}
+}
+
+var myonlineTime = time.Now()
+
+func (this *RoundTable) processInfoCmd(friendNumber uint32) {
+	info := ""
+
+	info += fmt.Sprintf("Uptime: %s\n\n", time.Now().Sub(myonlineTime).String())
+	info += fmt.Sprintf("Friends: %d (105 online)\n\n",
+		this.ctx.toxagt._tox.SelfGetFriendListSize())
+
+	groupNumbers := this.ctx.toxagt._tox.GetChatList()
+	for _, groupNumber := range groupNumbers {
+		groupTitle, err := this.ctx.toxagt._tox.GroupGetTitle(int(groupNumber))
+		if err != nil {
+			log.Println(err)
+		}
+		peerCount := this.ctx.toxagt._tox.GroupNumberPeers(int(groupNumber))
+		info += fmt.Sprintf("Group %d | Text | peers: %d | Title: %s\n\n",
+			groupNumber, peerCount, groupTitle)
+	}
+
+	this.ctx.toxagt._tox.FriendSendMessage(friendNumber, info)
+}
+
+// 如果是cmd则返回true
+func (this *RoundTable) processGroupCmd(msg string, groupNumber, peerNumber int) bool {
+	groupTitle, err := this.ctx.toxagt._tox.GroupGetTitle(groupNumber)
+	if err != nil {
+		log.Println(err)
+	}
+	segs := strings.Split(msg, " ")
+	if len(segs) == 1 {
+		switch segs[0] {
+		case "names":
+		case "nc": // name count of peer irc
+			ac := this.ctx.acpool.get(ircname)
+			if ac == nil {
+				log.Println("not connected to ", groupTitle)
+				this.ctx.toxagt._tox.GroupMessageSend(groupNumber, "not connected to irc:"+groupTitle)
+			} else {
+				ircon := ac.becon.(*IrcBackend)
+				ircon.ircon.SendRaw("/users")
+			}
+			return true
+		case "ping":
+			ac := this.ctx.acpool.get(ircname)
+			if ac == nil {
+				log.Println("not connected to ", groupTitle)
+				this.ctx.toxagt._tox.GroupMessageSend(groupNumber, "not connected to irc:"+groupTitle)
+			} else {
+				ircon := ac.becon.(*IrcBackend)
+				ircon.ircon.SendRaw(fmt.Sprintf("/whois %s", ircname))
+			}
+			return true
+		case "raw":
+			this.ctx.toxagt._tox.GroupMessageSend(groupNumber, "raw what?")
+			return true
+		}
+	} else if len(segs) > 1 {
+		switch segs[0] {
+		case "raw":
+			ac := this.ctx.acpool.get(ircname)
+			if ac == nil {
+				log.Println("not connected to ", groupTitle)
+				this.ctx.toxagt._tox.GroupMessageSend(groupNumber, "not connected to irc:"+groupTitle)
+			} else {
+				ircon := ac.becon.(*IrcBackend)
+				ircon.ircon.SendRaw(fmt.Sprintf("%s", strings.Join(segs[1:], " ")))
+			}
+			return true
+		}
+	}
+	return false
 }
 
 func (this *RoundTable) handleEventIrc(e *Event) {

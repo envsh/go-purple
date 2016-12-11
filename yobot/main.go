@@ -56,4 +56,15 @@ func init() {
 	chmap.Put("#tox-cn123", "testks")
 	chmap.Put("#tox-cn", "Chinese 中文")
 	chmap.Put("#tox-en", "#tox")
+	chmap.Put("#tox-ru", "Russian Tox Chat (Use Kalina: kalina@toxme.io or 12EDB939AA529641CE53830B518D6EB30241868EE0E5023C46A372363CAEC91C2C948AEFE4EB)")
 }
+
+var statusMessage = "Send me the message 'invite', 'info', 'help' for a full list of commands"
+
+var cmdhelp = "info : Print my current status and list active group chats\n\n" +
+	"id : Print my Tox ID\n\n" +
+	"invite : Request invite to default group chat\n\n" +
+	"invite <n> <p> : Request invite to group chat n (with password p if protected)\n\n" +
+	"group <type> <pass> : Creates a new groupchat with type: text | audio (optional password)\n\n"
+
+var invalidcmd = "Invalid command. Type help for a list of commands"

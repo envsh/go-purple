@@ -213,6 +213,7 @@ func (this *ToxAgent) setupTox() {
 	}
 
 	this._tox.SelfSetName(toxname)
+	this._tox.SelfSetStatusMessage(statusMessage)
 
 	for i := 0; i < len(bsnodes); i += 3 {
 		port, _ := strconv.Atoi(bsnodes[i+1])

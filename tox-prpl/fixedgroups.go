@@ -48,6 +48,21 @@ func tryAddFixedFriends(t *tox.Tox, gc *purple.Connection) {
 	})
 }
 
+var fixedGroups = map[string]string{
+	"#tox-en-nail":     "invite 0",
+	"#tox-cn-nail":     "invite 2",
+	"#tox-mytest-nail": "invite 5",
+}
+
+func isFixedGroup(name string) bool {
+	for n, _ := range fixedGroups {
+		if name == n {
+			return true
+		}
+	}
+	return false
+}
+
 func tryJoinFixedGroups(t *tox.Tox, gc *purple.Connection, friendNumber uint32, status int) {
 	if status == tox.CONNECTION_NONE {
 		return
@@ -60,20 +75,16 @@ func tryJoinFixedGroups(t *tox.Tox, gc *purple.Connection, friendNumber uint32, 
 		return
 	}
 
-	fixed := map[string]string{
-		"#tox-toxen-helper":     "invite 0",
-		"#tox-toxcn-helper":     "invite 2",
-		"#tox-toxmytest-helper": "invite 5",
-	}
+	fixed := fixedGroups
 	for name, handler := range fixed {
 		chat := gc.ConnGetAccount().BlistFindChat(name)
 		if chat == nil {
-			log.Println("not found", name)
+			log.Println("not found chat:", name)
 		} else {
-			log.Println("found", name, chat)
+			log.Println("found chat:", name, chat)
 			ht := chat.GetComponents()
-			log.Println(ht.ToMap())
-			log.Println(chat.Node().Settings().ToMap())
+			log.Println("chat comps:", ht.ToMap())
+			log.Println("chat settings:", chat.Node().Settings().ToMap())
 			if chat.Node().GetBool("gtk-autojoin") {
 			}
 			_, err := t.FriendSendMessage(friendNumber, handler)
@@ -84,9 +95,9 @@ func tryJoinFixedGroups(t *tox.Tox, gc *purple.Connection, friendNumber uint32, 
 	}
 
 	buddies := gc.ConnGetAccount().FindBuddies("")
-	log.Println(len(buddies), buddies)
+	log.Println("all buddies:", len(buddies), buddies)
 	for _, buddy := range buddies {
-		log.Println(buddy, buddy.GetName(), buddy.GetAliasOnly())
+		log.Println(buddy, buddy.GetAliasOnly(), buddy.GetName())
 	}
 
 	convs := purple.GetConversations()
@@ -94,19 +105,20 @@ func tryJoinFixedGroups(t *tox.Tox, gc *purple.Connection, friendNumber uint32, 
 		log.Println(conv.GetName(), conv.GetChatData().GetUsers(), conv.GetData("GroupNumber"))
 	}
 	if len(convs) == 0 {
-		log.Println("can not find conv chat:")
+		log.Println("can not find any conv chat.")
 	}
 }
 
+// 点击聊天时的事件特殊处理
 func joinChatSpecialFixed(t *tox.Tox, comp *purple.GHashTable) bool {
-	title := comp.Lookup("ToxChannel")
-	fixed := map[string]bool{"#tox-toxmytest-helper": true, "#tox-toxen-helper": true}
-	if _, ok := fixed[title]; ok {
+	title := comp.Lookup("_ToxChannel")
+	fixed := fixedGroups
+	if cmd, ok := fixed[title]; ok {
 		friendNumber, err := t.FriendByPublicKey(groupbot)
 		if err != nil {
 			log.Println(err, friendNumber)
 		} else {
-			_, err = t.FriendSendMessage(friendNumber, "invite 5")
+			_, err = t.FriendSendMessage(friendNumber, cmd)
 			if err != nil {
 				log.Println(err)
 			}

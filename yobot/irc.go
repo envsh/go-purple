@@ -57,11 +57,11 @@ func (this *IrcBackend) onEvent(e *irc.Event) {
 		// log.Printf("%s<- %+v", e.Connection.GetNick(), e)
 	default:
 		log.Printf("%s<- %+v", e.Connection.GetNick(), e)
-	}
 
-	ce := NewEventFromIrcEvent(e)
-	ce.Be = this
-	this.ctx.busch <- ce
+		ce := NewEventFromIrcEvent(e)
+		ce.Be = this
+		this.ctx.busch <- ce
+	}
 }
 
 func (this *IrcBackend) connect() {
@@ -125,7 +125,7 @@ func NewEventFromIrcEvent(e *irc.Event) *Event {
 	case "QUIT":
 		ne.EType = EVT_FRIEND_DISCONNECTED
 	default:
-		ne.EType = EVT_NONE
+		ne.EType = e.Code
 	}
 	return ne
 }

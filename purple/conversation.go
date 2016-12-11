@@ -148,15 +148,14 @@ func (this *ConvChat) RemoveUser(user string) {
 	C.purple_conv_chat_remove_user(this.chat, CCString(user).Ptr, CCString(reason).Ptr)
 }
 
-func (this *ConvChat) GetUsers() []string {
+func (this *ConvChat) GetUsers() []*ConvChatBuddy {
 	lst := C.purple_conv_chat_get_users(this.chat)
 
-	res := make([]string, 0)
+	res := make([]*ConvChatBuddy, 0)
 	newGListFrom(lst).Each(func(item C.gpointer) {
 		ccbudy := (*C.PurpleConvChatBuddy)(item)
 		goccbudy := newConvChatBuddyFrom(ccbudy)
-		str := goccbudy.GetName()
-		res = append(res, str)
+		res = append(res, goccbudy)
 	})
 
 	return res
@@ -200,6 +199,11 @@ func (this *ConvChat) HasLeft() bool {
 	return c2goBool(r)
 }
 
+func NewConvChatBuddy(name, alias string) *ConvChatBuddy {
+	r := C.purple_conv_chat_cb_new(C.CString(name), C.CString(alias), 0)
+	return newConvChatBuddyFrom(r)
+}
+
 func (this *ConvChatBuddy) GetName() string {
 	return C.GoString(this.buddy.name)
 }
@@ -208,22 +212,34 @@ func (this *ConvChatBuddy) GetAlias() string {
 	return C.GoString(this.buddy.alias)
 }
 
+/* no corresponding method in libpurple
 func (this *ConvChatBuddy) SetAlias(alias string) {
 	if this.buddy != nil {
 		if this.buddy.alias != nil {
 			// TODO free it first
 		}
 		if this.buddy.alias != nil {
-			C.free(unsafe.Pointer(this.buddy.alias))
+			// C.free(unsafe.Pointer(this.buddy.alias))
 		}
 		this.buddy.alias = C.CString(alias)
 	}
 }
+*/
 
 func (this *ConvChatBuddy) Destroy() {
 	buddy := this.buddy
 	this.buddy = nil
+
 	C.purple_conv_chat_cb_destroy(buddy)
+	this = nil
+}
+
+func (this *ConvChatBuddy) SetAttribute(chat *ConvChat, key, value string) {
+	C.purple_conv_chat_cb_set_attribute(chat.chat, this.buddy, CCString(key).Ptr, CCString(value).Ptr)
+}
+func (this *ConvChatBuddy) GetAttribute(key string) string {
+	r := C.purple_conv_chat_cb_get_attribute(this.buddy, CCString(key).Ptr)
+	return C.GoString(r)
 }
 
 func GetConversations() []*Conversation {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"go-purple/purple"
 
@@ -204,73 +205,9 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 	}, ac)
 
 	// TODO should notify UI first and think groupbot's invite also
-	this._tox.CallbackGroupInvite(func(t *tox.Tox,
-		friendNumber uint32, itype uint8, data []byte, d interface{}) {
-		log.Println(friendNumber, len(data), itype)
-		pubkey, err := this._tox.FriendGetPublicKey(friendNumber)
-		if err != nil {
-			log.Println(err)
-		}
-		acceptInvite := func(interface{}) {
-			var groupNumber int
-			var err error
-			switch itype {
-			case tox.GROUPCHAT_TYPE_AV:
-				groupNumber, err = this._tox.JoinAVGroupChat(friendNumber, data)
-				if err != nil {
-					log.Println(err, groupNumber)
-				}
-			case tox.GROUPCHAT_TYPE_TEXT:
-				groupNumber, err = this._tox.JoinGroupChat(friendNumber, data)
-				if err != nil {
-					log.Println(err, groupNumber)
-				}
-			default:
-				log.Panicln("wtf")
-			}
-			if err == nil {
-				groupTitle, err := this._tox.GroupGetTitle(groupNumber)
-				if err != nil {
-					log.Println(err, groupTitle)
-					groupTitle = DEFAULT_GROUPCHAT_TITLE
-				}
-				conv := conn.ServGotJoinedChat(groupNumber, groupTitle)
-				if conv == nil {
-					log.Println("join chat failed:", conv, groupNumber, groupTitle)
-				} else if conv != nil {
-					conv.SetData("GroupNumber", fmt.Sprintf("%d", groupNumber))
-					conv.SetLogging(true)
-				}
-			}
-		}
-		if strings.HasPrefix(groupbot, pubkey) {
-			// go on without notify UI
-			acceptInvite(nil)
-		} else {
-			friendName, err := this._tox.FriendGetName(friendNumber)
-			if err != nil {
-				log.Println("wtf")
-			}
-			purple.RequestAcceptCancel(nil, conn, "New Group Invite",
-				fmt.Sprintf("Are you want to join %s's group?", friendName), friendName,
-				acceptInvite, nil)
-		}
-	}, ac)
+	this._tox.CallbackGroupInvite(this.onGroupInvite, ac)
 
-	this._tox.CallbackGroupTitle(func(t *tox.Tox,
-		groupNumber int, peerNumber int, title string, d interface{}) {
-		log.Println(groupNumber, peerNumber, title)
-		conv := conn.ConnFindChat(groupNumber)
-		if conv != nil {
-			if conv.GetName() != title {
-				conv.SetName(title)
-			}
-		}
-		conv2 := conn.ServGotJoinedChat(groupNumber, title)
-		if conv != conv2 {
-			log.Println("wtf, maybe remove one")
-		}
-	}, ac)
+	this._tox.CallbackGroupTitle(this.onGroupTitle, ac)
 }
 
 func (this *ToxPlugin) loadFriends(ac *purple.Account) {
@@ -328,7 +265,88 @@ func (this *ToxPlugin) findBuddyEx(ac *purple.Account, pubkeyOrFriendID string) 
 	return buddy
 }
 
-// optional callbacks
+// tox callbacks
+func (this *ToxPlugin) onGroupInvite(t *tox.Tox,
+	friendNumber uint32, itype uint8, data []byte, d interface{}) {
+	ac := d.(*purple.Account)
+	conn := ac.GetConnection()
+
+	log.Println(friendNumber, len(data), itype)
+	pubkey, err := this._tox.FriendGetPublicKey(friendNumber)
+	if err != nil {
+		log.Println(err)
+	}
+	acceptInvite := func(interface{}) {
+		var groupNumber int
+		var err error
+		switch itype {
+		case tox.GROUPCHAT_TYPE_AV:
+			groupNumber, err = this._tox.JoinAVGroupChat(friendNumber, data)
+			if err != nil {
+				log.Println(err, groupNumber)
+			}
+		case tox.GROUPCHAT_TYPE_TEXT:
+			groupNumber, err = this._tox.JoinGroupChat(friendNumber, data)
+			if err != nil {
+				log.Println(err, groupNumber)
+			}
+		default:
+			log.Panicln("wtf")
+		}
+		if err == nil {
+			groupTitle, err := this._tox.GroupGetTitle(groupNumber)
+			if err != nil {
+				log.Println(err, groupTitle)
+				groupTitle = DEFAULT_GROUPCHAT_TITLE
+			}
+			conv := conn.ServGotJoinedChat(groupNumber, groupTitle)
+			if conv == nil {
+				log.Println("join chat failed:", conv, groupNumber, groupTitle)
+			} else if conv != nil {
+				conv.SetData("GroupNumber", fmt.Sprintf("%d", groupNumber))
+				conv.SetLogging(true)
+			}
+		}
+	}
+	if strings.HasPrefix(groupbot, pubkey) {
+		// go on without notify UI
+		acceptInvite(nil)
+	} else {
+		friendName, err := this._tox.FriendGetName(friendNumber)
+		if err != nil {
+			log.Println("wtf")
+		}
+		purple.RequestAcceptCancel(nil, conn, "New Group Invite",
+			fmt.Sprintf("Are you want to join %s's group?", friendName),
+			friendName, acceptInvite, nil)
+	}
+}
+
+func (this *ToxPlugin) onGroupTitle(t *tox.Tox,
+	groupNumber, peerNumber int, title string, ud interface{}) {
+	ac := ud.(*purple.Account)
+	conn := ac.GetConnection()
+
+	log.Println(groupNumber, peerNumber, title)
+	conv := conn.ConnFindChat(groupNumber)
+	if conv == nil {
+		log.Println("can not found conv, create new chat:", groupNumber, title)
+		conv = conn.ServGotJoinedChat(groupNumber, title)
+	} else {
+		if conv.GetName() != title {
+			conv.SetName(title)
+		}
+	}
+	if false {
+		// 即使参数相同，也不可忽略的调用
+		conv2 := conn.ServGotJoinedChat(groupNumber, title)
+		if conv != conv2 {
+			log.Println("wtf, maybe remove one")
+		}
+	}
+}
+
+// purple optional callbacks
 func (this *ToxPlugin) ChatInfo(gc *purple.Connection) []*purple.ProtoChatEntry {
 	// log.Println(gc)
 
@@ -356,7 +374,7 @@ func (this *ToxPlugin) SendIM(gc *purple.Connection, who string, msg string) int
 }
 
 func (this *ToxPlugin) JoinChat(gc *purple.Connection, comp *purple.GHashTable) {
-	log.Println(gc, comp.Lookup("ToxChannel"), comp.Lookup("GroupNumber"))
+	log.Println(gc, comp.Lookup("_ToxChannel"), comp.Lookup("GroupNumber"))
 	if joinChatSpecialFixed(this._tox, comp) {
 		return
 	}
@@ -366,10 +384,10 @@ func (this *ToxPlugin) JoinChat(gc *purple.Connection, comp *purple.GHashTable) 
 	if err != nil {
 		log.Println(err)
 	}
-	title := comp.Lookup("ToxChannel")
+	title := comp.Lookup("_ToxChannel")
 	this._tox.GroupSetTitle(groupNumber, title)
 	comp.Insert("GroupNumber", fmt.Sprintf("%d", groupNumber))
-	conv := gc.ServGotJoinedChat(groupNumber, comp.Lookup("ToxChannel"))
+	conv := gc.ServGotJoinedChat(groupNumber, comp.Lookup("_ToxChannel"))
 	if conv != nil {
 		conv.SetLogging(true)
 	}
@@ -391,12 +409,15 @@ func (this *ToxPlugin) RejectChat(gc *purple.Connection, comp *purple.GHashTable
 
 // TODO what?
 func (this *ToxPlugin) GetChatName(comp *purple.GHashTable) string {
-	log.Println("herhere")
 	log.Println(comp.ToMap())
-	return ""
+	groupName := comp.Lookup("_ToxChannel")
+	if isFixedGroup(groupName) {
+		return groupName
+		// return DEFAULT_GROUPCHAT_TITLE
+	}
+	return groupName
 }
 func (this *ToxPlugin) ChatInvite(gc *purple.Connection, id int, message string, who string) {
-	log.Println("herhere")
 	log.Println("herhere", id, message, who)
 	friendNumber, err := this._tox.FriendByPublicKey(who)
 	if err != nil {
@@ -408,7 +429,17 @@ func (this *ToxPlugin) ChatInvite(gc *purple.Connection, id int, message string,
 	}
 }
 func (this *ToxPlugin) ChatLeave(gc *purple.Connection, id int) {
-	log.Println("herhere")
+	groupNumber := id
+	title, err := this._tox.GroupGetTitle(groupNumber)
+	if err != nil {
+		log.Println(err)
+	}
+	// TODO 检查设置，是否是关闭不离开的会话
+	_, err = this._tox.DelGroupChat(groupNumber)
+	if err != nil {
+		log.Println(err)
+	}
+	log.Println("proto leaved group:", groupNumber, title)
 }
 func (this *ToxPlugin) ChatWhisper(gc *purple.Connection, id int, who string, message string) {
 	log.Println("herhere")
@@ -464,20 +495,70 @@ func (this *ToxPlugin) RemoveBuddy(gc *purple.Connection, buddy *purple.Buddy, g
 }
 
 func (this *ToxPlugin) GetInfo(gc *purple.Connection, who string) {
+	var uinfo *purple.NotifyUserInfo
+	var err error
+
 	friendNumber, err := this._tox.FriendByPublicKey(who)
 	if err != nil {
 		log.Println(err, friendNumber, who)
-	}
-	friendName, err := this._tox.FriendGetName(friendNumber)
-	friendStmsg, err := this._tox.FriendGetStatusMessage(friendNumber)
-	seen, err := this._tox.FriendGetLastOnline(friendNumber)
+		// maybe chat peer's name
+		pubkeys := make(map[int]string, 0)
+		groupNumbers := this._tox.GetChatList()
+		for _, groupNumber := range groupNumbers {
+			peerMap := this._tox.GroupGetPeers(int(groupNumber))
+			for peerNumber, pubkey := range peerMap {
+				peerName, err := this._tox.GroupPeerName(int(groupNumber), peerNumber)
+				if err != nil {
+					log.Println(err)
+				}
+				if peerName == who {
+					pubkeys[int(groupNumber)] = pubkey
+				}
+			}
+		}
 
-	uinfo := purple.NewNotifyUserInfo()
-	uinfo.AddPair("nickname", friendName)
-	uinfo.AddPair("status message", friendStmsg)
-	uinfo.AddPair("seen", fmt.Sprintf("%d", seen))
-	uinfo.AddPair("hehehe", "efffff")
-	uinfo.AddPair("hehehe12", "efffff456")
+		log.Println("find matched pubkeys:", len(pubkeys))
+		if len(pubkeys) == 0 {
+			log.Println("wtf")
+		} else {
+			uinfo = purple.NewNotifyUserInfo()
+			for groupNumber, pubkey := range pubkeys {
+				uinfo.AddPair("nickname", who)
+				uinfo.AddPair("id", pubkeys[0])
+				conv := gc.ConnFindChat(groupNumber)
+				if conv == nil {
+					log.Println("can not found coconv:", groupNumber, pubkey)
+				} else {
+					chat := conv.GetChatData()
+					ccbuddy := chat.FindBuddy(who)
+					if ccbuddy == nil {
+						log.Println("can not found cobuddy:", groupNumber, pubkey, conv.GetName())
+					} else {
+						joinTime := ccbuddy.GetAttribute("joinTime")
+						uinfo.AddPair("joinTime", joinTime)
+						attrPubkey := ccbuddy.GetAttribute("pubkey")
+						if attrPubkey != pubkey {
+							log.Println("not match pubkey:", attrPubkey, pubkey, who, conv.GetName())
+						}
+					}
+				}
+			}
+		}
+	} else {
+		friendName, err := this._tox.FriendGetName(friendNumber)
+		if err != nil {
+		}
+		friendStmsg, err := this._tox.FriendGetStatusMessage(friendNumber)
+		seen, err := this._tox.FriendGetLastOnline(friendNumber)
+
+		uinfo = purple.NewNotifyUserInfo()
+		uinfo.AddPair("nickname", friendName)
+		uinfo.AddPair("id", who)
+		uinfo.AddPair("status message", friendStmsg)
+		uinfo.AddPair("seen", fmt.Sprintf("%d", seen))
+		uinfo.AddPair("hehehe", "efffff")
+		uinfo.AddPair("hehehe12", "efffff456")
+	}
 
 	gc.NotifyUserInfo(who, uinfo, func(ud interface{}) {
 		log.Println("closed", ud)
@@ -519,47 +600,54 @@ func (this *ToxPlugin) Normalize(gc *purple.Connection, who string) string {
 // utils
 func (this *ToxPlugin) UpdateMembers(groupNumber int, conv *purple.Conversation) {
 	chat := conv.GetChatData()
+	// ac := conv.GetAccount()
+
 	// TODO member list diff and clean, so it is member list sync
 	t := this._tox
-	plst := chat.GetUsers()
-	tlst := t.GroupGetNames(groupNumber)
-	klst := t.GroupGetPeerPubkeys(groupNumber)
-	mlst := t.GroupGetPeers(groupNumber)
+	memList := chat.GetUsers()
+	nameList := t.GroupGetNames(groupNumber)
+	pubkeyList := t.GroupGetPeerPubkeys(groupNumber)
+	peerMap := t.GroupGetPeers(groupNumber)
 	peerCount := t.GroupNumberPeers(groupNumber)
-	if len(tlst) != peerCount {
+	if len(nameList) != peerCount {
 		log.Println("wtf")
 	}
 
-	if true {
+	if false {
 		log.Println("need sync names...")
-		log.Println("purple list:", plst)
-		log.Println("tox list:", tlst)
-		log.Println("pubkey list:", klst)
-		log.Println("peer list:", mlst)
+		log.Println("purple list:", memList)
+		log.Println("tox list:", nameList)
+		log.Println("pubkey list:", pubkeyList)
+		log.Println("peer list:", peerMap)
+	}
 
+	// still use nick for chatroom
+	if true {
 		// remove not existed
-		for _, pname := range plst {
+		for _, ccbuddy := range memList {
 			found := false
-			for _, tname := range tlst {
-				if tname == pname {
+			for _, tname := range nameList {
+				if tname == ccbuddy.GetName() {
 					found = true
 				}
 			}
 			if found == false {
-				chat.RemoveUser(pname) // should already destroy the ConvChatBuddy here
-				cbbuddy := chat.FindBuddy(pname)
-				cbbuddy.Destroy()
+				// should already destroy the ConvChatBuddy here
+				chat.RemoveUser(ccbuddy.GetName())
+				// ccbuddy.Destroy() // the remove with call this too
 			}
 		}
 
+		memList = chat.GetUsers() // reget
 		// add new
-		for peerNumber, pubkey := range mlst {
-			found := false
+		for peerNumber, pubkey := range peerMap {
 			peerName, err := t.GroupPeerName(groupNumber, peerNumber)
 			if err != nil {
+				log.Println(err)
 			}
-			for _, pname := range plst {
-				if pname == peerName {
+			found := false
+			for _, ccbuddy := range memList {
+				if ccbuddy.GetName() == peerName {
 					found = true
 				}
 			}
@@ -569,8 +657,10 @@ func (this *ToxPlugin) UpdateMembers(groupNumber int, conv *purple.Conversation)
 				}
 				if true {
 					chat.AddUser(peerName)
-					cbbudy := chat.FindBuddy(peerName)
-					cbbudy.SetAlias(pubkey)
+					ccbuddy := chat.FindBuddy(peerName)
+					ccbuddy.SetAttribute(chat, "pubkey", pubkey)
+					ccbuddy.SetAttribute(chat, "joinTime", time.Now().String())
+					// log.Println(peerName, ccbuddy.GetAlias(), ccbuddy.GetName(), ccbuddy.GetAttribute("pubkey"))
 				}
 			}
 		}
