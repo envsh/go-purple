@@ -17,6 +17,7 @@ const (
 	EVT_FRIEND_DISCONNECTED = "friend_disconnected"
 	EVT_FRIEND_MESSAGE      = "friend_message"
 	EVT_JOIN_GROUP          = "join_group"
+	EVT_LEAVE_GROUP         = "leave_group"
 	EVT_GROUP_MESSAGE       = "group_message"
 )
 
@@ -142,6 +143,30 @@ func (this *RoundTable) handleEventTox(e *Event) {
 			be.join(chname)
 		}
 
+	case EVT_LEAVE_GROUP:
+		// 在一段时间内如果用户未再次进入该群组，则视其为离开，并关闭其irc连接
+		// 或者让其也离开对应的irc群组
+		chname := e.Chan
+		peerName := e.Args[0].(string)
+		groupNumber := e.Args[1].(int)
+		time.AfterFunc(leaveChannelTimeout*time.Second, func() {
+			names := this.ctx.toxagt._tox.GroupGetNames(groupNumber)
+			found := false
+			for _, name := range names {
+				if name == peerName {
+					found = true
+				}
+			}
+			if !found {
+				ac := this.ctx.acpool.get(peerName + "[t]")
+				if ac == nil {
+					log.Println("wtf", peerName, this.ctx.acpool.count(), this.ctx.acpool.getNames(5))
+				} else {
+					ac.becon.(*IrcBackend).ircon.Part(chname)
+				}
+			}
+		})
+
 	case EVT_FRIEND_MESSAGE:
 		friendNumber := e.Args[1].(uint32)
 		cmd := e.Args[0].(string)
@@ -165,6 +190,64 @@ func (this *RoundTable) handleEventTox(e *Event) {
 			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, invalidcmd)
 		}
 	}
+}
+
+func (this *RoundTable) handleEventIrc(e *Event) {
+	be := e.Be.(*IrcBackend)
+
+	switch e.EType {
+	case EVT_CONNECTED: // MOTD end
+		// ircon.Join("#tox-cn123")
+		ac := this.ctx.acpool.get(be.getName())
+		for len(ac.conque) > 0 {
+			e := <-ac.conque
+			this.ctx.busch <- e
+		}
+
+	case EVT_GROUP_MESSAGE:
+		nick := e.Args[0].(string)
+		// 检查是否是root用户连接
+		if be.getName() != ircname {
+			break // forward message only by root user
+		}
+		// 检查来源是否是我们自己的连接发的消息
+		if _, ok := this.ctx.acpool.acs[e.Args[0].(string)]; ok {
+			break
+		}
+
+		chname := e.Args[1].(string)
+		message := e.Args[2].(string)
+		message = fmt.Sprintf("[%s] %s", nick, message)
+
+		if val, found := chmap.Get(chname); found {
+			chname = val.(string)
+		}
+
+		// TODO maybe multiple result
+		groupNumber := this.ctx.toxagt.getToxGroupByName(chname)
+		if groupNumber == -1 {
+			groupNumber = this.ctx.toxagt.getToxGroupByName(strings.ToLower(chname))
+		}
+		if groupNumber == -1 {
+			log.Println("group not exists:", chname, strings.ToLower(chname))
+		} else {
+			_, err := this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message)
+			if err != nil {
+				// should be 1
+				pno := this.ctx.toxagt._tox.GroupNumberPeers(groupNumber)
+				log.Println(err, chname, groupNumber, message, pno)
+			}
+		}
+
+	case EVT_JOIN_GROUP:
+	case EVT_DISCONNECTED:
+		// close reconnect/ by Excess Flood/
+		this.ctx.acpool.remove(ircname)
+	default:
+		log.Println("unknown evt:", e.EType)
+
+	}
+
 }
 
 func (this *RoundTable) processInviteCmd(channels []string, friendNumber uint32) {
@@ -227,6 +310,10 @@ func (this *RoundTable) processInviteCmd(channels []string, friendNumber uint32)
 				if err != nil {
 					log.Println("wtf")
 				}
+				// 这个逻辑不会自动触发groupTitle事件，手工触发一下
+				var peerNumber int = 0
+				var title = chname
+				this.ctx.busch <- NewEvent(PROTO_TOX, EVT_JOIN_GROUP, title, groupNumber, peerNumber)
 			}
 		}
 		// ac := this.ctx.acpool.get(chname)
@@ -238,9 +325,22 @@ var myonlineTime = time.Now()
 func (this *RoundTable) processInfoCmd(friendNumber uint32) {
 	info := ""
 
+	onlineFriendCount := this.ctx.toxagt.getOnlineFriendCount()
+
 	info += fmt.Sprintf("Uptime: %s\n\n", time.Now().Sub(myonlineTime).String())
-	info += fmt.Sprintf("Friends: %d (105 online)\n\n",
-		this.ctx.toxagt._tox.SelfGetFriendListSize())
+	info += fmt.Sprintf("Friends: %d (%d online)\n\n",
+		this.ctx.toxagt._tox.SelfGetFriendListSize(), onlineFriendCount)
+
+	// irc connections
+	ircConnectionCount := len(this.ctx.acpool.acs)
+	ircActiveConnectionCount := 0
+	for _, ac := range this.ctx.acpool.acs {
+		if ac.becon.(*IrcBackend).isconnected() {
+			ircActiveConnectionCount += 1
+		}
+	}
+	info += fmt.Sprintf("Connections: %d (%d active)\n\n",
+		ircConnectionCount, ircActiveConnectionCount)
 
 	groupNumbers := this.ctx.toxagt._tox.GetChatList()
 	for _, groupNumber := range groupNumbers {
@@ -253,6 +353,7 @@ func (this *RoundTable) processInfoCmd(friendNumber uint32) {
 			groupNumber, peerCount, groupTitle)
 	}
 
+	info = strings.TrimRight(info, "\n")
 	this.ctx.toxagt._tox.FriendSendMessage(friendNumber, info)
 }
 
@@ -305,59 +406,4 @@ func (this *RoundTable) processGroupCmd(msg string, groupNumber, peerNumber int)
 		}
 	}
 	return false
-}
-
-func (this *RoundTable) handleEventIrc(e *Event) {
-	be := e.Be.(*IrcBackend)
-
-	switch e.EType {
-	case EVT_CONNECTED: // MOTD end
-		// ircon.Join("#tox-cn123")
-		ac := this.ctx.acpool.get(be.getName())
-		for len(ac.conque) > 0 {
-			e := <-ac.conque
-			this.ctx.busch <- e
-		}
-
-	case EVT_GROUP_MESSAGE:
-		nick := e.Args[0].(string)
-		// 检查是否是root用户连接
-		if be.getName() != ircname {
-			break // forward message only by root user
-		}
-		// 检查来源是否是我们自己的连接发的消息
-		if _, ok := this.ctx.acpool.acs[e.Args[0].(string)]; ok {
-			break
-		}
-
-		chname := e.Args[1].(string)
-		message := e.Args[2].(string)
-		message = fmt.Sprintf("[%s] %s", nick, message)
-
-		if val, found := chmap.Get(chname); found {
-			chname = val.(string)
-		}
-
-		// TODO maybe multiple result
-		groupNumber := this.ctx.toxagt.getToxGroupByName(chname)
-		if groupNumber == -1 {
-			log.Println("group not exists:", chname)
-		} else {
-			_, err := this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message)
-			if err != nil {
-				// should be 1
-				pno := this.ctx.toxagt._tox.GroupNumberPeers(groupNumber)
-				log.Println(err, chname, groupNumber, message, pno)
-			}
-		}
-
-	case EVT_JOIN_GROUP:
-	case EVT_DISCONNECTED:
-		// close reconnect/ by Excess Flood/
-		this.ctx.acpool.remove(ircname)
-	default:
-		log.Println("unknown evt:", e.EType)
-
-	}
-
 }

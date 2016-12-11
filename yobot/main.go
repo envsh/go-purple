@@ -48,6 +48,7 @@ func main() {
 const serverssl = "weber.freenode.net:6697"
 const toxname = "zuck07"
 const ircname = toxname
+const leaveChannelTimeout = 270 // seconds
 
 var chmap = hashbidimap.New()
 
@@ -65,6 +66,6 @@ var cmdhelp = "info : Print my current status and list active group chats\n\n" +
 	"id : Print my Tox ID\n\n" +
 	"invite : Request invite to default group chat\n\n" +
 	"invite <n> <p> : Request invite to group chat n (with password p if protected)\n\n" +
-	"group <type> <pass> : Creates a new groupchat with type: text | audio (optional password)\n\n"
+	"group <type> <pass> : Creates a new groupchat with type: text | audio (optional password)"
 
 var invalidcmd = "Invalid command. Type help for a list of commands"

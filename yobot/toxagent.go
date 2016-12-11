@@ -14,11 +14,16 @@ import (
 type ToxAgent struct {
 	ctx  *Context
 	_tox *tox.Tox
+
+	groupMembers map[int]map[int]string // leave group get peer name
 }
 
 func NewToxAgent() *ToxAgent {
 	this := &ToxAgent{}
 	this.ctx = ctx
+
+	this.groupMembers = make(map[int]map[int]string)
+
 	return this
 }
 
@@ -182,6 +187,45 @@ func (this *ToxAgent) setupCallbacks() {
 		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_JOIN_GROUP, title, groupNumber, peerNumber)
 	}, nil)
 
+	this._tox.CallbackGroupNameListChange(this.onGroupNameListChange, nil)
+}
+
+func (this *ToxAgent) onGroupNameListChange(t *tox.Tox,
+	groupNumber int, peerNumber int, change uint8, ud interface{}) {
+	groupTitle, err := this._tox.GroupGetTitle(groupNumber)
+	if err != nil {
+		log.Println("wtf", err)
+	}
+	peerName, err := this._tox.GroupPeerName(groupNumber, peerNumber)
+	if err != nil {
+		if change != tox.CHAT_CHANGE_PEER_DEL {
+			log.Println("wtf", err)
+		}
+	}
+
+	switch change {
+	case tox.CHAT_CHANGE_PEER_DEL:
+		if _, ok := this.groupMembers[groupNumber]; !ok {
+			log.Println("wtf")
+		}
+		peerName = this.groupMembers[groupNumber][peerNumber]
+		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_LEAVE_GROUP,
+			groupTitle, peerName, groupNumber, peerNumber, change)
+
+		delete(this.groupMembers[groupNumber], peerNumber)
+
+	case tox.CHAT_CHANGE_PEER_ADD:
+		if _, ok := this.groupMembers[groupNumber]; !ok {
+			this.groupMembers[groupNumber] = make(map[int]string)
+		}
+		this.groupMembers[groupNumber][peerNumber] = peerName
+
+	case tox.CHAT_CHANGE_PEER_NAME:
+		if _, ok := this.groupMembers[groupNumber]; !ok {
+			this.groupMembers[groupNumber] = make(map[int]string)
+		}
+		this.groupMembers[groupNumber][peerNumber] = peerName
+	}
 }
 
 var bsnodes = []string{
@@ -274,4 +318,20 @@ func (this *ToxAgent) load_account(toxops *tox.ToxOptions) {
 func (this *ToxAgent) save_account() {
 	data := this._tox.GetSavedata()
 	ioutil.WriteFile(tox_save_file, data, 0644)
+}
+
+func (this *ToxAgent) getOnlineFriendCount() int {
+	onlineFriendCount := 0
+	friendNumbers := this._tox.SelfGetFriendList()
+	for _, friendNumber := range friendNumbers {
+		cs, err := this.ctx.toxagt._tox.FriendGetConnectionStatus(friendNumber)
+		if err != nil {
+			log.Println(err)
+		} else {
+			if cs > tox.CONNECTION_NONE {
+				onlineFriendCount += 1
+			}
+		}
+	}
+	return onlineFriendCount
 }

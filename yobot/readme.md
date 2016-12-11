@@ -1,5 +1,5 @@
 
-libpurple's go/golang binding. Now can write pidgin plugin with go/golang.
+a tox to irc channel bridge.
 
 ## Features
 * irc 连接
@@ -11,4 +11,9 @@ libpurple's go/golang binding. Now can write pidgin plugin with go/golang.
 ## Tech
 也许嵌入python脚本来做逻辑
 也许使用独立的python脚本做逻辑
+
+## TODO
+[ ] rename problem
+[ ] preconnection
+[ ] multiple tox instance
 

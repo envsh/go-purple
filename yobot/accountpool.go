@@ -73,3 +73,18 @@ func (this *AccountPool) remove(name string) {
 		}
 	*/
 }
+
+func (this *AccountPool) count() int {
+	return len(this.acs)
+}
+
+func (this *AccountPool) getNames(max int) []string {
+	names := make([]string, 0)
+	for n, _ := range this.acs {
+		names = append(names, n)
+		if len(names) >= max && max > 0 {
+			break
+		}
+	}
+	return names
+}
