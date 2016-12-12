@@ -32,6 +32,36 @@ type ToxPlugin struct {
 func (this *ToxPlugin) init_tox(p *purple.Plugin) {
 	log.Println("called", purple.GoID())
 
+	var ao *purple.AccountOption
+
+	ao = purple.NewAccountOptionString("Server", "server-ip", "")
+	p.AddProtocolOption(ao)
+	ao = purple.NewAccountOptionInt("Port", "server-port", 33445)
+	p.AddProtocolOption(ao)
+
+	ao = purple.NewAccountOptionBool("Use TCP", "use-tcp", true)
+	p.AddProtocolOption(ao)
+	ao = purple.NewAccountOptionBool("Use IPV6", "use-ipv6", false)
+	p.AddProtocolOption(ao)
+
+	ao = purple.NewAccountOptionBool("Show Contact Change", "show-contact-change", false)
+	p.AddProtocolOption(ao)
+	ao = purple.NewAccountOptionBool("Fake Offline Message", "fake-offline-message", true)
+	p.AddProtocolOption(ao)
+	ao = purple.NewAccountOptionBool("Auto accept file", "auto-accept-file", false)
+	p.AddProtocolOption(ao)
+
+	ao = purple.NewAccountOptionString("status text", "status-text", "hohohoh status text")
+	p.AddProtocolOption(ao)
+
+	ao = purple.NewAccountOptionBool("Send Typing", "send-typing", true)
+	p.AddProtocolOption(ao)
+	ao = purple.NewAccountOptionBool("Save Chat History", "save-chat-history", true)
+	p.AddProtocolOption(ao)
+
+	ao = purple.NewAccountOptionString("NoSpam", "nospam", "")
+	p.AddProtocolOption(ao)
+
 }
 
 // should malloc some resource for use?
@@ -195,6 +225,11 @@ func NewToxPlugin() *ToxPlugin {
 		Destroy: this.destroy_tox,
 	}
 	ppi := purple.PluginProtocolInfo{
+		Options: purple.OPT_PROTO_CHAT_TOPIC |
+			purple.OPT_PROTO_INVITE_MESSAGE | purple.OPT_PROTO_PASSWORD_OPTIONAL,
+		IconSpec: purple.BuddyIconSpec{Format: "png,jpg,jpeg",
+			MinWidth: 16, MinHeight: 16, MaxWidth: 96, MaxHeight: 96,
+			MaxFilesize: 0, ScaleRules: purple.ICON_SCALE_DISPLAY | purple.ICON_SCALE_SEND},
 		BlistIcon:   this.tox_blist_icon,
 		Login:       this.tox_login,
 		Close:       this.tox_close,

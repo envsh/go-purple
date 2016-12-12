@@ -52,7 +52,7 @@ func (this *AccountPool) add(name string) *Account {
 	ac := &Account{}
 	// ac.ircon = ircon
 	ac.becon = be
-	ac.conque = make(chan *Event, 123)
+	ac.conque = make(chan *Event, MAX_BUS_QUEUE_LEN)
 	this.acs[name] = ac
 
 	be.connect()

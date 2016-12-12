@@ -6,6 +6,18 @@ package purple
 import "C"
 import "unsafe"
 
+type PrefType int
+
+const (
+	PREF_NONE        = PrefType(C.PURPLE_PREF_NONE)        /**< No type.		   */
+	PREF_BOOLEAN     = PrefType(C.PURPLE_PREF_BOOLEAN)     /**< Boolean.		   */
+	PREF_INT         = PrefType(C.PURPLE_PREF_INT)         /**< Integer.		   */
+	PREF_STRING      = PrefType(C.PURPLE_PREF_STRING)      /**< String.		   */
+	PREF_STRING_LIST = PrefType(C.PURPLE_PREF_STRING_LIST) /**< List of strings. */
+	PREF_PATH        = PrefType(C.PURPLE_PREF_PATH)        /**< Path.			   */
+	PREF_PATH_LIST   = PrefType(C.PURPLE_PREF_PATH_LIST)   /**< List of paths.	*/
+)
+
 type PrefsUiOps struct {
 	// private
 	uiops *C.PurplePrefsUiOps
@@ -250,7 +262,6 @@ func PrefsExists(name string) bool {
  * @param name The name of the pref
  * @return The type of the pref
  */
-type PrefType int
 
 func PrefsGetType(name string) PrefType {
 	ret := C.purple_prefs_get_type(CCString(name).Ptr)

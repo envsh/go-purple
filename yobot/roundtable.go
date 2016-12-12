@@ -19,6 +19,7 @@ const (
 	EVT_JOIN_GROUP          = "join_group"
 	EVT_LEAVE_GROUP         = "leave_group"
 	EVT_GROUP_MESSAGE       = "group_message"
+	EVT_GROUP_ACTION        = "group_action"
 )
 
 const MAX_BUS_QUEUE_LEN = 123
@@ -38,6 +39,19 @@ func NewEvent(proto string, etype string, ch string, args ...interface{}) *Event
 	this.EType = etype
 	this.Chan = ch
 	this.Args = args
+	return this
+}
+
+func DupEvent(e *Event) *Event {
+	this := &Event{}
+	this.Proto = e.Proto
+	this.EType = e.EType
+	this.Chan = e.Chan
+	this.Args = make([]interface{}, 0)
+	for _, arg := range e.Args {
+		this.Args = append(this.Args, arg)
+	}
+	this.Be = e.Be
 	return this
 }
 
@@ -125,6 +139,12 @@ func (this *RoundTable) handleEventTox(e *Event) {
 				}
 			}
 		}
+
+	case EVT_GROUP_ACTION:
+		ne := DupEvent(e)
+		ne.EType = EVT_GROUP_MESSAGE
+		ne.Args[0] = PREFIX_ACTION + ne.Args[0].(string)
+		this.ctx.busch <- ne
 
 	case EVT_JOIN_GROUP:
 
@@ -217,7 +237,11 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 
 		chname := e.Args[1].(string)
 		message := e.Args[2].(string)
-		message = fmt.Sprintf("[%s] %s", nick, message)
+		if strings.HasPrefix(message, PREFIX_ACTION) {
+			message = fmt.Sprintf("%s[%s] %s", PREFIX_ACTION, nick, message[len(PREFIX_ACTION):])
+		} else {
+			message = fmt.Sprintf("[%s] %s", nick, message)
+		}
 
 		if val, found := chmap.Get(chname); found {
 			chname = val.(string)
@@ -231,13 +255,23 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 		if groupNumber == -1 {
 			log.Println("group not exists:", chname, strings.ToLower(chname))
 		} else {
-			_, err := this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message)
+			var err error
+			if strings.HasPrefix(message, PREFIX_ACTION) {
+				_, err = this.ctx.toxagt._tox.GroupActionSend(groupNumber, message[len(PREFIX_ACTION):])
+			} else {
+				_, err = this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message)
+			}
 			if err != nil {
 				// should be 1
 				pno := this.ctx.toxagt._tox.GroupNumberPeers(groupNumber)
 				log.Println(err, chname, groupNumber, message, pno)
 			}
 		}
+	case EVT_GROUP_ACTION:
+		ne := DupEvent(e)
+		ne.EType = EVT_GROUP_MESSAGE
+		ne.Args[2] = PREFIX_ACTION + ne.Args[2].(string)
+		this.ctx.busch <- ne
 
 	case EVT_JOIN_GROUP:
 	case EVT_DISCONNECTED:

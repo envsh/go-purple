@@ -114,7 +114,7 @@ func (this *ToxAgent) setupCallbacks() {
 			// log.Println("omit self message forward", groupTitle)
 			return
 		}
-		if len(this.ctx.busch) >= 123 {
+		if len(this.ctx.busch) >= MAX_BUS_QUEUE_LEN {
 			log.Println("busch full, will blocked")
 		}
 		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_GROUP_MESSAGE, groupTitle,
@@ -187,7 +187,42 @@ func (this *ToxAgent) setupCallbacks() {
 		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_JOIN_GROUP, title, groupNumber, peerNumber)
 	}, nil)
 
+	this._tox.CallbackGroupAction(this.onGroupAction, nil)
 	this._tox.CallbackGroupNameListChange(this.onGroupNameListChange, nil)
+}
+
+func (this *ToxAgent) onGroupAction(t *tox.Tox,
+	groupNumber int, peerNumber int, message string, userData interface{}) {
+	log.Println(groupNumber, peerNumber, message)
+	groupTitle, err := t.GroupGetTitle(groupNumber)
+	if err != nil {
+		log.Println(err, groupTitle)
+	}
+	pubkeys := t.GroupGetPeerPubkeys(groupNumber)
+	groupbotIn := false
+	for _, pubkey := range pubkeys {
+		if strings.HasPrefix(groupbot, pubkey) {
+			groupbotIn = true
+		}
+	}
+	selfMessage := false
+	peerPubkey, err := t.GroupPeerPubkey(groupNumber, peerNumber)
+	if strings.HasPrefix(t.SelfGetAddress(), peerPubkey) {
+		selfMessage = true
+	}
+	if selfMessage {
+		// log.Println("omit self message forward", groupTitle)
+		return
+	}
+	if len(this.ctx.busch) >= MAX_BUS_QUEUE_LEN {
+		log.Println("busch full, will blocked")
+	}
+	this.ctx.busch <- NewEvent(PROTO_TOX, EVT_GROUP_ACTION, groupTitle,
+		message, groupNumber, peerNumber)
+
+	// should be
+	if groupbotIn {
+	}
 }
 
 func (this *ToxAgent) onGroupNameListChange(t *tox.Tox,

@@ -16,4 +16,8 @@ a tox to irc channel bridge.
 [ ] rename problem
 [ ] preconnection
 [ ] multiple tox instance
+[ ] 逻辑与连接分开，可以重加载逻辑模块而不丢失连接。
+[ ] 消息颜色格式转换
+[ ] action同步处理
+
 

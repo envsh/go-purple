@@ -159,6 +159,10 @@ type PluginInfo struct {
 }
 
 type PluginProtocolInfo struct {
+	// optional fields
+	Options  ProtocolOptions
+	IconSpec BuddyIconSpec
+
 	// must
 	BlistIcon   func() string
 	StatusTypes func(*Account) []*StatusType
@@ -258,14 +262,24 @@ func (this *Plugin) convertInfo() {
 
 	// protocol info
 	this.cppi.extra_info = unsafe.Pointer(this.cpppi)
-	this.cpppi.options = C.OPT_PROTO_CHAT_TOPIC | C.OPT_PROTO_PASSWORD_OPTIONAL |
-		C.OPT_PROTO_INVITE_MESSAGE
+	if this.cpppi.options == 0 {
+		this.cpppi.options = C.OPT_PROTO_CHAT_TOPIC | C.OPT_PROTO_PASSWORD_OPTIONAL |
+			C.OPT_PROTO_INVITE_MESSAGE
+	}
 	this.cpppi.struct_size = C.sizeof_PurplePluginProtocolInfo
 }
 
 // go version of C._set_plugin_funcs()
 func (this *Plugin) set_plugin_funcs() {
+	this.cpppi.options = C.PurpleProtocolOptions(this.ppi.Options)
 	var ispec C.PurpleBuddyIconSpec
+	ispec.format = C.CString(this.ppi.IconSpec.Format)
+	ispec.min_width = C.int(this.ppi.IconSpec.MinWidth)
+	ispec.min_height = C.int(this.ppi.IconSpec.MinHeight)
+	ispec.max_width = C.int(this.ppi.IconSpec.MaxWidth)
+	ispec.max_height = C.int(this.ppi.IconSpec.MinHeight)
+	ispec.max_filesize = C.size_t(this.ppi.IconSpec.MaxFilesize)
+	ispec.scale_rules = C.PurpleIconScaleRules(this.ppi.IconSpec.ScaleRules)
 	this.cpppi.icon_spec = ispec
 
 	// must
@@ -424,6 +438,11 @@ func (this *Plugin) _unset_plugin_funcs() {
 		this.cpppi.get_attention_types = nil
 	}
 
+}
+
+// this is not purple's function
+func (this *Plugin) AddProtocolOption(ao *AccountOption) {
+	this.cpppi.protocol_options = C.g_list_append(this.cpppi.protocol_options, ao.ao)
 }
 
 func newPluginInfoFrom(plugInfo *C.PurplePluginInfo) *PluginInfo {

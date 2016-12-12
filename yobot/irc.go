@@ -14,7 +14,7 @@ type IrcBackend struct {
 func NewIrcBackend(ctx *Context, name string) *IrcBackend {
 	this := &IrcBackend{}
 	this.ctx = ctx
-	this.conque = make(chan interface{}, 123)
+	this.conque = make(chan interface{}, MAX_BUS_QUEUE_LEN)
 	this.proto = PROTO_IRC
 	this.name = name
 
@@ -117,6 +117,9 @@ func NewEventFromIrcEvent(e *irc.Event) *Event {
 	case "PRIVMSG":
 		// TODO 如何区分好友消息和群组消息
 		ne.EType = EVT_GROUP_MESSAGE
+		ne.Chan = e.Arguments[0]
+	case "CTCP_ACTION":
+		ne.EType = EVT_GROUP_ACTION
 		ne.Chan = e.Arguments[0]
 	case "JOIN":
 		ne.EType = EVT_JOIN_GROUP

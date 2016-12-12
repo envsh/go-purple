@@ -34,7 +34,7 @@ func main() {
 
 	ctx = &Context{}
 	// ctx.busch = make(chan interface{}, 123)
-	ctx.busch = make(chan *Event, 123)
+	ctx.busch = make(chan *Event, MAX_BUS_QUEUE_LEN)
 	ctx.acpool = NewAccountPool()
 	ctx.toxagt = NewToxAgent()
 	ctx.toxagt.start()
@@ -45,6 +45,7 @@ func main() {
 	// TODO system signal, elegant shutdown
 }
 
+// TODO multiple servers,
 const serverssl = "weber.freenode.net:6697"
 const toxname = "zuck07"
 const ircname = toxname
@@ -59,6 +60,8 @@ func init() {
 	chmap.Put("#tox-en", "#tox")
 	chmap.Put("#tox-ru", "Russian Tox Chat (Use Kalina: kalina@toxme.io or 12EDB939AA529641CE53830B518D6EB30241868EE0E5023C46A372363CAEC91C2C948AEFE4EB)")
 }
+
+var PREFIX_ACTION = "/me "
 
 var statusMessage = "Send me the message 'invite', 'info', 'help' for a full list of commands"
 

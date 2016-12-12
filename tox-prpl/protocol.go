@@ -6,6 +6,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -22,6 +23,13 @@ func (this *ToxPlugin) setupSelfInfo(ac *purple.Account) {
 	}
 	this._tox.SelfSetStatusMessage("It's from gotox-prpl, hoho.")
 
+	iconName := ac.GetString("buddy_icon")
+	iconFile := purple.UserDir() + "/icons/" + iconName
+	_, err := os.Stat(iconFile)
+	if err == os.ErrNotExist {
+		log.Println(purple.UserDir(), iconName, iconFile)
+	}
+
 	if false {
 		conn := ac.GetConnection()
 		purple.RequestYesNoDemo(this, conn, func(ud interface{}) {
@@ -30,52 +38,6 @@ func (this *ToxPlugin) setupSelfInfo(ac *purple.Account) {
 			log.Println("request no")
 		})
 	}
-}
-
-type minictx struct {
-	gc *purple.Connection
-	s0 string
-}
-
-func (this *ToxPlugin) requestYescbForFriendRequest(d interface{}) {
-	ctx := d.(*minictx)
-	conn := ctx.gc
-	pubkey := ctx.s0
-	ac := conn.ConnGetAccount()
-	gc := ctx.gc
-
-	friendNumber, err := this._tox.FriendAddNorequest(pubkey)
-	if err != nil {
-		log.Println(err, friendNumber)
-	}
-	this.save_account(conn)
-	friendName, err := this._tox.FriendGetName(friendNumber)
-	if len(friendName) == 0 {
-		friendName = "GoTox User"
-	}
-	buddy := this.findBuddyEx(ac, pubkey)
-	// log.Println(buddy, buddy.GetName(), buddy.GetAliasOnly())
-	if buddy == nil {
-		buddy := purple.NewBuddy(ac, pubkey, friendName)
-		ac.AddBuddy(buddy)
-		buddy.BlistAdd(nil)
-	}
-	this.save_account(gc)
-}
-
-func (this *ToxPlugin) onFriendRequest(t *tox.Tox, pubkey, msg string, d interface{}) {
-	log.Println("hehhe", pubkey, msg)
-	ac := d.(*purple.Account)
-	conn := ac.GetConnection()
-
-	// TODO notice UI and then make desision
-	ctx := &minictx{conn, pubkey}
-	log.Println(purple.GoID())
-	purple.RequestAcceptCancel(ctx, conn, "New Friend Request", msg, pubkey,
-		this.requestYescbForFriendRequest, func(ud interface{}) {
-			// reject?
-			log.Println(ud)
-		})
 }
 
 func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
@@ -168,41 +130,8 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 		this.UpdateMembers(groupNumber, conv)
 	}, ac)
 
-	this._tox.CallbackGroupMessage(func(t *tox.Tox, groupNumber int,
-		peerNumber int, message string, d interface{}) {
-		log.Println(groupNumber, peerNumber, message)
-		conn := ac.GetConnection()
-		pubkey, err := t.GroupPeerPubkey(groupNumber, peerNumber)
-		peerName, err := t.GroupPeerName(groupNumber, peerNumber)
-		if err != nil {
-			log.Println(err, peerName, pubkey)
-		} else {
-			if false {
-				conn.ServGotChatIn(groupNumber, pubkey, purple.MESSAGE_RECV, message)
-			}
-			groupTitle, err := this._tox.GroupGetTitle(groupNumber)
-			if err != nil {
-				log.Println(err, groupTitle)
-			}
-
-			convs := purple.GetConversations()
-			for _, conv := range convs {
-				log.Println(conv.GetName(), conv.GetChatData().GetUsers(), conv.GetData("GroupNumber"))
-			}
-			if len(convs) == 0 {
-				log.Println("can not find conv chat:", groupNumber, groupTitle)
-			}
-			// conversation should be created when invited
-			conv := conn.FindChat(int(groupNumber))
-			if conv == nil {
-				log.Println("can not find conv chat:", groupNumber, groupTitle)
-			} else {
-				// conv.GetChatData().Send(message) // infinite message loop!!!
-				conn.ServGotChatIn(groupNumber, peerName, purple.MESSAGE_RECV, message)
-				// conn.ServGotChatIn(groupNumber, pubkey, purple.MESSAGE_RECV, message)
-			}
-		}
-	}, ac)
+	this._tox.CallbackGroupMessage(this.onGroupMessage, ac)
+	this._tox.CallbackGroupAction(this.onGroupAction, ac)
 
 	// TODO should notify UI first and think groupbot's invite also
 	this._tox.CallbackGroupInvite(this.onGroupInvite, ac)
@@ -266,6 +195,52 @@ func (this *ToxPlugin) findBuddyEx(ac *purple.Account, pubkeyOrFriendID string) 
 }
 
 // tox callbacks
+type minictx struct {
+	gc *purple.Connection
+	s0 string
+}
+
+func (this *ToxPlugin) requestYescbForFriendRequest(d interface{}) {
+	ctx := d.(*minictx)
+	conn := ctx.gc
+	pubkey := ctx.s0
+	ac := conn.ConnGetAccount()
+	gc := ctx.gc
+
+	friendNumber, err := this._tox.FriendAddNorequest(pubkey)
+	if err != nil {
+		log.Println(err, friendNumber)
+	}
+	this.save_account(conn)
+	friendName, err := this._tox.FriendGetName(friendNumber)
+	if len(friendName) == 0 {
+		friendName = "GoTox User"
+	}
+	buddy := this.findBuddyEx(ac, pubkey)
+	// log.Println(buddy, buddy.GetName(), buddy.GetAliasOnly())
+	if buddy == nil {
+		buddy := purple.NewBuddy(ac, pubkey, friendName)
+		ac.AddBuddy(buddy)
+		buddy.BlistAdd(nil)
+	}
+	this.save_account(gc)
+}
+
+func (this *ToxPlugin) onFriendRequest(t *tox.Tox, pubkey, msg string, d interface{}) {
+	log.Println("hehhe", pubkey, msg)
+	ac := d.(*purple.Account)
+	conn := ac.GetConnection()
+
+	// TODO notice UI and then make desision
+	ctx := &minictx{conn, pubkey}
+	log.Println(purple.GoID())
+	purple.RequestAcceptCancel(ctx, conn, "New Friend Request", msg, pubkey,
+		this.requestYescbForFriendRequest, func(ud interface{}) {
+			// reject?
+			log.Println(ud)
+		})
+}
+
 func (this *ToxPlugin) onGroupInvite(t *tox.Tox,
 	friendNumber uint32, itype uint8, data []byte, d interface{}) {
 	ac := d.(*purple.Account)
@@ -346,6 +321,48 @@ func (this *ToxPlugin) onGroupTitle(t *tox.Tox,
 	}
 }
 
+func (this *ToxPlugin) onGroupMessage(t *tox.Tox, groupNumber int,
+	peerNumber int, message string, ud interface{}) {
+	log.Println(groupNumber, peerNumber, message)
+	ac := ud.(*purple.Account)
+	conn := ac.GetConnection()
+	pubkey, err := t.GroupPeerPubkey(groupNumber, peerNumber)
+	peerName, err := t.GroupPeerName(groupNumber, peerNumber)
+	if err != nil {
+		log.Println(err, peerName, pubkey)
+	} else {
+		if false {
+			conn.ServGotChatIn(groupNumber, pubkey, purple.MESSAGE_RECV, message)
+		}
+		groupTitle, err := this._tox.GroupGetTitle(groupNumber)
+		if err != nil {
+			log.Println(err, groupTitle)
+		}
+
+		convs := purple.GetConversations()
+		for _, conv := range convs {
+			log.Println(conv.GetName(), conv.GetChatData().GetUsers(), conv.GetData("GroupNumber"))
+		}
+		if len(convs) == 0 {
+			log.Println("can not find conv chat:", groupNumber, groupTitle)
+		}
+		// conversation should be created when invited
+		conv := conn.FindChat(int(groupNumber))
+		if conv == nil {
+			log.Println("can not find conv chat:", groupNumber, groupTitle)
+		} else {
+			// conv.GetChatData().Send(message) // infinite message loop!!!
+			conn.ServGotChatIn(groupNumber, peerName, purple.MESSAGE_RECV, message)
+			// conn.ServGotChatIn(groupNumber, pubkey, purple.MESSAGE_RECV, message)
+		}
+	}
+}
+
+func (this *ToxPlugin) onGroupAction(t *tox.Tox, groupNumber int, peerNumber int, action string, ud interface{}) {
+	message := PREFIX_ACTION + action
+	this.onGroupMessage(t, groupNumber, peerNumber, message, ud)
+}
+
 // purple optional callbacks
 func (this *ToxPlugin) ChatInfo(gc *purple.Connection) []*purple.ProtoChatEntry {
 	// log.Println(gc)
@@ -365,12 +382,18 @@ func (this *ToxPlugin) ChatInfoDefaults(gc *purple.Connection, chatName string) 
 func (this *ToxPlugin) SendIM(gc *purple.Connection, who string, msg string) int {
 	log.Println(gc, who, msg)
 	friendNumber, _ := this._tox.FriendByPublicKey(who)
-	len, err := this._tox.FriendSendMessage(friendNumber, msg)
+	var ln uint32
+	var err error
+	if strings.HasPrefix(msg, PREFIX_ACTION) {
+		ln, err = this._tox.FriendSendAction(friendNumber, msg[len(PREFIX_ACTION):])
+	} else {
+		ln, err = this._tox.FriendSendMessage(friendNumber, msg)
+	}
 	if err != nil {
-		log.Println(err, len)
+		log.Println(err, ln)
 		return -1
 	}
-	return int(len)
+	return int(ln)
 }
 
 func (this *ToxPlugin) JoinChat(gc *purple.Connection, comp *purple.GHashTable) {
@@ -445,8 +468,13 @@ func (this *ToxPlugin) ChatWhisper(gc *purple.Connection, id int, who string, me
 	log.Println("herhere")
 }
 func (this *ToxPlugin) ChatSend(gc *purple.Connection, id int, message string, flags int) int {
-	log.Println("herhere")
-	n, err := this._tox.GroupMessageSend(id, message)
+	var n int
+	var err error
+	if strings.HasPrefix(message, PREFIX_ACTION) {
+		n, err = this._tox.GroupActionSend(id, message[len(PREFIX_ACTION):])
+	} else {
+		n, err = this._tox.GroupMessageSend(id, message)
+	}
 	if err != nil {
 		log.Println(err)
 	}

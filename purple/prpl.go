@@ -15,6 +15,44 @@ import (
 	"fmt"
 )
 
+type IconScaleRules int
+
+const (
+	/**< We scale the icon when we display it */
+	ICON_SCALE_DISPLAY = IconScaleRules(C.PURPLE_ICON_SCALE_DISPLAY)
+	/**< We scale the icon before we send it to the server */
+	ICON_SCALE_SEND = IconScaleRules(C.PURPLE_ICON_SCALE_SEND)
+)
+
+type BuddyIconSpec struct {
+	Format      string
+	MinWidth    int            /**< Minimum width of this icon  */
+	MinHeight   int            /**< Minimum height of this icon */
+	MaxWidth    int            /**< Maximum width of this icon  */
+	MaxHeight   int            /**< Maximum height of this icon */
+	MaxFilesize int            /**< Maximum size in bytes */
+	ScaleRules  IconScaleRules /**< How to stretch this icon */
+
+	// private
+	fromc bool
+	bis   *C.PurpleBuddyIconSpec
+}
+
+type ProtocolOptions int
+
+const (
+	OPT_PROTO_UNIQUE_CHATNAME       = ProtocolOptions(C.OPT_PROTO_UNIQUE_CHATNAME)
+	OPT_PROTO_CHAT_TOPIC            = ProtocolOptions(C.OPT_PROTO_CHAT_TOPIC)
+	OPT_PROTO_NO_PASSWORD           = ProtocolOptions(C.OPT_PROTO_NO_PASSWORD)
+	OPT_PROTO_MAIL_CHECK            = ProtocolOptions(C.OPT_PROTO_MAIL_CHECK)
+	OPT_PROTO_IM_IMAGE              = ProtocolOptions(C.OPT_PROTO_IM_IMAGE)
+	OPT_PROTO_PASSWORD_OPTIONAL     = ProtocolOptions(C.OPT_PROTO_PASSWORD_OPTIONAL)
+	OPT_PROTO_USE_POINTSIZE         = ProtocolOptions(C.OPT_PROTO_USE_POINTSIZE)
+	OPT_PROTO_REGISTER_NOSCREENNAME = ProtocolOptions(C.OPT_PROTO_REGISTER_NOSCREENNAME)
+	OPT_PROTO_SLASH_COMMANDS_NATIVE = ProtocolOptions(C.OPT_PROTO_SLASH_COMMANDS_NATIVE)
+	OPT_PROTO_INVITE_MESSAGE        = ProtocolOptions(C.OPT_PROTO_INVITE_MESSAGE)
+)
+
 // cgo don't support variadic parameter list, so wrapper it
 func PrplGotUserStatus(ac *Account, name, statusId string) {
 	C.gopurple_prpl_got_user_status(ac.account, CCString(name).Ptr, CCString(statusId).Ptr)

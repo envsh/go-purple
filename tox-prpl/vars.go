@@ -16,3 +16,7 @@ const (
 	DEFAULT_USERNAME        = "GoTox User"
 	DEFAULT_GROUPCHAT_TITLE = "GoTox GroupChat"
 )
+
+const (
+	PREFIX_ACTION = "/me "
+)
