@@ -70,6 +70,8 @@ func (this *RoundTable) run() {
 	select {}
 }
 
+// 这个方法是可以阻塞运行的，只是把后续的事件延后处理，这样带来程序逻辑简洁。
+// 从另一个方面，并不会阻塞发送事件的线程
 func (this *RoundTable) handleEvent() {
 	for ie := range this.ctx.busch {
 		// log.Println(ie)
@@ -111,11 +113,18 @@ func (this *RoundTable) handleEventTox(e *Event) {
 			rac.conque <- e
 		} else {
 			rac := this.ctx.acpool.get(ircname)
-			be := rac.becon.(*IrcBackend)
-			if !be.isconnected() {
-				log.Println("Oh, maybe unexpected")
+			rbe := rac.becon.(*IrcBackend2)
+			if !rbe.isconnected() {
+				log.Println("Oh, maybe unexpected", rbe.getName())
+				// TODO 怎么处理呢？
+				this.ctx.acpool.remove(ircname)
+				rac := this.ctx.acpool.add(ircname)
+				rac.conque <- e
+				break
 			}
-			be.join(chname)
+			if !rbe.isOn(chname) {
+				rbe.join(chname)
+			}
 
 			// agent user
 			var ac *Account
@@ -124,18 +133,19 @@ func (this *RoundTable) handleEventTox(e *Event) {
 				ac.conque <- e
 			} else {
 				ac := this.ctx.acpool.get(fromUser)
-				be := ac.becon.(*IrcBackend)
+				be := ac.becon.(*IrcBackend2)
 				if !be.isconnected() {
-					log.Println("Oh, connection broken, ", chname)
-					err := be.reconnect()
-					if err != nil {
-						log.Println(err)
+					log.Println("Oh, connection broken, ", chname, be.getName(), fromUser)
+					this.ctx.acpool.remove(fromUser)
+					ac.conque <- e
+				} else {
+					if !be.isOn(chname) {
+						be.join(chname)
 					}
-				}
-				be.join(chname)
-				messages := strings.Split(message, "\n") // fix multiple line message
-				for _, m := range messages {
-					be.sendGroupMessage(m, chname)
+					messages := strings.Split(message, "\n") // fix multiple line message
+					for _, m := range messages {
+						be.sendGroupMessage(m, chname)
+					}
 				}
 			}
 		}
@@ -159,7 +169,7 @@ func (this *RoundTable) handleEventTox(e *Event) {
 				chname = key.(string)
 			}
 			ac := this.ctx.acpool.get(ircname)
-			be := ac.becon.(*IrcBackend)
+			be := ac.becon.(*IrcBackend2)
 			be.join(chname)
 		}
 
@@ -182,7 +192,7 @@ func (this *RoundTable) handleEventTox(e *Event) {
 				if ac == nil {
 					log.Println("wtf", peerName, this.ctx.acpool.count(), this.ctx.acpool.getNames(5))
 				} else {
-					ac.becon.(*IrcBackend).ircon.Part(chname)
+					ac.becon.(*IrcBackend2).ircon.Part(chname)
 				}
 			}
 		})
@@ -213,10 +223,12 @@ func (this *RoundTable) handleEventTox(e *Event) {
 }
 
 func (this *RoundTable) handleEventIrc(e *Event) {
-	be := e.Be.(*IrcBackend)
+	be := e.Be.(*IrcBackend2)
 
 	switch e.EType {
 	case EVT_CONNECTED: // MOTD end
+		log.Printf("%+v", e)
+
 		// ircon.Join("#tox-cn123")
 		ac := this.ctx.acpool.get(be.getName())
 		for len(ac.conque) > 0 {
@@ -232,6 +244,10 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 		}
 		// 检查来源是否是我们自己的连接发的消息
 		if _, ok := this.ctx.acpool.acs[e.Args[0].(string)]; ok {
+			break
+		}
+		// 检查来源是否是我们自己的*变体*连接发的消息
+		if _, ok := this.ctx.acpool.acs[strings.TrimRight(e.Args[0].(string), "^")]; ok {
 			break
 		}
 
@@ -275,11 +291,18 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 
 	case EVT_JOIN_GROUP:
 	case EVT_DISCONNECTED:
+		log.Printf("%+v", e)
 		// close reconnect/ by Excess Flood/
-		this.ctx.acpool.remove(ircname)
+		if !this.ctx.acpool.has(be.getName()) {
+			log.Println("wtf:", be.getName(), "//", this.ctx.acpool.getNames(5))
+		}
+		this.ctx.acpool.remove(be.getName())
 	default:
-		log.Println("unknown evt:", e.EType)
-
+		switch e.EType {
+		case "PONG", "PING", "NOTICE": // omit, i known
+		default:
+			log.Println("unknown evt:", e.EType)
+		}
 	}
 
 }
@@ -369,7 +392,7 @@ func (this *RoundTable) processInfoCmd(friendNumber uint32) {
 	ircConnectionCount := len(this.ctx.acpool.acs)
 	ircActiveConnectionCount := 0
 	for _, ac := range this.ctx.acpool.acs {
-		if ac.becon.(*IrcBackend).isconnected() {
+		if ac.becon.(*IrcBackend2).isconnected() {
 			ircActiveConnectionCount += 1
 		}
 	}
@@ -407,8 +430,9 @@ func (this *RoundTable) processGroupCmd(msg string, groupNumber, peerNumber int)
 				log.Println("not connected to ", groupTitle)
 				this.ctx.toxagt._tox.GroupMessageSend(groupNumber, "not connected to irc:"+groupTitle)
 			} else {
-				ircon := ac.becon.(*IrcBackend)
-				ircon.ircon.SendRaw("/users")
+				ircon := ac.becon.(*IrcBackend2)
+				// ircon.ircon.SendRaw("/users")
+				ircon.ircon.Raw("/users")
 			}
 			return true
 		case "ping":
@@ -417,8 +441,9 @@ func (this *RoundTable) processGroupCmd(msg string, groupNumber, peerNumber int)
 				log.Println("not connected to ", groupTitle)
 				this.ctx.toxagt._tox.GroupMessageSend(groupNumber, "not connected to irc:"+groupTitle)
 			} else {
-				ircon := ac.becon.(*IrcBackend)
-				ircon.ircon.SendRaw(fmt.Sprintf("/whois %s", ircname))
+				ircon := ac.becon.(*IrcBackend2)
+				// ircon.ircon.SendRaw(fmt.Sprintf("/whois %s", ircname))
+				ircon.ircon.Whois(ircname)
 			}
 			return true
 		case "raw":
@@ -433,8 +458,9 @@ func (this *RoundTable) processGroupCmd(msg string, groupNumber, peerNumber int)
 				log.Println("not connected to ", groupTitle)
 				this.ctx.toxagt._tox.GroupMessageSend(groupNumber, "not connected to irc:"+groupTitle)
 			} else {
-				ircon := ac.becon.(*IrcBackend)
-				ircon.ircon.SendRaw(fmt.Sprintf("%s", strings.Join(segs[1:], " ")))
+				ircon := ac.becon.(*IrcBackend2)
+				// ircon.ircon.SendRaw(fmt.Sprintf("%s", strings.Join(segs[1:], " ")))
+				ircon.ircon.Raw(fmt.Sprintf("%s", strings.Join(segs[1:], " ")))
 			}
 			return true
 		}

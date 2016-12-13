@@ -47,7 +47,7 @@ func (this *AccountPool) get(name string) *Account {
 }
 
 func (this *AccountPool) add(name string) *Account {
-	be := NewIrcBackend(this.ctx, name)
+	be := NewIrcBackend2(this.ctx, name)
 
 	ac := &Account{}
 	// ac.ircon = ircon
@@ -63,6 +63,9 @@ func (this *AccountPool) add(name string) *Account {
 func (this *AccountPool) remove(name string) {
 	if ac, ok := this.acs[name]; ok {
 		delete(this.acs, name)
+		if ac.becon.isconnected() {
+			ac.becon.disconnect()
+		}
 	} else {
 		log.Println("not found:", name, ac)
 	}

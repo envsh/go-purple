@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/emirpasic/gods/maps/hashbidimap"
+	"github.com/fluffle/goirc/logging/glog"
 	"github.com/kitech/colog"
 )
 
@@ -29,8 +30,10 @@ type Context struct {
 
 var ctx *Context
 
+// ./bot -debug -v 2 -logtostderr
 func main() {
 	flag.Parse()
+	glog.Init()
 
 	ctx = &Context{}
 	// ctx.busch = make(chan interface{}, 123)

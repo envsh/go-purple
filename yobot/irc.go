@@ -46,6 +46,10 @@ func (this *IrcBackend) getName() string {
 	return this.name
 }
 
+func (this *IrcBackend) isOn(channel string) bool {
+	return false // unknown
+}
+
 func (this *IrcBackend) onEvent(e *irc.Event) {
 	// log.Printf("%+v\n", e)
 	// filter logout
