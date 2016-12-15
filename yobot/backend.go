@@ -10,4 +10,5 @@ type BackendBase struct {
 	conque chan interface{}
 	proto  string
 	name   string
+	uid    string
 }

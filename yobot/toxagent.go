@@ -15,14 +15,14 @@ type ToxAgent struct {
 	ctx  *Context
 	_tox *tox.Tox
 
-	groupMembers map[int]map[int]string // leave group get peer name
+	groupMembers map[int]map[int][]string // leave group get peer name/pubkey
 }
 
 func NewToxAgent() *ToxAgent {
 	this := &ToxAgent{}
 	this.ctx = ctx
 
-	this.groupMembers = make(map[int]map[int]string)
+	this.groupMembers = make(map[int]map[int][]string)
 
 	return this
 }
@@ -72,13 +72,14 @@ func (this *ToxAgent) setupCallbacks() {
 		}
 
 		defer func() {
-			if strings.HasPrefix(groupbot, pubkey) {
+			if strings.HasPrefix(groupbot, pubkey) && status > 0 {
 				// t.FriendSendMessage(friendNumber, "invite 1")
 				// t.FriendSendMessage(friendNumber, "invite 2")
 				_, err := t.FriendSendMessage(friendNumber, "invite 5")
 				if err != nil {
 					log.Println(err)
 				}
+				log.Println("send groupbot invite:", friendNumber, status, err)
 			}
 		}()
 		if status > 0 {
@@ -237,29 +238,43 @@ func (this *ToxAgent) onGroupNameListChange(t *tox.Tox,
 			log.Println("wtf", err)
 		}
 	}
+	var peerPubkey string
 
 	switch change {
 	case tox.CHAT_CHANGE_PEER_DEL:
 		if _, ok := this.groupMembers[groupNumber]; !ok {
 			log.Println("wtf")
 		}
-		peerName = this.groupMembers[groupNumber][peerNumber]
+		peerInfo := this.groupMembers[groupNumber][peerNumber]
+		if peerInfo == nil || len(peerInfo) != 2 {
+			log.Println("wtf", peerInfo, peerName, groupNumber)
+			break
+		}
+		peerName, peerPubkey = peerInfo[0], peerInfo[1]
 		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_LEAVE_GROUP,
-			groupTitle, peerName, groupNumber, peerNumber, change)
+			groupTitle, peerName, peerPubkey, groupNumber, peerNumber, change)
 
 		delete(this.groupMembers[groupNumber], peerNumber)
 
 	case tox.CHAT_CHANGE_PEER_ADD:
-		if _, ok := this.groupMembers[groupNumber]; !ok {
-			this.groupMembers[groupNumber] = make(map[int]string)
+		peerPubkey, err := this._tox.GroupPeerPubkey(groupNumber, peerNumber)
+		if err != nil {
+			log.Println(err)
 		}
-		this.groupMembers[groupNumber][peerNumber] = peerName
+		if _, ok := this.groupMembers[groupNumber]; !ok {
+			this.groupMembers[groupNumber] = make(map[int][]string)
+		}
+		this.groupMembers[groupNumber][peerNumber] = []string{peerName, peerPubkey}
 
 	case tox.CHAT_CHANGE_PEER_NAME:
-		if _, ok := this.groupMembers[groupNumber]; !ok {
-			this.groupMembers[groupNumber] = make(map[int]string)
+		peerPubkey, err := this._tox.GroupPeerPubkey(groupNumber, peerNumber)
+		if err != nil {
+			log.Println(err)
 		}
-		this.groupMembers[groupNumber][peerNumber] = peerName
+		if _, ok := this.groupMembers[groupNumber]; !ok {
+			this.groupMembers[groupNumber] = make(map[int][]string)
+		}
+		this.groupMembers[groupNumber][peerNumber] = []string{peerName, peerPubkey}
 	}
 }
 
@@ -309,7 +324,7 @@ func (this *ToxAgent) setupTox() {
 // for use new group, but not old unsable group
 func (this *ToxAgent) getToxGroupByName(name string) int {
 	chats := this._tox.GetChatList()
-	log.Println(len(chats), chats)
+	log.Println(len(chats), chats, name)
 	for idx, groupNumber := range chats {
 		// reverse order
 		groupNumber = chats[len(chats)-1-idx]

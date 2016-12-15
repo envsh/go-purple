@@ -29,7 +29,7 @@ wxl:
 	go install -v ./wechat-prpl/wechat
 
 bot:
-	go build -v -o yobot.bin go-purple/yobot/
+	go build -v -race -o yobot.bin go-purple/yobot/
 
 bot2:
 	go build -v -o yobot2.bin go-purple/yobot2/
