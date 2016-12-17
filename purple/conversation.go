@@ -11,6 +11,8 @@ import (
 	"time"
 )
 
+type TypingState int
+
 const (
 	NOT_TYPING = int(C.PURPLE_NOT_TYPING)
 	TYPING     = int(C.PURPLE_TYPING)
@@ -57,6 +59,12 @@ type ConvChat struct {
 type ConvChatBuddy struct {
 	buddy *C.PurpleConvChatBuddy
 }
+
+type ConvIm struct {
+	im *C.PurpleConvIm
+}
+
+func newConvImFrom(im *C.PurpleConvIm) *ConvIm { return &ConvIm{im} }
 
 func newConversationFrom(conv *C.PurpleConversation) *Conversation {
 	this := &Conversation{}
@@ -242,6 +250,84 @@ func (this *ConvChatBuddy) GetAttribute(key string) string {
 	return C.GoString(r)
 }
 
+// conv im
+func (this *ConvIm) GetConversation() *Conversation {
+	r := C.purple_conv_im_get_conversation(this.im)
+	return newConversationFrom(r)
+}
+
+func (this *ConvIm) SetIcon(icon *BuddyIcon) {
+	C.purple_conv_im_set_icon(this.im, icon.icon)
+}
+
+func (this *ConvIm) GetIcon() *BuddyIcon {
+	r := C.purple_conv_im_get_icon(this.im)
+	return newBuddyIconFrom(r)
+}
+
+func (this *ConvIm) SetTypingState(state int) {
+	C.purple_conv_im_set_typing_state(this.im, C.PurpleTypingState(state))
+}
+
+func (this *ConvIm) GetTypingState() int {
+	r := C.purple_conv_im_get_typing_state(this.im)
+	return int(r)
+}
+
+func (this *ConvIm) StartTypingTimeout(timeout int) {
+	C.purple_conv_im_start_typing_timeout(this.im, C.int(timeout))
+}
+
+func (this *ConvIm) StopTypingTimeout() {
+	C.purple_conv_im_stop_typing_timeout(this.im)
+}
+
+func (this *ConvIm) GetTypingTimeout() uint {
+	r := C.purple_conv_im_get_typing_timeout(this.im)
+	return uint(r)
+}
+
+func (this *ConvIm) SetTypeAgain(val uint) {
+	C.purple_conv_im_set_type_again(this.im, C.uint(val))
+}
+
+func (this *ConvIm) GetTypeAgain() uint64 {
+	r := C.purple_conv_im_get_type_again(this.im)
+	return uint64(r)
+}
+
+func (this *ConvIm) StartSendTypedTimeout() {
+	C.purple_conv_im_start_send_typed_timeout(this.im)
+}
+
+func (this *ConvIm) StopSendTypedTimeout() {
+	C.purple_conv_im_stop_send_typed_timeout(this.im)
+}
+
+func (this *ConvIm) GetSendTypedTimeout() uint {
+	r := C.purple_conv_im_get_send_typed_timeout(this.im)
+	return uint(r)
+}
+
+func (this *ConvIm) UpdateTyping() {
+	C.purple_conv_im_update_typing(this.im)
+}
+
+func (this *ConvIm) Write(who, message string, flags int) {
+	C.purple_conv_im_write(this.im, CCString(who).Ptr,
+		CCString(message).Ptr, C.PurpleMessageFlags(flags),
+		C.time_t(time.Now().Unix()))
+}
+
+func (this *ConvIm) Send(message string) {
+	C.purple_conv_im_send(this.im, CCString(message).Ptr)
+}
+
+func (this *ConvIm) SendWithFlags(message string, flags int) {
+	C.purple_conv_im_send_with_flags(this.im, CCString(message).Ptr, C.PurpleMessageFlags(flags))
+}
+
+//
 func GetConversations() []*Conversation {
 	convs := make([]*Conversation, 0)
 	lst := C.purple_get_conversations()

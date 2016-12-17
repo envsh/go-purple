@@ -252,6 +252,8 @@ func NewToxPlugin() *ToxPlugin {
 		StatusText:         this.StatusText,
 		SetChatTopic:       this.SetChatTopic,
 		Normalize:          this.Normalize,
+		// other more
+		SendTyping: this.SendTyping,
 	}
 	this.pi = &pi
 	this.ppi = &ppi

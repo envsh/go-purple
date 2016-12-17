@@ -127,12 +127,13 @@ func (this *WechatPlugin) load_account(ac *purple.Account) {
 }
 
 func (this *WechatPlugin) save_account(gc *purple.Connection) {
-	/*
-		data := this._wechat.GetSavedata()
-		data64 := base64.StdEncoding.EncodeToString(data)
-		ac := gc.ConnGetAccount()
-		ac.SetString("wechat_save_data", data64)
-	*/
+
+	data := this._wechat.GetSavedata()
+	data64 := base64.StdEncoding.EncodeToString(data)
+	ac := gc.ConnGetAccount()
+	ac.SetString("wechat_save_data", data64)
+	log.Println("saved data:", len(data))
+
 }
 
 func NewWechatPlugin() *WechatPlugin {

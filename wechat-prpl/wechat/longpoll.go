@@ -55,7 +55,8 @@ type longPoll struct {
 	reqState int
 
 	//
-	state pollState
+	state    pollState
+	saveData string // for caller save, can be as []byte
 
 	// persistent
 	cookies []*http.Cookie
@@ -89,6 +90,8 @@ func newLongPoll(eqch chan<- *Event) *longPoll {
 func (this *longPoll) start() {
 	go this.run()
 }
+
+type ReqType int
 
 const (
 	REQ_NONE int = iota
@@ -188,6 +191,8 @@ func (this *longPoll) loadCookies() {
 				log.Println("Invalid json node")
 				return
 			}
+			this.saveData = string(sck)
+
 			this.state.Qruuid = jck.Get("qruuid").MustString()
 			this.state.WxSKey = jck.Get("wxskey").MustString()
 			this.state.WxPassTicket = jck.Get("pass_ticket").MustString()
@@ -288,6 +293,9 @@ func (this *longPoll) saveCookies(resp *grequests.Response) {
 		log.Println(len(sck), string(sck)[0:78])
 		sck, err = jck.EncodePretty()
 		this.saveContent("cookies.txt", sck, nil, "")
+
+		this.saveData = string(sck)
+		this.eqch <- newEvent(EVT_SAVEDATA)
 	}
 }
 
@@ -295,6 +303,8 @@ func (this *longPoll) saveCookies(resp *grequests.Response) {
 func (this *longPoll) resetState() {
 	this.cookies = nil
 	this.state = pollState{}
+	this.saveData = ""
+	this.eqch <- newEvent(EVT_SAVEDATA)
 }
 
 var ips = strings.Split("101.226.76.164 101.227.160.102 140.206.160.161 140.207.135.104 117.135.169.34 117.144.242.33 203.205.151.221", " ")

@@ -153,3 +153,15 @@ func (this *Wechat) GegMsgImg()       {}
 func (this *Wechat) GegMsgImgUrl()    {}
 func (this *Wechat) GegMsgFileUrl()   {}
 func (this *Wechat) GegMsgVoice()     {}
+
+// promise not nil
+func (this *Wechat) GetSavedata() []byte {
+	return []byte(this.poller.saveData)
+}
+
+func (this *Wechat) GetUser(userName string) *User {
+	if u, ok := insess.usersm[userName]; ok {
+		return u
+	}
+	return nil
+}

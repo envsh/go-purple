@@ -47,6 +47,9 @@ func (this *WechatPlugin) eventHandler(evt *wechat.Event, ud interface{}) {
 	case wechat.EVT_GOT_MESSAGE:
 		log.Println("you have 1 new message", evt.Args[0][0:65])
 		this.onWXMessage(gc, evt)
+
+	case wechat.EVT_SAVEDATA:
+		this.save_account(gc)
 	}
 }
 
@@ -186,18 +189,20 @@ func (this *WechatPlugin) findBuddyEx(ac *purple.Account, pubkeyOrFriendID strin
 func (this *WechatPlugin) onWXMessage(gc *purple.Connection, evt *wechat.Event) {
 	ac := gc.ConnGetAccount()
 
-	msgo := wechat.ParseMessage(evt.Args[0])
-	pubkey := msgo.ToUserName
+	log.Println(evt)
 	msg := evt.Args[0]
+	msgo := wechat.ParseMessage(msg)
+	pubkey := msgo.ToUserName
 	buddy := this.findBuddyEx(ac, pubkey)
 	if buddy == nil {
 		log.Println("wtf", pubkey, msgo.MsgId)
-		// buddy = purple.NewBuddy(ac, msgo.FromUserName, msgo.FromUserName)
 		buddy = purple.NewBuddy(ac, msgo.ToUserName, msgo.ToUserName)
-		gc.ServGotIM(buddy.GetName(), msg, purple.MESSAGE_RECV)
+		// gc.ServGotIM(buddy.GetName(), msg, purple.MESSAGE_RECV)
+		gc.ServGotIM(buddy.GetName(), msgo.Content, purple.MESSAGE_RECV)
 	} else {
 		log.Println(buddy, msgo)
-		gc.ServGotIM(buddy.GetName(), msg, purple.MESSAGE_RECV)
+		// gc.ServGotIM(buddy.GetName(), msg, purple.MESSAGE_RECV)
+		gc.ServGotIM(buddy.GetName(), msgo.Content, purple.MESSAGE_RECV)
 	}
 }
 
@@ -357,26 +362,34 @@ func (this *WechatPlugin) RemoveBuddy(gc *purple.Connection, buddy *purple.Buddy
 }
 
 func (this *WechatPlugin) GetInfo(gc *purple.Connection, who string) {
-	/*
-		friendNumber, err := this._wechat.FriendByPublicKey(who)
-		if err != nil {
-			log.Println(err, friendNumber, who)
+	var friendName string
+	var friendStmsg string
+	u := this._wechat.GetUser(who)
+	if u != nil {
+		friendName = u.NickName
+		friendStmsg = u.Signature
+	} else {
+		log.Println("user not found:", who)
+		buddy := gc.ConnGetAccount().FindBuddy(who)
+		if buddy != nil {
+			friendName = buddy.GetAliasOnly()
+		} else {
+			log.Println("buddy not found:", who)
 		}
-		friendName, err := this._wechat.FriendGetName(friendNumber)
-		friendStmsg, err := this._wechat.FriendGetStatusMessage(friendNumber)
-		seen, err := this._wechat.FriendGetLastOnline(friendNumber)
+	}
 
-		uinfo := purple.NewNotifyUserInfo()
-		uinfo.AddPair("nickname", friendName)
-		uinfo.AddPair("status message", friendStmsg)
-		uinfo.AddPair("seen", fmt.Sprintf("%d", seen))
-		uinfo.AddPair("hehehe", "efffff")
-		uinfo.AddPair("hehehe12", "efffff456")
+	uinfo := purple.NewNotifyUserInfo()
+	uinfo.AddPair("nickname", friendName)
+	uinfo.AddPair("status message", friendStmsg)
+	// uinfo.AddPair("seen", fmt.Sprintf("%d", seen))
+	uinfo.AddPair("hehehe", "efffff")
+	uinfo.AddPair("hehehe12", "efffff456")
+	uinfo.AddPair("Uin", "0")
 
-		gc.NotifyUserInfo(who, uinfo, func(ud interface{}) {
-			log.Println("closed", ud)
-		}, 123)
-	*/
+	gc.NotifyUserInfo(who, uinfo, func(ud interface{}) {
+		log.Println("closed", ud)
+	}, 123)
+
 }
 
 func (this *WechatPlugin) StatusText(buddy *purple.Buddy) string {

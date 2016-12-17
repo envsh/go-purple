@@ -16,6 +16,8 @@ var groupbot = "56A1ADE4B65B86BCD51CC73E2CD4E542179F47959FE3E0E21B4B0ACDADE51855
 
 var addFixedFriendOnce sync.Once
 
+func isGroupbot(pubkey string) bool { return strings.HasPrefix(groupbot, pubkey) }
+
 func tryAddFixedFriends(t *tox.Tox, gc *purple.Connection) {
 	addFixedFriendOnce.Do(func() {
 		message := fmt.Sprintf("hello from gotox-prpl.%s", t.SelfGetAddress()[0:5])
@@ -126,4 +128,18 @@ func joinChatSpecialFixed(t *tox.Tox, comp *purple.GHashTable) bool {
 		return true
 	}
 	return false
+}
+
+// groupbot's response message
+func fixSpecialMessage(t *tox.Tox, friendNumber uint32, msg string) {
+	pubkey, err := t.FriendGetPublicKey(friendNumber)
+	if err != nil {
+		log.Println(err)
+	} else {
+		if isGroupbot(pubkey) {
+			if msg == "Group doesn't exist." {
+				t.FriendSendMessage(friendNumber, "group text")
+			}
+		}
+	}
 }

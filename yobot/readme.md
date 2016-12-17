@@ -13,11 +13,12 @@ a tox to irc channel bridge.
 也许使用独立的python脚本做逻辑
 
 ## TODO
-[ ] rename problem
-[ ] preconnection
-[ ] multiple tox instance
-[ ] 逻辑与连接分开，可以重加载逻辑模块而不丢失连接。
-[ ] 消息颜色格式转换
-[ ] action同步处理
-
+- [x] rename problem
+- [ ] preconnection
+- [ ] multiple tox instance
+- [ ] 逻辑与连接分开，可以重加载逻辑模块而不丢失连接。
+- [ ] 消息颜色格式转换
+- [x] action同步处理
+- [ ] 消息颜色格式过滤
+- [ ] features collection for channels
 

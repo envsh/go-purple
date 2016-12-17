@@ -22,6 +22,7 @@ const (
 	EVT_NEW_MPARTICLE
 	EVT_NEW_SUBSCRIBE
 	EVT_FRIEND_REQUEST
+	EVT_SAVEDATA
 	EVT_LOGOUT
 )
 
@@ -47,6 +48,8 @@ func (this EVT_TYPE) String() (s string) {
 		s = "EVT_RAW_MESSAGE"
 	case EVT_GOT_MESSAGE:
 		s = "EVT_GOT_MESSAGE"
+	case EVT_SAVEDATA:
+		s = "EVT_SAVEDATA"
 	case EVT_LOGOUT:
 		s = "EVT_LOGOUT"
 	default:

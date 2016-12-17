@@ -95,6 +95,9 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 				conn.ServGotIM(buddy.GetName(), msg, purple.MESSAGE_RECV)
 			}
 		}
+
+		// some extra
+		fixSpecialMessage(t, friendNumber, msg)
 	}, ac)
 
 	this._tox.CallbackFriendName(func(t *tox.Tox, friendNumber uint32, name string, d interface{}) {
@@ -135,8 +138,9 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 
 	// TODO should notify UI first and think groupbot's invite also
 	this._tox.CallbackGroupInvite(this.onGroupInvite, ac)
-
 	this._tox.CallbackGroupTitle(this.onGroupTitle, ac)
+
+	this._tox.CallbackFriendTyping(this.onFriendTyping, ac)
 }
 
 func (this *ToxPlugin) loadFriends(ac *purple.Account) {
@@ -361,6 +365,28 @@ func (this *ToxPlugin) onGroupMessage(t *tox.Tox, groupNumber int,
 func (this *ToxPlugin) onGroupAction(t *tox.Tox, groupNumber int, peerNumber int, action string, ud interface{}) {
 	message := PREFIX_ACTION + action
 	this.onGroupMessage(t, groupNumber, peerNumber, message, ud)
+}
+
+func (this *ToxPlugin) onFriendTyping(t *tox.Tox, friendNumber uint32, isTyping uint8, ud interface{}) {
+	ac := ud.(*purple.Account)
+	gc := ac.GetConnection()
+
+	pubkey, err := this._tox.FriendGetPublicKey(friendNumber)
+	if err != nil {
+		log.Println(err, pubkey)
+	} else {
+		buddy := this.findBuddyEx(ac, pubkey)
+		if buddy == nil {
+			log.Println("wtf", friendNumber, pubkey)
+		} else {
+			timeout := 3
+			if isTyping == 1 {
+				gc.ServGotTyping(buddy.GetName(), timeout, purple.TYPING)
+			} else {
+				gc.ServGotTypingStopped(buddy.GetName())
+			}
+		}
+	}
 }
 
 // purple optional callbacks
@@ -623,6 +649,35 @@ func (this *ToxPlugin) SetChatTopic(gc *purple.Connection, id int, topic string)
 
 func (this *ToxPlugin) Normalize(gc *purple.Connection, who string) string {
 	return strings.ToUpper(who)
+}
+
+func (this *ToxPlugin) SendTyping(gc *purple.Connection, name string, state int) uint {
+	switch state {
+	case purple.NOT_TYPING:
+		fn, err := this._tox.FriendByPublicKey(name)
+		if err != nil {
+			log.Println(err)
+		} else {
+			this._tox.SelfSetTyping(fn, false)
+		}
+	case purple.TYPING:
+		fn, err := this._tox.FriendByPublicKey(name)
+		if err != nil {
+			log.Println(err)
+		} else {
+			this._tox.SelfSetTyping(fn, true)
+		}
+		return 2
+	case purple.TYPED:
+		fn, err := this._tox.FriendByPublicKey(name)
+		if err != nil {
+			log.Println(err)
+		} else {
+			this._tox.SelfSetTyping(fn, false)
+		}
+	}
+
+	return 0
 }
 
 // utils
