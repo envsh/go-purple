@@ -6,7 +6,10 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	// "github.com/thoj/go-ircevent"
+
+	"go-purple/fetchtitle"
+
+	"github.com/mvdan/xurls"
 )
 
 const (
@@ -20,6 +23,8 @@ const (
 	EVT_LEAVE_GROUP         = "leave_group"
 	EVT_GROUP_MESSAGE       = "group_message"
 	EVT_GROUP_ACTION        = "group_action"
+	EVT_FETCH_URL_META      = "fetch_url_meta"
+	EVT_GOT_URL_META        = "got_url_meta"
 )
 
 const MAX_BUS_QUEUE_LEN = 123
@@ -56,12 +61,18 @@ func DupEvent(e *Event) *Event {
 }
 
 type RoundTable struct {
-	ctx *Context
+	ctx  *Context
+	mflt *MessageFilter
 }
 
 func NewRoundTable() *RoundTable {
 	this := &RoundTable{}
 	this.ctx = ctx
+	this.mflt = NewMessageFilter()
+
+	if pxyurl != "" {
+		fetchtitle.SetProxy(pxyurl)
+	}
 	return this
 }
 
@@ -81,6 +92,8 @@ func (this *RoundTable) handleEvent() {
 			this.handleEventIrc(ie)
 		case PROTO_TOX:
 			this.handleEventTox(ie)
+		case PROTO_TABLE:
+			this.handleEventTable(ie)
 		}
 	}
 }
@@ -154,6 +167,8 @@ func (this *RoundTable) handleEventTox(e *Event) {
 				}
 			}
 		}
+		// plugins process
+		this.ctx.busch <- NewEvent(PROTO_TABLE, EVT_FETCH_URL_META, chname, message, fromUser)
 
 	case EVT_GROUP_ACTION:
 		ne := DupEvent(e)
@@ -199,7 +214,7 @@ func (this *RoundTable) handleEventTox(e *Event) {
 				if ac == nil {
 					log.Println("wtf", peerName, this.ctx.acpool.count(), this.ctx.acpool.getNames(5))
 				} else {
-					ac.becon.(*IrcBackend2).ircon.Part(chname)
+					ac.becon.(*IrcBackend2).ircon.Part(chname, "tox rejoin need.")
 				}
 			} else {
 				log.Println("wtf", peerName, this.ctx.acpool.count(), this.ctx.acpool.getNames(5))
@@ -285,6 +300,7 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 		if groupNumber == -1 {
 			log.Println("group not exists:", chname, strings.ToLower(chname))
 		} else {
+			message = this.mflt.Filter(message)
 			var err error
 			if strings.HasPrefix(message, PREFIX_ACTION) {
 				_, err = this.ctx.toxagt._tox.GroupActionSend(groupNumber, message[len(PREFIX_ACTION):])
@@ -300,6 +316,8 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 				}
 			}
 		}
+		// plugins process
+		this.ctx.busch <- NewEvent(PROTO_TABLE, EVT_FETCH_URL_META, chname, message, nick)
 	case EVT_GROUP_ACTION:
 		ne := DupEvent(e)
 		ne.EType = EVT_GROUP_MESSAGE
@@ -490,4 +508,97 @@ func (this *RoundTable) processGroupCmd(msg string, groupNumber, peerNumber int)
 		}
 	}
 	return false
+}
+
+func (this *RoundTable) handleEventTable(e *Event) {
+	switch e.EType {
+	case EVT_FETCH_URL_META:
+		msg := e.Args[0].(string)
+		msgsegs := strings.Split(msg, " ")
+		if len(msgsegs) > 1 && strings.HasPrefix(msgsegs[1], "Title:") {
+			break // 过滤掉返回的meta结果的meta
+		}
+
+		urlst := xurls.Strict.FindAllString(msg, -1)
+		go func() {
+			for _, u := range urlst {
+				if isLocalUrl(u) {
+					log.Println("oh bad guy:", e.Args[1], u)
+				}
+				title, mime, err := fetchtitle.FetchMeta(u, 7)
+				titleLine := fmtUrlMeta(title, mime, err, u)
+				this.ctx.busch <- NewEvent(PROTO_TABLE, EVT_GOT_URL_META, e.Chan, titleLine, e.Args[1])
+			}
+		}()
+	case EVT_GOT_URL_META:
+		chname := e.Chan
+		message := e.Args[0].(string)
+		nick := e.Args[1].(string)
+		message = fmt.Sprintf("%s: %s", nick, message)
+
+		// check has bot
+		hasTitleBot := false
+		ac := this.ctx.acpool.get(ircname, this.ctx.toxagt._tox.SelfGetPublicKey())
+		for _, bot := range []string{"smbot", "varia", "xmppbot", "anotitlebot", "TideBot", "ttlbot"} {
+			tk, ok := ac.becon.(*IrcBackend2).ircon.StateTracker().IsOn(e.Chan, bot)
+			log.Println(tk, ok, bot)
+			if ok {
+				hasTitleBot = true
+				break
+			}
+		}
+		if hasTitleBot {
+			break
+		}
+		found := false
+		whiteChans := []string{"roundtablex1", "#tox-cn123", "#tox-cn", "#tox", "##orz"}
+		for _, c := range whiteChans {
+			if c == chname {
+				found = true
+				break
+			}
+			if nch, ok := chmap.Get(c); ok {
+				if nch == chname {
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			break
+		}
+
+		if true {
+			groupNumber := this.ctx.toxagt.getToxGroupByName(chname)
+			if groupNumber == -1 {
+				groupNumber = this.ctx.toxagt.getToxGroupByName(strings.ToLower(chname))
+			}
+			if groupNumber == -1 {
+				if nch, ok := chmap.Get(chname); ok {
+					groupNumber = this.ctx.toxagt.getToxGroupByName(nch.(string))
+				}
+			}
+			if groupNumber == -1 {
+				log.Println("group not exists:", chname, strings.ToLower(chname))
+			} else {
+				_, err := this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message)
+				if err != nil {
+				}
+			}
+		}
+		if true {
+			// find channel connection
+			ac := this.ctx.acpool.get(ircname, this.ctx.toxagt._tox.SelfGetPublicKey())
+			if ac == nil {
+				log.Println("account not found:", ircname)
+			} else {
+				if nch, ok := chmap.GetKey(chname); ok {
+					ac.becon.(*IrcBackend2).sendGroupMessage(message, nch.(string))
+				} else {
+					ac.becon.(*IrcBackend2).sendGroupMessage(message, chname)
+				}
+			}
+		}
+	}
+
 }

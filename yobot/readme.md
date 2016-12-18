@@ -21,4 +21,4 @@ a tox to irc channel bridge.
 - [x] action同步处理
 - [ ] 消息颜色格式过滤
 - [ ] features collection for channels
-
+- [ ] 发送错误的消息重发

@@ -42,6 +42,10 @@ func (this *IrcBackend2) init() {
 		rmer := ircon.HandleFunc(name, this.onEvent)
 		this.rmers[name] = rmer
 	}
+	for _, no := range []string{"353"} {
+		rmer := ircon.HandleFunc(no, this.onEvent)
+		this.rmers[name] = rmer
+	}
 
 	this.ircon = ircon
 }
@@ -98,6 +102,11 @@ func (this *IrcBackend2) onEvent(ircon *irc.Conn, line *irc.Line) {
 		ce.Be = this
 		this.nonblockSendBusch(ce)
 	}
+
+	switch line.Cmd {
+	case "353":
+
+	}
 }
 
 func (this *IrcBackend2) nonblockSendBusch(ce *Event) {
@@ -144,6 +153,7 @@ func (this *IrcBackend2) isconnected() bool {
 }
 
 func (this *IrcBackend2) join(channel string) {
+	this.ircon.StateTracker().NewChannel(channel)
 	this.ircon.Join(channel)
 }
 
@@ -168,6 +178,7 @@ func NewEventFromIrcEvent2(ircon *irc.Conn, line *irc.Line) *Event {
 		ne.Args = append(ne.Args, arg)
 	}
 
+	ne.EType = line.Cmd
 	switch line.Cmd {
 	case irc.CONNECTED:
 		ne.EType = EVT_CONNECTED

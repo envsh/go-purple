@@ -12,9 +12,11 @@ import (
 )
 
 var debug bool
+var pxyurl string
 
 func init() {
 	flag.BoolVar(&debug, "debug", debug, "purple debug switch")
+	flag.StringVar(&pxyurl, "proxy", pxyurl, "proxy, http://")
 	colog.Register()
 	colog.SetFlags(log.Flags() | log.Lshortfile | log.LstdFlags)
 	time.Sleep(0)

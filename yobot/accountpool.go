@@ -7,9 +7,10 @@ import (
 )
 
 const (
-	PROTO_NONE = "none"
-	PROTO_IRC  = "irc"
-	PROTO_TOX  = "tox"
+	PROTO_NONE  = "none"
+	PROTO_IRC   = "irc"
+	PROTO_TOX   = "tox"
+	PROTO_TABLE = "table"
 )
 
 type Account struct {
