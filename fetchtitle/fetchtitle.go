@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -84,9 +83,9 @@ func fetchWebMeta(u string, timeout int) (title string, mime string, err error) 
 	cli.Timeout = time.Duration(timeout) * time.Second
 
 	var resp *http.Response
-	var req *http.Request
 
 	for idx := 0; idx < 5; idx++ {
+		var req *http.Request
 		req, err = http.NewRequest(http.MethodGet, u, nil)
 		if err != nil {
 			// log.Println(err)
@@ -105,10 +104,18 @@ func fetchWebMeta(u string, timeout int) (title string, mime string, err error) 
 		if resp.Request.URL.String() != u {
 			// maybe redirected
 			u = resp.Request.URL.String()
+			resp.Body.Close()
+			resp = nil
 		} else {
 			break
 		}
 	}
+	if resp == nil {
+		err = errors.New("reloc exceeded 5 times")
+		return
+	}
+	defer resp.Body.Close()
+
 	if false {
 		bcc, _ := ioutil.ReadAll(resp.Body)
 		log.Println(resp, string(bcc))
@@ -120,24 +127,25 @@ func fetchWebMeta(u string, timeout int) (title string, mime string, err error) 
 		return
 	}
 
+	mime = resp.Header.Get("Content-Type")
+	// log.Println(mime)
+
+	// some other post reformat
+	// image/video/audio/stream
+	if len(mime) > 0 && !strings.Contains(mime, "text/") {
+		sz := resp.ContentLength
+		title = fmt.Sprintf("Size: %s", sizeToHuman(int64(sz)))
+		return
+	}
+
 	var hmime string
 	title, hmime, err = parseTitle(resp)
 	if err != nil {
 		// log.Println(err)
 		return
 	}
-
-	mime = resp.Header.Get("Content-Type")
-	// log.Println(mime)
 	if len(hmime) > len(mime) {
 		mime = hmime
-	}
-
-	// some other post reformat
-	if len(mime) > 0 && strings.Contains(mime, "image/") {
-		strsz := resp.Header.Get("Content-Length")
-		sz, _ := strconv.Atoi(strsz)
-		title = fmt.Sprintf("Size: %s", sizeToHuman(int64(sz)))
 	}
 
 	// TODO 自动检测编码并尝试转码
@@ -161,8 +169,6 @@ func fetchWebMeta(u string, timeout int) (title string, mime string, err error) 
 }
 
 func parseTitle(resp *http.Response) (string, string, error) {
-	defer resp.Body.Close()
-
 	if false {
 		buf := make([]byte, 8192)
 		n, err := resp.Body.Read(buf)
@@ -191,6 +197,9 @@ func parseTitle(resp *http.Response) (string, string, error) {
 		}
 	})
 
+	log.Println(resp.Close)
+	resp.Body.Close()
+	resp = nil
 	return title, hmime, nil
 }
 

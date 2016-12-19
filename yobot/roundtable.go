@@ -540,15 +540,11 @@ func (this *RoundTable) handleEventTable(e *Event) {
 		hasTitleBot := false
 		ac := this.ctx.acpool.get(ircname, this.ctx.toxagt._tox.SelfGetPublicKey())
 		for _, bot := range []string{"smbot", "varia", "xmppbot", "anotitlebot", "TideBot", "ttlbot"} {
-			tk, ok := ac.becon.(*IrcBackend2).ircon.StateTracker().IsOn(e.Chan, bot)
-			log.Println(tk, ok, bot)
+			_, ok := ac.becon.(*IrcBackend2).ircon.StateTracker().IsOn(e.Chan, bot)
 			if ok {
 				hasTitleBot = true
 				break
 			}
-		}
-		if hasTitleBot {
-			break
 		}
 		found := false
 		whiteChans := []string{"roundtablex1", "#tox-cn123", "#tox-cn", "#tox", "##orz"}
@@ -564,7 +560,8 @@ func (this *RoundTable) handleEventTable(e *Event) {
 				}
 			}
 		}
-		if !found {
+		if hasTitleBot || !found {
+			log.Println("got meta: ", message)
 			break
 		}
 

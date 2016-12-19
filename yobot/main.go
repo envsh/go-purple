@@ -38,7 +38,6 @@ func main() {
 	glog.Init()
 
 	ctx = &Context{}
-	// ctx.busch = make(chan interface{}, 123)
 	ctx.busch = make(chan *Event, MAX_BUS_QUEUE_LEN)
 	ctx.acpool = NewAccountPool()
 	ctx.toxagt = NewToxAgent()

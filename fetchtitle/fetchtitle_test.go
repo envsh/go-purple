@@ -47,11 +47,13 @@ func TestFetchTitle(t *testing.T) {
 	}
 
 	urls = []string{
-		"https://gist.github.com/4caa949091e80834c965156f0e3b493c", //empty title?
+		// "https://gist.github.com/4caa949091e80834c965156f0e3b493c", //empty title?
+		// "https://dn-fishroom.qbox.me/sticker/1370.png",
+		"http://fishroom.tuna.moe/log/linuxba/2016-12-18/553",
 	}
 
 	titles := []string{}
-	SetProxy("http://127.0.0.1:8117")
+	// SetProxy("http://127.0.0.1:8117")
 
 	for idx, url := range urls {
 		t.Run(fmt.Sprintf("url%02d", idx), func(t *testing.T) {

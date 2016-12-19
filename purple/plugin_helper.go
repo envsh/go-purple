@@ -59,7 +59,9 @@ extern gint goprpl_send_raw(PurpleConnection *gc, char* buf, int len);
 // RoomlistRoomSerialize func(room *RoomlistRoom) string
 extern gboolean goprpl_send_attention(PurpleConnection *gc, char *userName, guint atype);
 extern GList* goprpl_get_attension_types(PurpleAccount *ac);
-
+extern gboolean goprpl_can_receive_file(PurpleConnection *gc, char *who);
+extern void goprpl_send_file(PurpleConnection *gc, char *who, char *filename);
+extern PurpleXfer* goprpl_new_xfer(PurpleConnection *gc, char *who);
 
 static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pppi) {
     pi->load = goprpl_plugin_load;
@@ -109,6 +111,12 @@ static void _set_plugin_funcs(PurplePluginInfo *pi, PurplePluginProtocolInfo *pp
     // RoomlistRoomSerialize func(room *RoomlistRoom) string
     pppi->send_attention = goprpl_send_attention;
     pppi->get_attention_types = goprpl_get_attension_types;
+
+    // file transfer
+    pppi->can_receive_file = goprpl_can_receive_file;
+    pppi->send_file = goprpl_send_file;
+    pppi->new_xfer = goprpl_new_xfer;
+
     // TODO fix compile warnings
 }
 
@@ -203,6 +211,11 @@ type PluginProtocolInfo struct {
 	// RoomlistRoomSerialize func(room *RoomlistRoom) string
 	SendAttention     func(gc *Connection, userName string, atype uint) bool
 	GetAttentionTypes func(ac *Account) *GList
+
+	// file transfer
+	CanReceiveFile func(gc *Connection, who string) bool
+	SendFile       func(gc *Connection, who string, filename string)
+	NewXfer        func(gc *Connection, who string) *Xfer
 
 	// private
 	ppi   *C.PurplePluginProtocolInfo
@@ -325,6 +338,10 @@ func (this *Plugin) set_plugin_funcs() {
 	this.cpppi.send_attention = go2cfn(C.goprpl_send_attention)
 	this.cpppi.get_attention_types = go2cfn(C.goprpl_get_attension_types)
 
+	// file transfer
+	this.cpppi.can_receive_file = go2cfn(C.goprpl_can_receive_file)
+	this.cpppi.send_file = go2cfn(C.goprpl_send_file)
+	this.cpppi.new_xfer = go2cfn(C.goprpl_new_xfer)
 }
 
 // this will check and unset nil callback functions
@@ -438,6 +455,16 @@ func (this *Plugin) _unset_plugin_funcs() {
 		this.cpppi.get_attention_types = nil
 	}
 
+	// file transfer
+	if this.ppi.CanReceiveFile == nil {
+		this.cpppi.can_receive_file = nil
+	}
+	if this.ppi.SendFile == nil {
+		this.cpppi.send_file = nil
+	}
+	if this.ppi.NewXfer == nil {
+		this.cpppi.new_xfer = nil
+	}
 }
 
 // this is not purple's function
@@ -870,5 +897,35 @@ func goprpl_get_attension_types(ac *C.PurpleAccount) *C.GList {
 		ret := this.ppi.GetAttentionTypes(newAccountFrom(ac))
 		return ret.lst
 	}
+	return nil
+}
+
+// file transfer
+//export goprpl_can_receive_file
+func goprpl_can_receive_file(gc *C.PurpleConnection, who *C.char) C.gboolean {
+	var this = _plugin_instance
+	if this.ppi.CanReceiveFile != nil {
+		ret := this.ppi.CanReceiveFile(newConnectionFrom(gc), C.GoString(who))
+		return go2cBool(ret)
+	}
+	return C.FALSE
+}
+
+//export goprpl_send_file
+func goprpl_send_file(gc *C.PurpleConnection, who *C.char, filename *C.char) {
+	var this = _plugin_instance
+	if this.ppi.SendFile != nil {
+		this.ppi.SendFile(newConnectionFrom(gc), C.GoString(who), C.GoString(filename))
+	}
+}
+
+//export goprpl_new_xfer
+func goprpl_new_xfer(gc *C.PurpleConnection, who *C.char) *C.PurpleXfer {
+	var this = _plugin_instance
+	if this.ppi.NewXfer != nil {
+		ret := this.ppi.NewXfer(newConnectionFrom(gc), C.GoString(who))
+		return ret.xfer
+	}
+
 	return nil
 }
