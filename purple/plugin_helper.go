@@ -347,17 +347,29 @@ func (this *Plugin) set_plugin_funcs() {
 // this will check and unset nil callback functions
 func (this *Plugin) _unset_plugin_funcs() {
 	// must
+	lackofmust := false
 	if this.ppi.BlistIcon == nil {
 		this.cpppi.list_icon = nil
+		lackofmust = true
+		log.Println("BlistIcon method must set.")
 	}
 	if this.ppi.StatusTypes == nil {
 		this.cpppi.status_types = nil
+		lackofmust = true
+		log.Println("StatusTypes method must set.")
 	}
 	if this.ppi.Login == nil {
 		this.cpppi.login = nil
+		lackofmust = true
+		log.Println("Login method must set.")
 	}
 	if this.ppi.Close == nil {
 		this.cpppi.close = nil
+		lackofmust = true
+		log.Println("Close method must set.")
+	}
+	if lackofmust {
+		log.Fatalln("Lack of some must set methods.")
 	}
 
 	// optional, might by Proirity high to low

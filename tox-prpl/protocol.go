@@ -57,29 +57,8 @@ func (this *ToxPlugin) setupCallbacks(ac *purple.Account) {
 
 	this._tox.CallbackFriendRequest(this.onFriendRequest, ac)
 
-	this._tox.CallbackFriendConnectionStatus(func(t *tox.Tox, friendNumber uint32, status int, d interface{}) {
-		log.Println(friendNumber, status)
-		pubkey, _ := t.FriendGetPublicKey(friendNumber)
-		name, _ := t.FriendGetName(friendNumber)
-
-		buddy := this.findBuddyEx(ac, pubkey)
-		if buddy == nil {
-			log.Println("can not find buddy:", name, pubkey)
-		} else {
-			switch status {
-			case tox.CONNECTION_NONE:
-				purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_OFFLINE_STR)
-			case tox.CONNECTION_TCP:
-				purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_BUSY_STR)
-			case tox.CONNECTION_UDP:
-				purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_ONLINE_STR)
-			}
-		}
-
-		//
-		tryJoinFixedGroups(t, conn, friendNumber, status)
-		this.save_account(gc)
-	}, ac)
+	this._tox.CallbackFriendConnectionStatus(this.onFriendConnectionStatus, ac)
+	this._tox.CallbackFriendStatus(this.onFriendStatus, ac)
 
 	this._tox.CallbackFriendMessage(func(t *tox.Tox, friendNumber uint32, msg string, d interface{}) {
 		log.Println(friendNumber, msg, purple.MyTid2())
@@ -180,6 +159,11 @@ func (this *ToxPlugin) loadFriends(ac *purple.Account) {
 		// purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_ONLINE_STR)
 		log.Println("adding...", name, pubkey, purple.MyTid2())
 	}
+	// set inital offline
+	buddies = ac.FindBuddies("")
+	for _, buddy := range buddies {
+		purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_OFFLINE_STR)
+	}
 }
 
 // 因为存储的name可能是friendId，也可能是pubkey。
@@ -243,6 +227,59 @@ func (this *ToxPlugin) onFriendRequest(t *tox.Tox, pubkey, msg string, d interfa
 			// reject?
 			log.Println(ud)
 		})
+}
+
+func (this *ToxPlugin) onFriendConnectionStatus(t *tox.Tox, friendNumber uint32, status int, d interface{}) {
+	log.Println(friendNumber, status)
+	ac := d.(*purple.Account)
+	gc := ac.GetConnection()
+
+	pubkey, _ := t.FriendGetPublicKey(friendNumber)
+	name, _ := t.FriendGetName(friendNumber)
+
+	buddy := this.findBuddyEx(ac, pubkey)
+	if buddy == nil {
+		log.Println("can not find buddy:", name, pubkey)
+	} else {
+		switch status {
+		case tox.CONNECTION_NONE:
+			purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_OFFLINE_STR)
+		case tox.CONNECTION_TCP:
+			fallthrough
+		case tox.CONNECTION_UDP:
+			fallthrough
+		default:
+			purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_ONLINE_STR)
+		}
+	}
+
+	//
+	tryJoinFixedGroups(t, gc, friendNumber, status)
+	this.save_account(gc)
+}
+
+func (this *ToxPlugin) onFriendStatus(t *tox.Tox, friendNumber uint32, status int, d interface{}) {
+	ac := d.(*purple.Account)
+
+	pubkey, _ := t.FriendGetPublicKey(friendNumber)
+	name, _ := t.FriendGetName(friendNumber)
+
+	buddy := this.findBuddyEx(ac, pubkey)
+	if buddy == nil {
+		log.Println("can not find buddy:", name, pubkey)
+	} else {
+		switch status {
+		case tox.USER_STATUS_AWAY:
+			purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_AWAY_STR)
+		case tox.USER_STATUS_BUSY:
+			purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_BUSY_STR)
+		case tox.USER_STATUS_NONE:
+			// purple.PrplGotUserStatus(ac, buddy.GetName(), STATUS_ONLINE_STR)
+			fallthrough
+		default:
+			log.Println("what can i do?", status)
+		}
+	}
 }
 
 func (this *ToxPlugin) onGroupInvite(t *tox.Tox,
@@ -555,7 +592,7 @@ func (this *ToxPlugin) GetInfo(gc *purple.Connection, who string) {
 	friendNumber, err := this._tox.FriendByPublicKey(who)
 	if err != nil {
 		log.Println(err, friendNumber, who)
-		// maybe chat peer's name
+		// maybe chat peer's name, from group member list
 		pubkeys := make(map[int]string, 0)
 		groupNumbers := this._tox.GetChatList()
 		for _, groupNumber := range groupNumbers {
@@ -603,12 +640,30 @@ func (this *ToxPlugin) GetInfo(gc *purple.Connection, who string) {
 		if err != nil {
 		}
 		friendStmsg, err := this._tox.FriendGetStatusMessage(friendNumber)
+		friendSt, err := this._tox.FriendGetStatus(friendNumber)
 		seen, err := this._tox.FriendGetLastOnline(friendNumber)
 
 		uinfo = purple.NewNotifyUserInfo()
 		uinfo.AddPair("nickname", friendName)
 		uinfo.AddPair("id", who)
 		uinfo.AddPair("status message", friendStmsg)
+		switch friendSt {
+		case tox.USER_STATUS_AWAY:
+			uinfo.AddPair("status", STATUS_AWAY_STR)
+		case tox.USER_STATUS_BUSY:
+			uinfo.AddPair("status", STATUS_BUSY_STR)
+		default:
+			connst, err := this._tox.FriendGetConnectionStatus(friendNumber)
+			if err != nil {
+				log.Println(err)
+			}
+			switch connst {
+			case tox.CONNECTION_NONE:
+				uinfo.AddPair("status", STATUS_OFFLINE_STR)
+			default:
+				uinfo.AddPair("status", STATUS_ONLINE_STR)
+			}
+		}
 		uinfo.AddPair("seen", fmt.Sprintf("%d", seen))
 		uinfo.AddPair("hehehe", "efffff")
 		uinfo.AddPair("hehehe12", "efffff456")

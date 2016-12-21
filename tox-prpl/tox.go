@@ -139,6 +139,7 @@ func (this *ToxPlugin) tox_login(ac *purple.Account) {
 
 	this.setupSelfInfo(ac)
 	this.setupCallbacks(ac)
+	this.setupFileCallbacks(ac)
 	this.loadFriends(ac)
 	this.save_account(ac.GetConnection())
 
@@ -254,6 +255,10 @@ func NewToxPlugin() *ToxPlugin {
 		Normalize:          this.Normalize,
 		// other more
 		SendTyping: this.SendTyping,
+		// file transfer
+		CanReceiveFile: this.CanReceiveFile,
+		SendFile:       this.SendFile,
+		NewXfer:        this.NewXfer,
 	}
 	this.pi = &pi
 	this.ppi = &ppi

@@ -26,9 +26,9 @@ import (
 type XferType int
 
 const (
-	XFER_UNKNOWN = int(C.PURPLE_XFER_UNKNOWN)
-	XFER_SEND    = int(C.PURPLE_XFER_SEND)
-	XFER_RECEIVE = int(C.PURPLE_XFER_RECEIVE)
+	XFER_UNKNOWN = XferType(C.PURPLE_XFER_UNKNOWN)
+	XFER_SEND    = XferType(C.PURPLE_XFER_SEND)
+	XFER_RECEIVE = XferType(C.PURPLE_XFER_RECEIVE)
 )
 
 type XferStatusType int
@@ -68,6 +68,8 @@ type Xfer struct {
 	CancelSendFunc    func(*Xfer)
 	CancelRecvFunc    func(*Xfer)
 
+	Data interface{}
+
 	// private
 	fromc bool
 	xfer  *C.PurpleXfer
@@ -79,6 +81,7 @@ func (this *Account) NewXfer(xftype XferType, who string) *Xfer {
 	xfer.xfer = C.purple_xfer_new(this.account, C.PurpleXferType(xftype), CCString(who).Ptr)
 
 	xfer.setCallbakcFuncs()
+	xfer.addMap()
 	return xfer
 }
 
@@ -107,6 +110,9 @@ func (this *Xfer) Unref() { C.purple_xfer_unref(this.xfer) }
 
 func (this *Xfer) RequestAccepted(filename string) {
 	C.purple_xfer_request_accepted(this.xfer, CCString(filename).Ptr)
+}
+func (this *Xfer) Request() {
+	C.purple_xfer_request(this.xfer)
 }
 
 func (this *Xfer) RequestDenied() { C.purple_xfer_request_denied(this.xfer) }
@@ -230,7 +236,11 @@ func (this *Xfer) ReadFile() []byte {
 }
 
 func (this *Xfer) Start(fd int, ip string, port uint) {
-	C.purple_xfer_start(this.xfer, C.int(fd), CCString(ip).Ptr, C.uint(port))
+	if len(ip) == 0 {
+		C.purple_xfer_start(this.xfer, C.int(fd), nil, C.uint(port))
+	} else {
+		C.purple_xfer_start(this.xfer, C.int(fd), CCString(ip).Ptr, C.uint(port))
+	}
 }
 
 func (this *Xfer) End() { C.purple_xfer_end(this.xfer) }
@@ -305,6 +315,13 @@ func XfersGetUiOps() *XferUiOps      { return newXferUiOpsFrom(C.purple_xfers_ge
 
 //
 var xfer_cgo_map = make(map[*C.PurpleXfer]*Xfer, 0)
+
+func (this *Xfer) addMap() {
+	xfer_cgo_map[this.xfer] = this
+}
+func (this *Xfer) delMap() {
+	delete(xfer_cgo_map, this.xfer)
+}
 
 //export gopurple_xfer_read_fnc
 func gopurple_xfer_read_fnc(buf **C.guchar, xfer *C.PurpleXfer) C.gssize {

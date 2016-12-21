@@ -57,6 +57,9 @@ const (
 func PrplGotUserStatus(ac *Account, name, statusId string) {
 	C.gopurple_prpl_got_user_status(ac.account, CCString(name).Ptr, CCString(statusId).Ptr)
 }
+func (this *Account) GotUserStatus(name, statusId string) {
+	PrplGotUserStatus(this, name, statusId)
+}
 
 type ProtoChatEntry struct {
 	pce *C.struct_proto_chat_entry
