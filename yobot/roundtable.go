@@ -226,6 +226,11 @@ func (this *RoundTable) handleEventTox(e *Event) {
 		cmd := e.Args[0].(string)
 		segs := strings.Split(cmd, " ")
 
+		if this.ctx.toxagt.isGroupbot(friendNumber) {
+			log.Println("skip groupbot response message:", cmd)
+			break
+		}
+
 		switch segs[0] {
 		case "info": // show friends count, groups count and group list info
 			this.processInfoCmd(friendNumber)
@@ -241,7 +246,7 @@ func (this *RoundTable) handleEventTox(e *Event) {
 		case "help":
 			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, cmdhelp)
 		default:
-			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, invalidcmd)
+			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, invalidcmd+": "+segs[0])
 		}
 	}
 }
@@ -353,7 +358,7 @@ func (this *RoundTable) processInviteCmd(channels []string, friendNumber uint32)
 	// for irc groups
 	for _, chname := range channels {
 		if chname == "" {
-			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, invalidcmd)
+			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, invalidcmd+": "+chname)
 			continue
 		}
 
@@ -377,7 +382,11 @@ func (this *RoundTable) processInviteCmd(channels []string, friendNumber uint32)
 			if err != nil {
 				log.Println("wtf")
 			}
-			continue
+			// 冗余（或者并不冗余）触发一下进群事件，帮助确认成功进入 irc群
+			var peerNumber int = 0
+			var title = chname
+			this.ctx.busch <- NewEvent(PROTO_TOX, EVT_JOIN_GROUP, title, groupNumber, peerNumber)
+			continue // 这个continue会导致不正确的join问题，所以要手工触发一下事件
 		}
 
 		_, err := strconv.Atoi(chname)

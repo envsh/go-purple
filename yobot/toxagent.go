@@ -16,6 +16,7 @@ type ToxAgent struct {
 	_tox *tox.Tox
 
 	groupMembers map[int]map[int][]string // leave group get peer name/pubkey
+	theirGroups  map[int]bool             // accepted group number => true
 }
 
 func NewToxAgent() *ToxAgent {
@@ -23,6 +24,7 @@ func NewToxAgent() *ToxAgent {
 	this.ctx = ctx
 
 	this.groupMembers = make(map[int]map[int][]string)
+	this.theirGroups = make(map[int]bool)
 
 	return this
 }
@@ -63,124 +65,16 @@ func (this *ToxAgent) setupCallbacks() {
 		this.save_account()
 	}, nil)
 
-	this._tox.CallbackFriendConnectionStatus(func(t *tox.Tox, friendNumber uint32, status int, d interface{}) {
-		log.Println(friendNumber, status)
-		this.save_account()
-		pubkey, err := this._tox.FriendGetPublicKey(friendNumber)
-		if err != nil {
-			log.Println(err, pubkey)
-		}
-
-		defer func() {
-			if strings.HasPrefix(groupbot, pubkey) && status > 0 {
-				// t.FriendSendMessage(friendNumber, "invite 1")
-				// t.FriendSendMessage(friendNumber, "invite 2")
-				_, err := t.FriendSendMessage(friendNumber, "invite 5")
-				if err != nil {
-					log.Println(err)
-				}
-				log.Println("send groupbot invite:", friendNumber, status, err)
-			}
-		}()
-		if status > 0 {
-			this.ctx.busch <- NewEvent(PROTO_TOX, EVT_FRIEND_CONNECTED, "", friendNumber, status)
-		} else {
-			this.ctx.busch <- NewEvent(PROTO_TOX, EVT_FRIEND_DISCONNECTED, "", friendNumber, status)
-		}
-	}, nil)
+	this._tox.CallbackFriendConnectionStatus(this.onFriendConnectionStatus, nil)
 	this._tox.CallbackFriendMessage(func(t *tox.Tox, friendNumber uint32, msg string, d interface{}) {
 		log.Println(friendNumber, msg)
+		if this.isGroupbot(friendNumber) {
+			// maybe need skip the message here
+		}
 		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_FRIEND_MESSAGE, "", msg, friendNumber)
 	}, nil)
-	this._tox.CallbackGroupMessage(func(t *tox.Tox, groupNumber int,
-		peerNumber int, message string, d interface{}) {
-		log.Println(groupNumber, peerNumber, message)
-		groupTitle, err := t.GroupGetTitle(groupNumber)
-		if err != nil {
-			log.Println(err, groupTitle)
-		}
-		pubkeys := t.GroupGetPeerPubkeys(groupNumber)
-		groupbotIn := false
-		for _, pubkey := range pubkeys {
-			if strings.HasPrefix(groupbot, pubkey) {
-				groupbotIn = true
-			}
-		}
-		selfMessage := false
-		peerPubkey, err := t.GroupPeerPubkey(groupNumber, peerNumber)
-		if strings.HasPrefix(t.SelfGetAddress(), peerPubkey) {
-			selfMessage = true
-		}
-		if selfMessage {
-			// log.Println("omit self message forward", groupTitle)
-			return
-		}
-		if len(this.ctx.busch) >= MAX_BUS_QUEUE_LEN {
-			log.Println("busch full, will blocked")
-		}
-		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_GROUP_MESSAGE, groupTitle,
-			message, groupNumber, peerNumber)
-
-		// should be
-		if groupbotIn {
-		}
-		/*
-			if groupbotIn {
-				if toname, ok := chanMap[groupTitle]; ok {
-					// forward message to...
-					this.acp.get(ircname).ircon.Join(toname)
-					this.acp.get(ircname).ircon.Privmsg(toname, message)
-				} else {
-					log.Println("unsupported group:", groupTitle)
-				}
-			} else {
-				// forward message to...
-				this.acp.get(ircname).ircon.Join(groupTitle)
-				this.acp.get(ircname).ircon.Privmsg(groupTitle, message)
-			}
-		*/
-	}, nil)
-
-	this._tox.CallbackGroupInvite(func(t *tox.Tox,
-		friendNumber uint32, itype uint8, data []byte, d interface{}) {
-		log.Println(friendNumber, len(data), itype)
-		pubkey, err := this._tox.FriendGetPublicKey(friendNumber)
-		if err != nil {
-			log.Println(err, pubkey)
-		}
-
-		acceptInvite := func(interface{}) {
-			var groupNumber int
-			var err error
-			switch itype {
-			case tox.GROUPCHAT_TYPE_AV:
-				groupNumber, err = t.JoinAVGroupChat(friendNumber, data)
-				if err != nil {
-					log.Println(err, groupNumber)
-				}
-			case tox.GROUPCHAT_TYPE_TEXT:
-				groupNumber, err = t.JoinGroupChat(friendNumber, data)
-				if err != nil {
-					log.Println(err, groupNumber)
-				}
-			default:
-				log.Panicln("wtf")
-			}
-			if err == nil {
-				// 立即取Title一般会失败的
-				groupTitle, err := t.GroupGetTitle(groupNumber)
-				if err != nil {
-					log.Println(err, groupTitle)
-				}
-			}
-		}
-		if strings.HasPrefix(groupbot, pubkey) {
-			acceptInvite(nil)
-		} else if strings.HasPrefix(pubkey, "398C8") {
-			acceptInvite(nil)
-		}
-
-	}, nil)
+	this._tox.CallbackGroupMessage(this.onGroupMessage, nil)
+	this._tox.CallbackGroupInvite(this.onGroupInvite, nil)
 
 	this._tox.CallbackGroupTitle(func(t *tox.Tox,
 		groupNumber int, peerNumber int, title string, d interface{}) {
@@ -190,6 +84,133 @@ func (this *ToxAgent) setupCallbacks() {
 
 	this._tox.CallbackGroupAction(this.onGroupAction, nil)
 	this._tox.CallbackGroupNameListChange(this.onGroupNameListChange, nil)
+}
+
+func (this *ToxAgent) onFriendConnectionStatus(t *tox.Tox, friendNumber uint32, status int, d interface{}) {
+	log.Println(friendNumber, status)
+	this.save_account()
+	pubkey, err := this._tox.FriendGetPublicKey(friendNumber)
+	if err != nil {
+		log.Println(err, pubkey)
+	}
+
+	defer func() {
+		if status == 0 {
+			return
+		}
+		invcmds := []string{"0", "2", "3", "5"}
+		if strings.HasPrefix(groupbot, pubkey) && status > 0 {
+			// t.FriendSendMessage(friendNumber, "invite 1")
+			// t.FriendSendMessage(friendNumber, "invite 2")
+			for idx := 0; idx < len(invcmds); idx++ {
+				if invcmds[idx] != "5" {
+					continue
+				}
+				cmd := "invite " + invcmds[idx]
+				_, err := t.FriendSendMessage(friendNumber, cmd)
+				if err != nil {
+					log.Println(err)
+				}
+				log.Println("send groupbot invite:", friendNumber, status, err, cmd)
+			}
+		}
+	}()
+	if status > 0 {
+		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_FRIEND_CONNECTED, "", friendNumber, status)
+	} else {
+		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_FRIEND_DISCONNECTED, "", friendNumber, status)
+	}
+}
+
+func (this *ToxAgent) onGroupMessage(t *tox.Tox, groupNumber int,
+	peerNumber int, message string, d interface{}) {
+	log.Println(groupNumber, peerNumber, message)
+	groupTitle, err := t.GroupGetTitle(groupNumber)
+	if err != nil {
+		log.Println(err, groupTitle)
+	}
+	pubkeys := t.GroupGetPeerPubkeys(groupNumber)
+	groupbotIn := false
+	for _, pubkey := range pubkeys {
+		if strings.HasPrefix(groupbot, pubkey) {
+			groupbotIn = true
+		}
+	}
+	selfMessage := false
+	peerPubkey, err := t.GroupPeerPubkey(groupNumber, peerNumber)
+	if strings.HasPrefix(t.SelfGetAddress(), peerPubkey) {
+		selfMessage = true
+	}
+	if selfMessage {
+		// log.Println("omit self message forward", groupTitle)
+		return
+	}
+	if len(this.ctx.busch) >= MAX_BUS_QUEUE_LEN {
+		log.Println("busch full, will blocked")
+	}
+	this.ctx.busch <- NewEvent(PROTO_TOX, EVT_GROUP_MESSAGE, groupTitle,
+		message, groupNumber, peerNumber)
+
+	// should be
+	if groupbotIn {
+	}
+	/*
+		if groupbotIn {
+			if toname, ok := chanMap[groupTitle]; ok {
+				// forward message to...
+				this.acp.get(ircname).ircon.Join(toname)
+				this.acp.get(ircname).ircon.Privmsg(toname, message)
+			} else {
+				log.Println("unsupported group:", groupTitle)
+			}
+		} else {
+			// forward message to...
+			this.acp.get(ircname).ircon.Join(groupTitle)
+			this.acp.get(ircname).ircon.Privmsg(groupTitle, message)
+		}
+	*/
+}
+
+func (this *ToxAgent) onGroupInvite(t *tox.Tox,
+	friendNumber uint32, itype uint8, data []byte, d interface{}) {
+	log.Println(friendNumber, len(data), itype)
+	pubkey, err := this._tox.FriendGetPublicKey(friendNumber)
+	if err != nil {
+		log.Println(err, pubkey)
+	}
+
+	acceptInvite := func(interface{}) {
+		var groupNumber int
+		var err error
+		switch itype {
+		case tox.GROUPCHAT_TYPE_AV:
+			groupNumber, err = t.JoinAVGroupChat(friendNumber, data)
+			if err != nil {
+				log.Println(err, groupNumber)
+			}
+		case tox.GROUPCHAT_TYPE_TEXT:
+			groupNumber, err = t.JoinGroupChat(friendNumber, data)
+			if err != nil {
+				log.Println(err, groupNumber)
+			}
+		default:
+			log.Panicln("wtf")
+		}
+		if err == nil {
+			// 立即取Title一般会失败的
+			groupTitle, err := t.GroupGetTitle(groupNumber)
+			if err != nil {
+				log.Println(err, groupTitle)
+			}
+			this.theirGroups[groupNumber] = true
+		}
+	}
+	if strings.HasPrefix(groupbot, pubkey) {
+		acceptInvite(nil)
+	} else if strings.HasPrefix(pubkey, "398C8") {
+		acceptInvite(nil)
+	}
+
 }
 
 func (this *ToxAgent) onGroupAction(t *tox.Tox,
@@ -275,6 +296,19 @@ func (this *ToxAgent) onGroupNameListChange(t *tox.Tox,
 			this.groupMembers[groupNumber] = make(map[int][]string)
 		}
 		this.groupMembers[groupNumber][peerNumber] = []string{peerName, peerPubkey}
+	}
+
+	// check only me left case
+	if change == tox.CHAT_CHANGE_PEER_DEL {
+		if pn := this._tox.GroupNumberPeers(groupNumber); pn == 1 {
+			log.Println("oh, only me left:", groupNumber, groupTitle)
+			// check our create group or not
+			if _, ok := this.theirGroups[groupNumber]; ok {
+				log.Println("their invite group matched, clean it", groupNumber, groupTitle)
+				delete(this.theirGroups, groupNumber)
+				this._tox.DelGroupChat(groupNumber)
+			}
+		}
 	}
 }
 
@@ -384,4 +418,12 @@ func (this *ToxAgent) getOnlineFriendCount() int {
 		}
 	}
 	return onlineFriendCount
+}
+
+func (this *ToxAgent) isGroupbot(friendNumber uint32) bool {
+	botfn, err := this._tox.FriendByPublicKey(groupbot)
+	if err != nil {
+		log.Println(err)
+	}
+	return botfn == friendNumber
 }
