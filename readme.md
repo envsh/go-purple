@@ -30,6 +30,6 @@ Now implement most API function for write new IM protocol and simple client.
 
 ### TODOs
 
-[ ] full libpurple support
-[ ] improve memory management, avoid memory leaks.
-[ ] add documents.
+- [ ] full libpurple support
+- [ ] improve memory management, avoid memory leaks.
+- [ ] add documents.

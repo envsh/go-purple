@@ -245,6 +245,7 @@ func (this *RoundTable) handleEventTox(e *Event) {
 				this.ctx.toxagt._tox.SelfGetAddress())
 		case "help":
 			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, cmdhelp)
+			// this.ctx.toxagt.Call(func() { this.ctx.toxagt._tox.FriendSendMessage(friendNumber, cmdhelp) })
 		default:
 			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, invalidcmd+": "+segs[0])
 		}
@@ -329,9 +330,12 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 		ne.Args[2] = PREFIX_ACTION + ne.Args[2].(string)
 		this.ctx.busch <- ne
 
+	case EVT_FRIEND_MESSAGE:
+		log.Println("not impled", e.EType)
 	case EVT_JOIN_GROUP:
+		log.Println("not impled", e.EType)
 	case EVT_FRIEND_DISCONNECTED:
-
+		log.Println("not impled", e.EType)
 	case EVT_DISCONNECTED:
 		log.Printf("%+v", e)
 		// close reconnect/ by Excess Flood/

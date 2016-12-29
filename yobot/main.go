@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	// "strings"
+	"runtime"
 	"time"
 
 	"github.com/emirpasic/gods/maps/hashbidimap"
@@ -36,6 +37,8 @@ var ctx *Context
 func main() {
 	flag.Parse()
 	glog.Init()
+
+	log.Println("GOMAXPROCS:", runtime.GOMAXPROCS(0))
 
 	ctx = &Context{}
 	ctx.busch = make(chan *Event, MAX_BUS_QUEUE_LEN)

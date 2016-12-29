@@ -324,6 +324,7 @@ func (this *ToxAgent) setupTox() {
 	toxops := tox.NewToxOptions()
 	this._tox = tox.NewTox(toxops)
 
+	toxops.Udp_enabled = false
 	toxops.Tcp_port = uint16(rand.Uint32()%55536) + 10000
 	this.load_account(toxops)
 

@@ -183,9 +183,12 @@ func NewEventFromIrcEvent2(ircon *irc.Conn, line *irc.Line) *Event {
 	case irc.CONNECTED:
 		ne.EType = EVT_CONNECTED
 	case irc.PRIVMSG:
-		// TODO 如何区分好友消息和群组消息
-		ne.EType = EVT_GROUP_MESSAGE
 		ne.Chan = line.Args[0]
+		if ne.Chan == ircon.Me().Nick {
+			ne.EType = EVT_FRIEND_MESSAGE
+		} else {
+			ne.EType = EVT_GROUP_MESSAGE
+		}
 	case irc.ACTION:
 		ne.EType = EVT_GROUP_ACTION
 		ne.Chan = line.Args[0]
@@ -194,7 +197,11 @@ func NewEventFromIrcEvent2(ircon *irc.Conn, line *irc.Line) *Event {
 	case irc.DISCONNECTED:
 		ne.EType = EVT_DISCONNECTED
 	case irc.QUIT:
-		ne.EType = EVT_FRIEND_DISCONNECTED
+		if line.Nick == ircon.Me().Nick {
+			ne.EType = EVT_DISCONNECTED
+		} else {
+			ne.EType = EVT_FRIEND_DISCONNECTED
+		}
 	default:
 		ne.EType = line.Cmd
 	}
