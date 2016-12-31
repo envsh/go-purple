@@ -86,6 +86,7 @@ func (this *RoundTable) run() {
 func (this *RoundTable) handleEvent() {
 	for ie := range this.ctx.busch {
 		// log.Println(ie)
+		this.ctx.msgbus.Publish(ie)
 		switch ie.Proto {
 		case PROTO_IRC:
 			// this.handleEventIrc(ie.RawEvent.(*irc.Event))
