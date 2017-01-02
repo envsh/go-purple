@@ -23,6 +23,7 @@ type Account struct {
 }
 
 type AccountPool struct {
+	RelaxCallObject
 	ctx *Context
 	mtx sync.Mutex
 	acs map[string]*Account

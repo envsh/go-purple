@@ -12,6 +12,7 @@ import (
 )
 
 type ToxAgent struct {
+	RelaxCallObject
 	ctx  *Context
 	_tox *tox.Tox
 
@@ -382,7 +383,8 @@ func (this *ToxAgent) Iterate() {
 	for !stopped {
 		select {
 		case <-tick:
-			this._tox.Iterate()
+			this.Call0(func() { this._tox.Iterate() })
+			// this._tox.Iterate()
 		}
 	}
 	log.Println("stopped", id)

@@ -9,6 +9,7 @@ import (
 )
 
 type IrcBackend2 struct {
+	RelaxCallObject
 	BackendBase
 	ircon *irc.Conn
 	// ircfg *irc.Config
@@ -48,6 +49,7 @@ func (this *IrcBackend2) init() {
 	}
 
 	this.ircon = ircon
+
 }
 
 func (this *IrcBackend2) setName(name string) {
@@ -62,7 +64,7 @@ func (this *IrcBackend2) getName() string {
 	// zuck07 // Powered by GoIRC // Nick: zuck07 // Hostmask: goirc@
 	// Real Name: Powered by GoIRC // Channels: #a #b #c
 	// log.Println(ircon.Me().Nick, ircon.Me().Name, ircon.Me().String())
-	if this.ircon.Me().Nick != this.name {
+	if this.ircon != nil && this.ircon.Me().Nick != this.name {
 		if this.ircon.Me().Nick != this.ircon.Config().NewNick(this.name) {
 			log.Println("wtf", this.ircon.Me().Nick, this.name)
 		}
@@ -118,16 +120,16 @@ func (this *IrcBackend2) nonblockSendBusch(ce *Event) {
 }
 
 func (this *IrcBackend2) connect() {
-	go func() {
-		err := this.ircon.Connect()
-		if err != nil {
-			log.Println(err)
-			// 并不会触发disconnect事件，需要手动触发
-			ce := NewEvent(PROTO_IRC, EVT_DISCONNECTED, "unknown", err.Error())
-			ce.Be = this
-			this.nonblockSendBusch(ce)
-		}
-	}()
+	//	go func() {
+	err := this.ircon.Connect()
+	if err != nil {
+		log.Println(err)
+		// 并不会触发disconnect事件，需要手动触发
+		ce := NewEvent(PROTO_IRC, EVT_DISCONNECTED, "unknown", err.Error())
+		ce.Be = this
+		this.nonblockSendBusch(ce)
+	}
+	//	}()
 }
 
 func (this *IrcBackend2) reconnect() error {
@@ -177,7 +179,10 @@ func NewEventFromIrcEvent2(ircon *irc.Conn, line *irc.Line) *Event {
 	for _, arg := range line.Args {
 		ne.Args = append(ne.Args, arg)
 	}
+	ne.Ident = line.Ident
+	ne.Host = line.Host
 
+	log.Printf("%+v\n", line)
 	ne.EType = line.Cmd
 	switch line.Cmd {
 	case irc.CONNECTED:
