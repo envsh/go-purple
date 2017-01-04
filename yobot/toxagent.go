@@ -6,15 +6,18 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	// "sync"
 	"time"
 
 	"github.com/kitech/go-toxcore"
+	"github.com/sasha-s/go-deadlock"
 )
 
 type ToxAgent struct {
 	RelaxCallObject
-	ctx  *Context
-	_tox *tox.Tox
+	ctx    *Context
+	_tox   *tox.Tox
+	_toxmu deadlock.Mutex // sync.Mutex
 
 	groupMembers map[int]map[int][]string // leave group get peer name/pubkey
 	theirGroups  map[int]bool             // accepted group number => true
@@ -376,6 +379,23 @@ func (this *ToxAgent) getToxGroupByName(name string) int {
 	return -1
 }
 
+func (this *ToxAgent) getToxGroupNames() map[int]string {
+	ret := make(map[int]string, 0)
+	chats := this._tox.GetChatList()
+	for idx, groupNumber := range chats {
+		// reverse order
+		groupNumber = chats[len(chats)-1-idx]
+		groupTitle, err := this._tox.GroupGetTitle(int(groupNumber))
+		if err != nil {
+			log.Println(err, groupNumber, groupTitle)
+		} else {
+			// ret = append(ret, groupTitle)
+			ret[int(groupNumber)] = groupTitle
+		}
+	}
+	return ret
+}
+
 func (this *ToxAgent) Iterate() {
 	stopped := false
 	tick := time.Tick(100 * time.Millisecond)
@@ -383,8 +403,10 @@ func (this *ToxAgent) Iterate() {
 	for !stopped {
 		select {
 		case <-tick:
-			this.Call0(func() { this._tox.Iterate() })
-			// this._tox.Iterate()
+			// this.Call0(func() { this._tox.Iterate() })
+			this._toxmu.Lock()
+			this._tox.Iterate()
+			this._toxmu.Unlock()
 		}
 	}
 	log.Println("stopped", id)

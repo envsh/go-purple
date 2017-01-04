@@ -121,6 +121,7 @@ func (this *IrcBackend2) nonblockSendBusch(ce *Event) {
 
 func (this *IrcBackend2) connect() {
 	//	go func() {
+	log.Println(this.name)
 	err := this.ircon.Connect()
 	if err != nil {
 		log.Println(err)
@@ -129,6 +130,7 @@ func (this *IrcBackend2) connect() {
 		ce.Be = this
 		this.nonblockSendBusch(ce)
 	}
+	log.Println(this.name, "done")
 	//	}()
 }
 

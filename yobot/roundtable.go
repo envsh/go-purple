@@ -52,21 +52,19 @@ func NewEvent(proto string, etype string, ch string, args ...interface{}) *Event
 
 func DupEvent(e *Event) *Event {
 	this := &Event{}
-	this.Proto = e.Proto
-	this.EType = e.EType
-	this.Chan = e.Chan
+	*this = *e
 	this.Args = make([]interface{}, 0)
 	for _, arg := range e.Args {
 		this.Args = append(this.Args, arg)
 	}
-	this.Be = e.Be
 	return this
 }
 
 type RoundTable struct {
-	ctx     *Context
-	mflt    *MessageFilter
-	tracker state.Tracker
+	ctx                  *Context
+	mflt                 *MessageFilter
+	tracker              state.Tracker
+	masterReconnectTimes int
 }
 
 func NewRoundTable() *RoundTable {
@@ -133,8 +131,11 @@ func (this *RoundTable) handleEventTox(e *Event) {
 		uid := this.ctx.toxagt._tox.SelfGetPublicKey()
 		if !this.ctx.acpool.has(ircname, uid) {
 			log.Println("wtf, try fix")
-			rets := this.ctx.acpool.Call1(func() Any { return this.ctx.acpool.add(ircname, uid) })
-			rac := rets[0].(*Account)
+			/*
+				rets := this.ctx.acpool.Call1(func() Any { return this.ctx.acpool.add(ircname, uid) })
+				rac := rets[0].(*Account)
+			*/
+			rac := this.ctx.acpool.add(ircname, uid)
 			rac.conque <- e
 		} else {
 			rac := this.ctx.acpool.get(ircname, uid)
@@ -142,42 +143,52 @@ func (this *RoundTable) handleEventTox(e *Event) {
 			if !rbe.isconnected() {
 				log.Println("Oh, maybe unexpected", rbe.getName())
 				// TODO 怎么处理呢？
-				rets := this.ctx.acpool.Call1(func() Any {
-					this.ctx.acpool.remove(ircname, uid)
-					return this.ctx.acpool.add(ircname, uid)
-				})
-				rac := rets[0].(*Account)
+				/*
+					rets := this.ctx.acpool.Call1(func() Any {
+						this.ctx.acpool.remove(ircname, uid)
+						return this.ctx.acpool.add(ircname, uid)
+					})
+					rac := rets[0].(*Account)
+				*/
+				rac := this.ctx.acpool.add(ircname, uid)
 				rac.conque <- e
 				break
 			}
 			if !rbe.isOn(chname) {
-				rbe.Call0(func() { rbe.join(chname) })
+				// rbe.Call0(func() { rbe.join(chname) })
+				rbe.join(chname)
 				this.tracker.NewChannel(chname)
 			}
 
 			// agent user
 			var ac *Account
 			if !this.ctx.acpool.has(fromUser, peerPubkey) {
-				rets := this.ctx.acpool.Call1(func() Any {
-					return this.ctx.acpool.add(fromUser, peerPubkey)
-				})
-				ac = rets[0].(*Account)
+				/*
+					rets := this.ctx.acpool.Call1(func() Any {
+						return this.ctx.acpool.add(fromUser, peerPubkey)
+					})
+					ac = rets[0].(*Account)
+				*/
+				ac = this.ctx.acpool.add(fromUser, peerPubkey)
 				ac.conque <- e
 			} else {
 				ac := this.ctx.acpool.get(fromUser, peerPubkey)
 				be := ac.becon.(*IrcBackend2)
 				if !be.isconnected() {
 					log.Println("Oh, connection broken, ", chname, be.getName(), fromUser, peerPubkey)
-					this.ctx.acpool.Call0(func() { this.ctx.acpool.remove(fromUser, peerPubkey) })
+					// this.ctx.acpool.Call0(func() { this.ctx.acpool.remove(fromUser, peerPubkey) })
+					this.ctx.acpool.remove(fromUser, peerPubkey)
 					ac.conque <- e
 				} else {
 					if !be.isOn(chname) {
-						be.Call0(func() { be.join(chname) })
+						// be.Call0(func() { be.join(chname) })
+						be.join(chname)
 						this.tracker.NewChannel(chname)
 					}
 					messages := strings.Split(message, "\n") // fix multiple line message
 					for _, m := range messages {
-						be.Call0(func() { be.sendGroupMessage(m, chname) })
+						// be.Call0(func() { be.sendGroupMessage(m, chname) })
+						be.sendGroupMessage(m, chname)
 					}
 				}
 			}
@@ -194,10 +205,13 @@ func (this *RoundTable) handleEventTox(e *Event) {
 	case EVT_JOIN_GROUP:
 		rid := this.ctx.toxagt._tox.SelfGetPublicKey()
 		if !this.ctx.acpool.has(ircname, rid) {
-			rets := this.ctx.acpool.Call1(func() Any {
-				return this.ctx.acpool.add(ircname, rid)
-			})
-			ac := rets[0].(*Account)
+			/*
+				rets := this.ctx.acpool.Call1(func() Any {
+					return this.ctx.acpool.add(ircname, rid)
+				})
+				ac := rets[0].(*Account)
+			*/
+			ac := this.ctx.acpool.add(ircname, rid)
 			ac.conque <- e
 		} else {
 			groupTitle := e.Chan
@@ -208,7 +222,8 @@ func (this *RoundTable) handleEventTox(e *Event) {
 			}
 			ac := this.ctx.acpool.get(ircname, rid)
 			be := ac.becon.(*IrcBackend2)
-			be.Call0(func() { be.join(chname) })
+			// be.Call0(func() { be.join(chname) })
+			be.join(chname)
 			this.tracker.NewChannel(chname)
 		}
 
@@ -257,17 +272,27 @@ func (this *RoundTable) handleEventTox(e *Event) {
 			if len(segs) > 1 {
 				this.processInviteCmd(segs[1:], friendNumber)
 			} else {
-				this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.FriendSendMessage(friendNumber, "invite what?") })
+				// this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.FriendSendMessage(friendNumber, "invite what?") })
+				this.ctx.toxagt._toxmu.Lock()
+				this.ctx.toxagt._tox.FriendSendMessage(friendNumber, "invite what?")
+				this.ctx.toxagt._toxmu.Unlock()
 			}
 		case "id":
-			this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.FriendSendMessage(friendNumber, this.ctx.toxagt._tox.SelfGetAddress()) })
+			// this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.FriendSendMessage(friendNumber, this.ctx.toxagt._tox.SelfGetAddress()) })
+			this.ctx.toxagt._toxmu.Lock()
+			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, this.ctx.toxagt._tox.SelfGetAddress())
+			this.ctx.toxagt._toxmu.Unlock()
 		case "help":
-			// this.ctx.toxagt._tox.FriendSendMessage(friendNumber, cmdhelp)
-			this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.FriendSendMessage(friendNumber, cmdhelp) })
+			this.ctx.toxagt._toxmu.Lock()
+			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, cmdhelp)
+			this.ctx.toxagt._toxmu.Unlock()
+			// this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.FriendSendMessage(friendNumber, cmdhelp) })
 			// this.ctx.toxagt.Call(func() { this.ctx.toxagt._tox.FriendSendMessage(friendNumber, cmdhelp) })
 		default:
-			// this.ctx.toxagt._tox.FriendSendMessage(friendNumber, invalidcmd+": "+segs[0])
-			this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.FriendSendMessage(friendNumber, invalidcmd+": "+segs[0]) })
+			this.ctx.toxagt._toxmu.Lock()
+			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, invalidcmd+": "+segs[0])
+			this.ctx.toxagt._toxmu.Unlock()
+			// this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.FriendSendMessage(friendNumber, invalidcmd+": "+segs[0]) })
 		}
 	}
 }
@@ -327,22 +352,33 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 			log.Println("group not exists:", chname, strings.ToLower(chname))
 		} else {
 			message = this.mflt.Filter(message)
-			var err Any
+			var err error // Any
 			if strings.HasPrefix(message, PREFIX_ACTION) {
-				rets := this.ctx.toxagt.Call2(func() (Any, Any) {
-					return this.ctx.toxagt._tox.GroupActionSend(groupNumber, message[len(PREFIX_ACTION):])
-				})
-				err = rets[1]
+				/*
+					rets := this.ctx.toxagt.Call2(func() (Any, Any) {
+						return this.ctx.toxagt._tox.GroupActionSend(groupNumber, message[len(PREFIX_ACTION):])
+					})
+					err = rets[1]
+				*/
+				this.ctx.toxagt._toxmu.Lock()
+				_, err = this.ctx.toxagt._tox.GroupActionSend(groupNumber, message[len(PREFIX_ACTION):])
+				this.ctx.toxagt._toxmu.Unlock()
 			} else {
-				log.Println("send tox group message begin...")
-				rets := this.ctx.toxagt.Call2(func() (Any, Any) {
-					return this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message)
-				})
-				log.Println("send tox group message end", rets)
-				if len(rets) != 2 {
-					log.Println("wtf", groupNumber, message)
-				}
-				err = rets[1]
+				/*
+						log.Println("send tox group message begin...")
+						rets := this.ctx.toxagt.Call2(func() (Any, Any) {
+							return this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message)
+						})
+						log.Println("send tox group message end", rets)
+
+					if len(rets) != 2 {
+						log.Println("wtf", groupNumber, message)
+					}
+					err = rets[1]
+				*/
+				this.ctx.toxagt._toxmu.Lock()
+				_, err = this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message)
+				this.ctx.toxagt._toxmu.Unlock()
 			}
 			if err != nil {
 				pno := this.ctx.toxagt._tox.GroupNumberPeers(groupNumber)
@@ -375,7 +411,10 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 			log.Println("group not exists:", chname, strings.ToLower(chname))
 		} else {
 			message := fmt.Sprintf("        %s [%s@%s] 进入了聊天室。", nick, e.Ident, e.Host)
-			this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message) })
+			// this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message) })
+			this.ctx.toxagt._toxmu.Lock()
+			this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message)
+			this.ctx.toxagt._toxmu.Unlock()
 		}
 	case "PART":
 		nick, chname := e.Args[0].(string), e.Args[1].(string)
@@ -387,7 +426,10 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 			log.Println("group not exists:", chname, strings.ToLower(chname))
 		} else {
 			message := fmt.Sprintf("        %s 离开了聊天室 (quit: %s)", nick, e.EType)
-			this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message) })
+			// this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message) })
+			this.ctx.toxagt._toxmu.Lock()
+			this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message)
+			this.ctx.toxagt._toxmu.Unlock()
 		}
 		this.tracker.Dissociate(chname, nick)
 	case EVT_FRIEND_DISCONNECTED:
@@ -403,7 +445,10 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 			_, ok := this.tracker.IsOn(groupTitle, nick)
 			if ok {
 				message := fmt.Sprintf("        %s 离开了聊天室 (quit: %s)", nick, quitmsg)
-				this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.GroupMessageSend(int(groupNumber), message) })
+				// this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.GroupMessageSend(int(groupNumber), message) })
+				this.ctx.toxagt._toxmu.Lock()
+				this.ctx.toxagt._tox.GroupMessageSend(int(groupNumber), message)
+				this.ctx.toxagt._toxmu.Unlock()
 				this.tracker.Dissociate(groupTitle, nick)
 			}
 		}
@@ -414,7 +459,23 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 		if !this.ctx.acpool.has(be.getName(), be.uid) {
 			log.Println("wtf:", be.getName(), be.uid, "//", this.ctx.acpool.getNames(5))
 		}
-		this.ctx.acpool.Call0(func() { this.ctx.acpool.remove(be.getName(), be.uid) })
+		// this.ctx.acpool.Call0(func() { this.ctx.acpool.remove(be.getName(), be.uid) })
+		this.ctx.acpool.remove(be.getName(), be.uid)
+		if be.getName() == ircname {
+			log.Println("woo, might be reconnect the master connection")
+			time.AfterFunc(2000*time.Millisecond, func() {
+				if this.ctx.acpool.has(be.getName(), be.uid) {
+					return
+				}
+				groupNames := this.ctx.toxagt.getToxGroupNames()
+				log.Println("woo, reconnect the master connection to:", groupNames)
+				ac := this.ctx.acpool.add(be.getName(), be.uid)
+				for groupNumber, groupTitle := range groupNames {
+					ac.conque <- NewEvent(PROTO_TOX, EVT_JOIN_GROUP, groupTitle, groupNumber, 0)
+				}
+				this.masterReconnectTimes += 1
+			})
+		}
 
 	default:
 		switch e.EType {
@@ -434,7 +495,9 @@ func (this *RoundTable) processInviteCmd(channels []string, friendNumber uint32)
 	// for irc groups
 	for _, chname := range channels {
 		if chname == "" {
+			this.ctx.toxagt._toxmu.Lock()
 			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, invalidcmd+": "+chname)
+			this.ctx.toxagt._toxmu.Unlock()
 			continue
 		}
 
@@ -474,7 +537,9 @@ func (this *RoundTable) processInviteCmd(channels []string, friendNumber uint32)
 			}
 			invcmd := fmt.Sprintf("invite %s", chname)
 			log.Println("send groupbot invite:", chname, friendNumber, err)
+			this.ctx.toxagt._toxmu.Lock()
 			ret, err := this.ctx.toxagt._tox.FriendSendMessage(friendNumber, invcmd)
+			this.ctx.toxagt._toxmu.Unlock()
 			if err != nil {
 				log.Println(err, ret)
 			}
@@ -482,21 +547,36 @@ func (this *RoundTable) processInviteCmd(channels []string, friendNumber uint32)
 			}()
 		} else {
 			// for irc groups
-			rets := this.ctx.toxagt.Call2(func() (Any, Any) {
-				return this.ctx.toxagt._tox.AddGroupChat()
-			})
-			groupNumber, err := rets[0].(int), rets[1]
+			/*
+				rets := this.ctx.toxagt.Call2(func() (Any, Any) {
+					return this.ctx.toxagt._tox.AddGroupChat()
+				})
+				groupNumber, err := rets[0].(int), rets[1]
+			*/
+			this.ctx.toxagt._toxmu.Lock()
+			groupNumber, err := this.ctx.toxagt._tox.AddGroupChat()
+			this.ctx.toxagt._toxmu.Unlock()
 			if err != nil {
 				log.Println("wtf")
 			} else {
-				rets := this.ctx.toxagt.Call2(func() (Any, Any) {
-					t.GroupSetTitle(groupNumber, chname)
-					return t.InviteFriend(friendNumber, groupNumber)
-				})
-				err := rets[1]
+				/*
+					rets := this.ctx.toxagt.Call2(func() (Any, Any) {
+						t.GroupSetTitle(groupNumber, chname)
+						return t.InviteFriend(friendNumber, groupNumber)
+					})
+					err := rets[1]
+					if err != nil {
+						log.Println("wtf")
+					}
+				*/
+				this.ctx.toxagt._toxmu.Lock()
+				t.GroupSetTitle(groupNumber, chname)
+				_, err := t.InviteFriend(friendNumber, groupNumber)
+				this.ctx.toxagt._toxmu.Unlock()
 				if err != nil {
 					log.Println("wtf")
 				}
+
 				// 这个逻辑不会自动触发groupTitle事件，手工触发一下
 				var peerNumber int = 0
 				var title = chname
@@ -561,7 +641,9 @@ func (this *RoundTable) processGroupCmd(msg string, groupNumber, peerNumber int)
 			ac := this.ctx.acpool.get(ircname, uid)
 			if ac == nil {
 				log.Println("not connected to ", groupTitle)
+				this.ctx.toxagt._toxmu.Lock()
 				this.ctx.toxagt._tox.GroupMessageSend(groupNumber, "not connected to irc:"+groupTitle)
+				this.ctx.toxagt._toxmu.Unlock()
 			} else {
 				ircon := ac.becon.(*IrcBackend2)
 				// ircon.ircon.SendRaw("/users")
@@ -572,7 +654,9 @@ func (this *RoundTable) processGroupCmd(msg string, groupNumber, peerNumber int)
 			ac := this.ctx.acpool.get(ircname, uid)
 			if ac == nil {
 				log.Println("not connected to ", groupTitle)
+				this.ctx.toxagt._toxmu.Lock()
 				this.ctx.toxagt._tox.GroupMessageSend(groupNumber, "not connected to irc:"+groupTitle)
+				this.ctx.toxagt._toxmu.Unlock()
 			} else {
 				ircon := ac.becon.(*IrcBackend2)
 				// ircon.ircon.SendRaw(fmt.Sprintf("/whois %s", ircname))
@@ -580,7 +664,9 @@ func (this *RoundTable) processGroupCmd(msg string, groupNumber, peerNumber int)
 			}
 			return true
 		case "raw":
+			this.ctx.toxagt._toxmu.Lock()
 			this.ctx.toxagt._tox.GroupMessageSend(groupNumber, "raw what?")
+			this.ctx.toxagt._toxmu.Unlock()
 			return true
 		}
 	} else if len(segs) > 1 {
@@ -589,7 +675,9 @@ func (this *RoundTable) processGroupCmd(msg string, groupNumber, peerNumber int)
 			ac := this.ctx.acpool.get(ircname, uid)
 			if ac == nil {
 				log.Println("not connected to ", groupTitle)
+				this.ctx.toxagt._toxmu.Lock()
 				this.ctx.toxagt._tox.GroupMessageSend(groupNumber, "not connected to irc:"+groupTitle)
+				this.ctx.toxagt._toxmu.Unlock()
 			} else {
 				ircon := ac.becon.(*IrcBackend2)
 				// ircon.ircon.SendRaw(fmt.Sprintf("%s", strings.Join(segs[1:], " ")))
@@ -669,7 +757,9 @@ func (this *RoundTable) handleEventTable(e *Event) {
 			if groupNumber == -1 {
 				log.Println("group not exists:", chname, strings.ToLower(chname))
 			} else {
+				this.ctx.toxagt._toxmu.Lock()
 				_, err := this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message)
+				this.ctx.toxagt._toxmu.Unlock()
 				if err != nil {
 				}
 			}

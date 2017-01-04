@@ -2,7 +2,9 @@ package main
 
 import (
 	"log"
-	"sync"
+	// "sync"
+
+	"github.com/sasha-s/go-deadlock"
 	// "github.com/thoj/go-ircevent"
 )
 
@@ -25,7 +27,7 @@ type Account struct {
 type AccountPool struct {
 	RelaxCallObject
 	ctx *Context
-	mtx sync.Mutex
+	mu  deadlock.Mutex // sync.Mutex
 	acs map[string]*Account
 }
 
@@ -37,6 +39,8 @@ func NewAccountPool() *AccountPool {
 }
 
 func (this *AccountPool) has(name string, id string) bool {
+	this.mu.Lock()
+	defer this.mu.Unlock()
 	if _, ok := this.acs[id]; ok {
 		return true
 	}
@@ -44,6 +48,9 @@ func (this *AccountPool) has(name string, id string) bool {
 }
 
 func (this *AccountPool) get(name string, uid string) *Account {
+	this.mu.Lock()
+	defer this.mu.Unlock()
+
 	if ac, ok := this.acs[uid]; ok {
 		return ac
 	}
@@ -51,6 +58,9 @@ func (this *AccountPool) get(name string, uid string) *Account {
 }
 
 func (this *AccountPool) add(name string, uid string) *Account {
+	this.mu.Lock()
+	defer this.mu.Unlock()
+
 	be := NewIrcBackend2(this.ctx, name)
 	be.uid = uid
 
@@ -66,6 +76,9 @@ func (this *AccountPool) add(name string, uid string) *Account {
 }
 
 func (this *AccountPool) remove(name string, uid string) {
+	this.mu.Lock()
+	defer this.mu.Unlock()
+
 	if ac, ok := this.acs[uid]; ok {
 		delete(this.acs, uid)
 		if ac.becon.isconnected() {
@@ -83,10 +96,16 @@ func (this *AccountPool) remove(name string, uid string) {
 }
 
 func (this *AccountPool) count() int {
+	this.mu.Lock()
+	defer this.mu.Unlock()
+
 	return len(this.acs)
 }
 
 func (this *AccountPool) getNames(max int) []string {
+	this.mu.Lock()
+	defer this.mu.Unlock()
+
 	names := make([]string, 0)
 	for _, ac := range this.acs {
 		names = append(names, ac.name)
