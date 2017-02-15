@@ -26,6 +26,8 @@ type ToxPlugin struct {
 	stopch   chan struct{}
 
 	iterTimerHandler int
+
+	fileTransferFields
 }
 
 // plugin functions
@@ -69,6 +71,7 @@ func (this *ToxPlugin) init_tox(p *purple.Plugin) {
 func (this *ToxPlugin) load_tox(p *purple.Plugin) bool {
 	log.Println("called", purple.GoID())
 	rand.Seed(time.Now().UnixNano())
+	this.setupModuleFields()
 	return true
 }
 

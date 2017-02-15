@@ -151,8 +151,7 @@ func (this *ConvChat) RenameUser(oldUser string, newUser string) {
 	C.purple_conv_chat_rename_user(this.chat, CCString(oldUser).Ptr, CCString(newUser).Ptr)
 }
 
-func (this *ConvChat) RemoveUser(user string) {
-	reason := "hehe"
+func (this *ConvChat) RemoveUser(user string, reason string) {
 	C.purple_conv_chat_remove_user(this.chat, CCString(user).Ptr, CCString(reason).Ptr)
 }
 

@@ -182,7 +182,7 @@ func (this *ToxPlugin) findBuddyEx(ac *purple.Account, pubkeyOrFriendID string) 
 	return buddy
 }
 
-// tox callbacks
+// tox callbacks from purple
 type minictx struct {
 	gc *purple.Connection
 	s0 string
@@ -771,7 +771,7 @@ func (this *ToxPlugin) UpdateMembers(groupNumber int, conv *purple.Conversation)
 			}
 			if found == false {
 				// should already destroy the ConvChatBuddy here
-				chat.RemoveUser(ccbuddy.GetName())
+				chat.RemoveUser(ccbuddy.GetName(), "heheoff")
 				// ccbuddy.Destroy() // the remove with call this too
 			}
 		}
@@ -790,7 +790,7 @@ func (this *ToxPlugin) UpdateMembers(groupNumber int, conv *purple.Conversation)
 				}
 			}
 			if found == false {
-				isours := t.GroupPeerNumberIsOurs(groupNumber, peerNumber)
+				isours := t.GroupPeerNumberIsOurs(groupNumber, uint32(peerNumber))
 				if isours == true {
 				}
 				if true {

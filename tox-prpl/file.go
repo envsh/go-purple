@@ -11,6 +11,7 @@ import (
 		"strings"
 		"time"
 	*/
+	"io/ioutil"
 
 	"go-purple/purple"
 
@@ -23,6 +24,19 @@ type xferSendData struct {
 	friendNumber uint32
 	who          string
 	fp           *os.File
+	fileKind     uint32
+	fileSize     uint64
+	fileName     string
+}
+
+// embed into ToxPlugin struct
+// used for avatar only
+type fileTransferFields struct {
+	ftqueue map[uint32]*xferSendData // fileNumber => *xferSendData
+}
+
+func (this *ToxPlugin) setupModuleFields() {
+	this.ftqueue = make(map[uint32]*xferSendData)
 }
 
 func (this *ToxPlugin) setupFileCallbacks(ac *purple.Account) {
@@ -40,27 +54,81 @@ func (this *ToxPlugin) onFileRecv(t *tox.Tox, friendNumber uint32, fileNumber ui
 	if err != nil {
 		log.Println(err)
 	}
-	xfer := ac.NewXfer(purple.XFER_RECEIVE, pubkey)
-	this.xferSetCallbacks(xfer)
-	xfer.Data = &xferSendData{}
-	(xfer.Data.(*xferSendData)).friendNumber = friendNumber
-	(xfer.Data.(*xferSendData)).fileNumber = fileNumber
-	(xfer.Data.(*xferSendData)).who = pubkey
-	xfer.SetFilename(fileName)
-	xfer.SetSize(fileSize)
-	xferSendMap[fileNumber] = xfer
 
-	xfer.Request()
+	xd := &xferSendData{}
+	xd.friendNumber = friendNumber
+	xd.fileNumber = fileNumber
+	xd.who = pubkey
+	xd.fileKind = kind
+	xd.fileSize = fileSize
 
+	if kind == tox.FILE_KIND_AVATAR {
+		log.Println("what can I do?")
+		// get avatar dir
+		// recieve avatar data and save to avatar dir, with friendId as name
+		// notify purple peer's icon changed
+		this.ftqueue[fileNumber] = xd
+		fname := os.Getenv("HOME") + "/" + purple.UserDir() + "/icons/" + pubkey + ".jpg"
+		log.Println(fname)
+		xd.fileName = fname
+		xd.fp, err = os.OpenFile(fname, os.O_RDWR|os.O_CREATE, 0644)
+		if err != nil {
+			log.Println(err)
+		} else {
+			// go on
+			_, err = this._tox.FileControl(friendNumber, fileNumber, tox.FILE_CONTROL_RESUME)
+			if err != nil {
+				log.Println(err)
+			}
+		}
+	} else {
+		xfer := ac.NewXfer(purple.XFER_RECEIVE, pubkey)
+		this.xferSetCallbacks(xfer)
+		xfer.Data = xd
+		xfer.SetFilename(fileName)
+		xfer.SetSize(fileSize)
+		xferSendMap[fileNumber] = xfer
+
+		xfer.Request()
+	}
 }
 
 func (this *ToxPlugin) onFileRecvChunk(t *tox.Tox, friendNumber uint32, fileNumber uint32, position uint64, data []byte, ud interface{}) {
-	// ac := ud.(*purple.Account)
+	ac := ud.(*purple.Account)
 
 	if position == 0 || len(data) == 0 {
-		log.Println("herere", position, len(data))
+		log.Println("start or finished:", position, len(data))
 	}
 
+	// process avatar
+	if xd, ok := this.ftqueue[fileNumber]; ok {
+		if position == xd.fileSize {
+			log.Println("avatar recv finished.")
+			xd.fp.Close()
+			delete(this.ftqueue, fileNumber)
+			// TODO change purple's buddy icon
+			fname := xd.fileName
+			log.Println("change buddy's icon to:", fname)
+			icon_data, err := ioutil.ReadFile(fname)
+			if err != nil {
+				log.Println(err)
+			} else {
+				ac.BuddyIconsSetForUser(xd.who, icon_data)
+			}
+			return
+		}
+		n, err := xd.fp.WriteAt(data, int64(position))
+		if err != nil {
+			log.Println(err, n, len(data), xd.fp.Fd())
+		} else if n != len(data) {
+			log.Println(n, len(data))
+		} else {
+			// write ok
+		}
+		return
+	}
+
+	// process normal file
 	x, ok := xferSendMap[fileNumber]
 	if !ok {
 		log.Println("wtf", ok, x)
