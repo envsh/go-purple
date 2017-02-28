@@ -218,7 +218,7 @@ func RequestAcceptCancelWithIcon(userData interface{}, gc *Connection, title, pr
 	cicon := (&iconData[0])
 	C.gopurple_request_accept_cancel_with_icon(handle, CCString(title).Ptr, CCString(primary).Ptr, nil,
 		C.int(default_action), ac.account, CCString(who).Ptr, nil,
-		cicon, C.gsize(len(iconData)), cseq)
+		(C.gconstpointer)(cicon), C.gsize(len(iconData)), cseq)
 }
 func RequestAcceptCancelWithIconDemo(userData interface{}, gc *Connection,
 	iconData []byte,

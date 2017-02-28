@@ -182,7 +182,7 @@ func PrefsDestroy() {
  */
 /* TODO: When this is removed, also remove struct purple_pref->value.generic */
 func PrefsSetGeneric(name string, value unsafe.Pointer) {
-	C.purple_prefs_set_generic(CCString(name).Ptr, value)
+	C.purple_prefs_set_generic(CCString(name).Ptr, (C.gpointer)(value))
 }
 
 /**
@@ -363,7 +363,7 @@ func PrefsGetChildrenNames(name string) *GList {
  */
 func PrefsConnectCallback(handle unsafe.Pointer, name string,
 	cb C.PurplePrefCallback, data unsafe.Pointer) uint {
-	ret := C.purple_prefs_connect_callback(handle, CCString(name).Ptr, cb, data)
+	ret := C.purple_prefs_connect_callback(handle, CCString(name).Ptr, cb, (C.gpointer)(data))
 	return uint(ret)
 }
 

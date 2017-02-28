@@ -481,7 +481,7 @@ func (this *Plugin) _unset_plugin_funcs() {
 
 // this is not purple's function
 func (this *Plugin) AddProtocolOption(ao *AccountOption) {
-	this.cpppi.protocol_options = C.g_list_append(this.cpppi.protocol_options, ao.ao)
+	this.cpppi.protocol_options = C.g_list_append(this.cpppi.protocol_options, (C.gpointer)(ao.ao))
 }
 
 func newPluginInfoFrom(plugInfo *C.PurplePluginInfo) *PluginInfo {
@@ -591,7 +591,7 @@ func goprpl_status_types(ac *C.PurpleAccount) *C.GList {
 	if this.ppi.StatusTypes != nil {
 		stys := this.ppi.StatusTypes(newAccountFrom(ac))
 		for _, sty := range stys {
-			types = C.g_list_append(types, sty.sty)
+			types = C.g_list_append(types, (C.gpointer)(sty.sty))
 		}
 	}
 	if types == nil { // add default online status types
@@ -599,11 +599,11 @@ func goprpl_status_types(ac *C.PurpleAccount) *C.GList {
 
 		stype = C.purple_status_type_new(C.PURPLE_STATUS_AVAILABLE,
 			CCString("tox_online").Ptr, CCString("Online").Ptr, C.TRUE)
-		types = C.g_list_append(types, stype)
+		types = C.g_list_append(types, (C.gpointer)(stype))
 
 		stype = C.purple_status_type_new(C.PURPLE_STATUS_OFFLINE,
 			CCString("tox_offline").Ptr, CCString("Offline").Ptr, C.TRUE)
-		types = C.g_list_append(types, stype)
+		types = C.g_list_append(types, (C.gpointer)(stype))
 	}
 
 	if types == nil {
@@ -628,13 +628,13 @@ func goprpl_chat_info(gc *C.PurpleConnection) *C.GList {
 		for _, info := range infos {
 			// pce = NewProtoChatEntry(info, info, true)
 			pce = info
-			m = C.g_list_append(m, pce.get())
+			m = C.g_list_append(m, (C.gpointer)(pce.get()))
 		}
 
 		// another for storage
 		if false {
 			pce = NewProtoChatEntry("GroupNumber", "GroupNumber", false)
-			m = C.g_list_append(m, pce.get())
+			m = C.g_list_append(m, (C.gpointer)(pce.get()))
 		}
 	}
 	return m
@@ -651,8 +651,8 @@ func goprpl_chat_info_defaults(gc *C.PurpleConnection, chatName *C.char) *C.GHas
 	defaults = C.goprpl_hash_table_new_full()
 	if chatName != nil {
 		dchan := C.g_strdup((*C.gchar)(CCString("ToxChannel").Ptr))
-		C.g_hash_table_insert(defaults, dchan,
-			(*C.gchar)(C.g_strdup((*C.gchar)(chatName))))
+		C.g_hash_table_insert(defaults, (C.gpointer)(dchan),
+			(C.gpointer)(C.g_strdup((*C.gchar)(chatName))))
 	}
 	return defaults
 }

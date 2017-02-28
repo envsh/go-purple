@@ -36,7 +36,7 @@ func (this *Buddy) BlistAdd(g *Group) {
 }
 
 func (this *Buddy) SetProtocolData(data interface{}) {
-	C.purple_buddy_set_protocol_data(this.buddy, CCString("hehhehee").Ptr)
+	C.purple_buddy_set_protocol_data(this.buddy, CCString("hehhehee").gpointer())
 }
 
 func (this *Buddy) GetName() string {

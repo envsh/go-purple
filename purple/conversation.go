@@ -106,7 +106,7 @@ func (this *Conversation) GetName() string {
 }
 
 func (this *Conversation) SetData(key, data string) {
-	C.purple_conversation_set_data(this.conv, CCString(key).Ptr, CCString(data).Ptr)
+	C.purple_conversation_set_data(this.conv, CCString(key).Ptr, CCString(data).gpointer())
 }
 
 func (this *Conversation) GetData(key string) string {

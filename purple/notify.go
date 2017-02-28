@@ -45,7 +45,7 @@ func (this *Connection) NotifyUserInfo(who string, nui *NotifyUserInfo, closecb 
 	// C.purple_notify_userinfo(this.conn, CCString(who).Ptr, nui.nui, nil, nil)
 	cuserData := C.calloc(1, 1)
 	notifyUserInfoCallbackDatas[(*C.char)(cuserData)] = &notifyUserInfoCallbackData{closecb, userData}
-	C.gopurple_notify_userinfo(this.conn, CCString(who).Ptr, nui.nui, cuserData)
+	C.gopurple_notify_userinfo(this.conn, CCString(who).Ptr, nui.nui, (C.gpointer)(cuserData))
 }
 
 func NewNotifyUserInfo() *NotifyUserInfo {

@@ -297,7 +297,7 @@ func (this *Xfer) GetThumbnailMimeype() string {
 }
 
 func (this *Xfer) SetThumbnail(thumbnail []byte, size uint64, mimeType string) {
-	thumbnail_ := (unsafe.Pointer)(&thumbnail[0])
+	thumbnail_ := (C.gconstpointer)((unsafe.Pointer)(&thumbnail[0]))
 	C.purple_xfer_set_thumbnail(this.xfer, thumbnail_, C.gsize(size),
 		(*C.gchar)(CCString(mimeType).Ptr))
 }

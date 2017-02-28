@@ -44,13 +44,14 @@ func (this *GHashTable) Destroy() {
 }
 
 func (this *GHashTable) Lookup(key string) string {
-	val := C.g_hash_table_lookup(this.ht, CCString(key).Ptr)
+	val := C.g_hash_table_lookup(this.ht, CCString(key).gconstpointer())
 	return C.GoString((*C.char)(val))
 }
 
 func (this *GHashTable) Insert(key string, value string) bool {
 	// hash table will manange it, don't use CCString
-	ret := C.g_hash_table_insert(this.ht, C.CString(key), C.CString(value))
+	ret := C.g_hash_table_insert(this.ht, (C.gpointer)(C.CString(key)),
+		(C.gpointer)(C.CString(value)))
 	if ret == C.TRUE {
 		return true
 	} else {
@@ -60,7 +61,8 @@ func (this *GHashTable) Insert(key string, value string) bool {
 
 func (this *GHashTable) Replace(key string, value string) bool {
 	// hash table will manange it, don't use CCString
-	ret := C.g_hash_table_replace(this.ht, C.CString(key), C.CString(value))
+	ret := C.g_hash_table_replace(this.ht, (C.gpointer)(C.CString(key)),
+		(C.gpointer)(C.CString(value)))
 	if ret == C.TRUE {
 		return true
 	} else {
@@ -69,7 +71,7 @@ func (this *GHashTable) Replace(key string, value string) bool {
 }
 
 func (this *GHashTable) Add(key string) bool {
-	ret := C.g_hash_table_add(this.ht, C.CString(key))
+	ret := C.g_hash_table_add(this.ht, (C.gpointer)(C.CString(key)))
 	if ret == C.TRUE {
 		return true
 	} else {
@@ -78,7 +80,7 @@ func (this *GHashTable) Add(key string) bool {
 }
 
 func (this *GHashTable) Remove(key string) bool {
-	ret := C.g_hash_table_remove(this.ht, CCString(key).Ptr)
+	ret := C.g_hash_table_remove(this.ht, (C.gconstpointer)(CCString(key).Ptr))
 	if ret == C.TRUE {
 		return true
 	} else {
@@ -87,7 +89,7 @@ func (this *GHashTable) Remove(key string) bool {
 }
 
 func (this *GHashTable) Contains(key string) bool {
-	ret := C.g_hash_table_contains(this.ht, CCString(key).Ptr)
+	ret := C.g_hash_table_contains(this.ht, (C.gconstpointer)(CCString(key).Ptr))
 	if ret == C.TRUE {
 		return true
 	} else {
@@ -140,7 +142,7 @@ func (this *GHashTable) ToMap() map[string]string {
 		len := C.g_list_length(lst)
 		for idx := 0; idx < int(len); idx++ {
 			key := C.g_list_nth_data(lst, C.guint(idx))
-			val := C.g_hash_table_lookup(this.ht, key)
+			val := C.g_hash_table_lookup(this.ht, (C.gconstpointer)(key))
 			res[C.GoString((*C.char)(key))] = C.GoString((*C.char)(val))
 		}
 	}
@@ -163,7 +165,7 @@ func (this *GHashTable) Map(
 		len := C.g_list_length(lst)
 		for idx := 0; idx < int(len); idx++ {
 			key := C.g_list_nth_data(lst, C.guint(idx))
-			val := C.g_hash_table_lookup(this.ht, key)
+			val := C.g_hash_table_lookup(this.ht, (C.gconstpointer)(key))
 			gokey, goval := functor(key, val)
 			res[gokey] = goval
 		}
