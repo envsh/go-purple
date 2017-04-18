@@ -12,10 +12,11 @@ package purple
 #include "prpl.h"
 #include <string.h>
 
-static void _set_plugin_type(PurplePluginInfo *pi) {
+static void _set_plugin_type(PurplePluginInfo *pi, int type_) {
     pi->type = PURPLE_PLUGIN_STANDARD;
     pi->type = PURPLE_PLUGIN_PROTOCOL;
    //  pi->type = PURPLE_PLUGIN_LOADER;
+    pi->type = type_;
 }
 extern gboolean goprpl_plugin_load(PurplePlugin *p);
 extern gboolean goprpl_plugin_unload(PurplePlugin *p);
@@ -145,6 +146,8 @@ func init() {
 
 // the fromc field means wrapper C directly
 type PluginInfo struct {
+	Type int
+
 	Id          string
 	Name        string
 	Version     string
@@ -258,7 +261,10 @@ func (this *Plugin) convertInfo() {
 	this.cppi.minor_version = C.PURPLE_MINOR_VERSION
 
 	// because type is golang's keyword, shit
-	C._set_plugin_type(this.cppi)
+	C._set_plugin_type(this.cppi, C.int(this.pi.Type))
+	if !(this.pi.Type >= PLUGIN_UNKNOWN && this.pi.Type <= PLUGIN_PROTOCOL) {
+		log.Panicln("Unsupported plugin type:", this.pi.Type)
+	}
 
 	this.cppi.id = C.CString(this.pi.Id)
 	this.cppi.name = C.CString(this.pi.Name)

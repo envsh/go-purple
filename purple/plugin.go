@@ -13,6 +13,13 @@ import "C"
 
 // import "unsafe"
 
+const (
+	PLUGIN_UNKNOWN  = int(C.PURPLE_PLUGIN_UNKNOWN)  /**< Unknown type.    */
+	PLUGIN_STANDARD = int(C.PURPLE_PLUGIN_STANDARD) /**< Standard plugin. */
+	PLUGIN_LOADER   = int(C.PURPLE_PLUGIN_LOADER)   /**< Loader plugin.   */
+	PLUGIN_PROTOCOL = int(C.PURPLE_PLUGIN_PROTOCOL) /**< Protocol plugin. */
+)
+
 func (this *Plugin) GetId() string {
 	ret := C.purple_plugin_get_id(this.cpp)
 	return C.GoString((*C.char)(ret))

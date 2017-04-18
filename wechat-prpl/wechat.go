@@ -140,6 +140,8 @@ func NewWechatPlugin() *WechatPlugin {
 	this := &WechatPlugin{}
 
 	pi := purple.PluginInfo{
+		Type: purple.PLUGIN_PROTOCOL,
+
 		Id:          "prpl-wechat",
 		Name:        "Wechat",
 		Version:     "1.0",

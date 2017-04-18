@@ -175,7 +175,12 @@ func (this *ToxPlugin) tox_close(gc *purple.Connection) {
 ////////
 func (this *ToxPlugin) itercb(d interface{}) {
 	// log.Println(purple.GoID())
-	this._tox.Iterate()
+	// 由于callback的延时/调度导致的极端情况
+	if this._tox != nil {
+		this._tox.Iterate()
+	} else {
+		log.Println("maybe already stopped.")
+	}
 }
 
 // should block and new thread
@@ -216,6 +221,8 @@ func NewToxPlugin() *ToxPlugin {
 	this := &ToxPlugin{}
 
 	pi := purple.PluginInfo{
+		Type: purple.PLUGIN_PROTOCOL,
+
 		Id:          "prpl-gotox",
 		Name:        "GoTox",
 		Version:     "1.0",
