@@ -40,3 +40,15 @@ bot2:
 cmem:
 	go install -v go-purple/cmemory
 
+mflt:
+	go build -v -buildmode=c-shared -o libmsgflt.so  ./msgflt-prpl
+
+mfltb:
+	go build -v -o msgflt.so ./msgflt-prpl
+
+mflti:
+	install -v ./libmsgflt.so ~/.gopurple-msgflt/plugins
+
+mfltt:
+	go test -v -run FF ./msgflt-prpl/bridges
+

@@ -46,7 +46,7 @@ type CoreCallbacks struct {
 	ReportDisconnectReason func(gc *Connection, reason int, text string)
 }
 
-var ccbs CoreCallbacks
+var ccbs = &Callbacks // CoreCallbacks
 
 type ConnSignals struct {
 	SignedOn  func(gc *Connection /*, data unsafe.Pointer*/)
@@ -61,6 +61,11 @@ type ConvSignals struct {
 	ReceivedChatMsg func(ac *Account, sender, message string, conv *Conversation, flags int)
 	ChatJoined      func(conv *Conversation)
 	ChatLeft        func(conv *Conversation)
+
+	// PurpleAccount *account, char **sender,
+	// char **message, PurpleConversation *conv,
+	// PurpleMessageFlags *flags
+	ReceivingChatMsg func(ac *Account, sender, message *string, conv *Conversation, flags *int) bool
 }
 type AccountSignals struct{}
 
@@ -71,7 +76,13 @@ type CoreSignals struct {
 	AccountSignals
 }
 
-var csigs CoreSignals
+var csigs = &Signals // CoreSignals
+
+// public
+// usage:
+// purple.Signals.xxx = func(){}
+var Signals CoreSignals
+var Callbacks CoreCallbacks
 
 type PurpleCore struct {
 	accountUiOps C.PurpleAccountUiOps
@@ -81,9 +92,10 @@ type PurpleCore struct {
 	loopUiOps C.PurpleEventLoopUiOps
 	coreUiOps C.PurpleCoreUiOps
 
-	loop  *C.GMainLoop
-	ccbs  CoreCallbacks
-	csigs CoreSignals
+	loop *C.GMainLoop
+
+	ccbs  *CoreCallbacks
+	csigs *CoreSignals
 }
 
 func NewPurpleCore() *PurpleCore {
@@ -93,13 +105,13 @@ func NewPurpleCore() *PurpleCore {
 }
 
 func (this *PurpleCore) SetCallbacks(cbs CoreCallbacks) {
-	this.ccbs = cbs
-	ccbs = cbs
+	this.ccbs = &cbs
+	ccbs = &cbs
 }
 
 func (this *PurpleCore) SetSignals(sigs CoreSignals) {
-	this.csigs = sigs
-	csigs = sigs
+	this.csigs = &sigs
+	csigs = &sigs
 }
 
 func (this *PurpleCore) initUiOps() {
@@ -180,6 +192,10 @@ func (this *PurpleCore) initLibpurple() {
 }
 
 func (this *PurpleCore) connect_to_signals() {
+	ConnectToSignals()
+}
+
+func ConnectToSignals() {
 	if true {
 		// signals
 		signalConnect(C.purple_connections_get_handle(), "signed-on",
@@ -199,11 +215,16 @@ func (this *PurpleCore) connect_to_signals() {
 			(unsafe.Pointer)(C.gopurple_chat_joined))
 		signalConnect(C.purple_conversations_get_handle(), "chat-left",
 			(unsafe.Pointer)(C.gopurple_chat_left))
+
+		signalConnect(C.purple_conversations_get_handle(), "receiving-chat-msg", (unsafe.Pointer)(C.gopurple_receiving_chat_msg))
 	}
 }
 
 // 在这个setup之后，才能够调用purple函数。
 func (this *PurpleCore) setupCore() {
+	this.ccbs = ccbs
+	this.csigs = csigs
+
 	this.loop = C.g_main_loop_new(nil, C.FALSE)
 
 	this.initUiOps()
@@ -391,4 +412,40 @@ func gopurple_chat_left(conv *C.PurpleConversation) {
 	if csigs.ChatLeft != nil {
 		csigs.ChatLeft(newConversationFrom(conv))
 	}
+}
+
+//export gopurple_receiving_chat_msg
+func gopurple_receiving_chat_msg(account *C.PurpleAccount, sender **C.char,
+	message **C.char, conv *C.PurpleConversation, flags *C.PurpleMessageFlags) C.gboolean {
+	log.Println("hehhe")
+	if csigs.ReceivingChatMsg != nil {
+		sender_go := C.GoString(*sender)
+		message_go := C.GoString(*message)
+		var flags_go int = int(*flags)
+		sender_go_p := &sender_go
+		message_go_p := &message_go
+
+		r := csigs.ReceivingChatMsg(
+			newAccountFrom(account),
+			sender_go_p, message_go_p,
+			newConversationFrom(conv),
+			&flags_go)
+
+		if sender_go_p == nil || message_go_p == nil || r {
+			C.free((unsafe.Pointer)(*sender))
+			C.free((unsafe.Pointer)(*message))
+			return go2cBool(r) // canceled message
+		}
+
+		if !r {
+			C.free((unsafe.Pointer)(*sender))
+			C.free((unsafe.Pointer)(*message))
+			*sender = C.CString(sender_go)
+			*message = C.CString(message_go)
+		}
+
+		return go2cBool(r)
+	}
+	// TRUE if the message should be canceled, or FALSE otherwise.
+	return go2cBool(false)
 }

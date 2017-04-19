@@ -31,4 +31,5 @@ void gopurple_received_chat_msg(PurpleAccount *account, char *sender, char *mess
 void gopurple_chat_joined(PurpleConversation *conv);
 void gopurple_chat_left(PurpleConversation *conv);
 
+gboolean gopurple_receiving_chat_msg(PurpleAccount *account, char **sender, char **message, PurpleConversation *conv, PurpleMessageFlags *flags);
 #endif
