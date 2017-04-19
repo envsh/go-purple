@@ -391,7 +391,6 @@ func gopurple_received_im_msg(ac *C.PurpleAccount, sender *C.char, buffer *C.cha
 //export gopurple_received_chat_msg
 func gopurple_received_chat_msg(ac *C.PurpleAccount, sender *C.char, buffer *C.char,
 	chat *C.PurpleConversation, flags C.PurpleMessageFlags, data unsafe.Pointer) {
-	log.Println("hehhe")
 	if csigs.ReceivedChatMsg != nil {
 		csigs.ReceivedChatMsg(newAccountFrom(ac), C.GoString(sender),
 			C.GoString(buffer), newConversationFrom(chat), int(flags))
@@ -417,7 +416,6 @@ func gopurple_chat_left(conv *C.PurpleConversation) {
 //export gopurple_receiving_chat_msg
 func gopurple_receiving_chat_msg(account *C.PurpleAccount, sender **C.char,
 	message **C.char, conv *C.PurpleConversation, flags *C.PurpleMessageFlags) C.gboolean {
-	log.Println("hehhe")
 	if csigs.ReceivingChatMsg != nil {
 		sender_go := C.GoString(*sender)
 		message_go := C.GoString(*message)

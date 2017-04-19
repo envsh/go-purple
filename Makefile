@@ -47,7 +47,8 @@ mfltb:
 	go build -v -o msgflt.so ./msgflt-prpl
 
 mflti:
-	install -v ./libmsgflt.so ~/.gopurple-msgflt/plugins
+	install -v ./libmsgflt.so ~/.gopurple-msgflt/plugins/
+	install -v ./libmsgflt.so ~/.purple/plugins/
 
 mfltt:
 	go test -v -run FF ./msgflt-prpl/bridges
