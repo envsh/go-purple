@@ -47,7 +47,7 @@
 %include <gloox/amp.h>
 // %include <gloox/annotations.h>
 %include <gloox/annotationshandler.h>
-// %include <gloox/atomicrefcount.h>
+%include <gloox/atomicrefcount.h>
 %include <gloox/attention.h>
 %include <gloox/base64.h>
 // %include <gloox/bookmarkhandler.h>
@@ -85,8 +85,8 @@
 %include <gloox/dataformreported.h>
 %include <gloox/delayeddelivery.h>
 %include <gloox/disco.h>
-// %include <gloox/discohandler.h>
-// %include <gloox/disconodehandler.h>
+%include <gloox/discohandler.h>
+%include <gloox/disconodehandler.h>
 %include <gloox/error.h>
 %include <gloox/eventdispatcher.h>
 %include <gloox/event.h>
@@ -135,7 +135,7 @@
 %include <gloox/mucroomconfighandler.h>
 %include <gloox/mucroom.h>
 %include <gloox/mucroomhandler.h>
-// %include <gloox/mutexguard.h>
+%include <gloox/mutexguard.h>
 %include <gloox/mutex.h>
 %include <gloox/nickname.h>
 %include <gloox/oob.h>
@@ -151,14 +151,14 @@
 %include <gloox/pubsub.h>
 %include <gloox/pubsubitem.h>
 // %include <gloox/pubsubmanager.h>
-// %include <gloox/pubsubresulthandler.h>
+%include <gloox/pubsubresulthandler.h>
 %include <gloox/receipt.h>
 %include <gloox/registration.h>
 %include <gloox/registrationhandler.h>
 %include <gloox/resource.h>
 %include <gloox/rosteritem.h>
 %include <gloox/rosterlistener.h>
-// %include <gloox/rostermanager.h>
+%include <gloox/rostermanager.h>
 %include <gloox/search.h>
 %include <gloox/searchhandler.h>
 %include <gloox/sha.h>
