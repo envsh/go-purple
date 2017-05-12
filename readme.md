@@ -22,6 +22,7 @@ Now implement most API function for write new IM protocol and simple client.
 * [wechat-prpl/wechat](wechat-prpl/wechat/) wechat web protocol implement
 * [yobot](yobot/) an IM robot that relay messages between different protocols, and build on raw protocol.
 * [yobot2](yobot2/) an IM robot that relay messages between different protocols, and build on go-purple.
+* [msgflt-prpl](msgflt-prpl/) pidign message filter/transform plugin.
 
 ### Notes
 

@@ -72,6 +72,7 @@ func (this *ToxPlugin) load_tox(p *purple.Plugin) bool {
 	log.Println("called", purple.GoID())
 	rand.Seed(time.Now().UnixNano())
 	this.setupModuleFields()
+	log.Println("called")
 	return true
 }
 
@@ -158,18 +159,24 @@ func (this *ToxPlugin) tox_login(ac *purple.Account) {
 	this.iterTimerHandler = purple.TimeoutAdd(100, this, this.itercb)
 }
 
+// TODO
+// 有时在关闭的时候这步慢
 func (this *ToxPlugin) tox_close(gc *purple.Connection) {
 	// this.stopch <- struct{}{}
+	log.Println("a")
 	ok := purple.TimeoutRemove(this.iterTimerHandler)
 	if !ok {
 		log.Println("rm timer failed")
 	}
+	log.Println("b")
 	this.save_account(gc)
+	log.Println("c")
 	// TODO might have pending callback???
 	this.ppi.StatusText = nil
 	this._tox.Kill()
 	this._tox = nil
 	this._toxopts = nil
+	log.Println("d")
 }
 
 ////////
@@ -280,6 +287,7 @@ func NewToxPlugin() *ToxPlugin {
 func init() {
 	colog.Register()
 	colog.SetFlags(log.LstdFlags | log.Lshortfile | colog.Flags())
+	colog.SetFlags(log.Lmicroseconds | colog.Flags())
 
 	NewToxPlugin()
 }
