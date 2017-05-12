@@ -40,9 +40,9 @@
 
 /* %include "/usr/include/gloox/gloox.h" */
 
-// %include <gloox/adhoccommandprovider.h>
-// %include <gloox/adhoc.h>
-// %include <gloox/adhochandler.h>
+%include <gloox/adhoccommandprovider.h>
+%include <gloox/adhoc.h>
+%include <gloox/adhochandler.h>
 // %include <gloox/adhocplugin.h>
 %include <gloox/amp.h>
 // %include <gloox/annotations.h>
@@ -110,9 +110,9 @@
 // %include <gloox/jingleiceudp.h>
 // %include <gloox/jinglepluginfactory.h>
 %include <gloox/jingleplugin.h>
-// %include <gloox/jinglesession.h>
-// %include <gloox/jinglesessionhandler.h>
-// %include <gloox/jinglesessionmanager.h>
+%include <gloox/jinglesession.h>
+%include <gloox/jinglesessionhandler.h>
+%include <gloox/jinglesessionmanager.h>
 %include <gloox/lastactivity.h>
 %include <gloox/lastactivityhandler.h>
 %include <gloox/linklocalclient.h>
