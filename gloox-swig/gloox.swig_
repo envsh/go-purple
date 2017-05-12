@@ -40,6 +40,19 @@
 
 /* %include "/usr/include/gloox/gloox.h" */
 
+// sucks headers
+// %include <gloox/adhocplugin.h>
+// %include <gloox/annotations.h>
+// %include <gloox/bookmarkstorage.h>
+// %include <gloox/instantmucroom.h>
+// %include <gloox/jinglecontent.h>
+// %include <gloox/jinglefiletransfer.h>
+// %include <gloox/jingleiceudp.h>
+// %include <gloox/jinglepluginfactory.h>
+// %include <gloox/pubsubmanager.h>
+// %include <gloox/vcard.h>
+
+// all headers
 %include <gloox/adhoccommandprovider.h>
 %include <gloox/adhoc.h>
 %include <gloox/adhochandler.h>
@@ -50,7 +63,7 @@
 %include <gloox/atomicrefcount.h>
 %include <gloox/attention.h>
 %include <gloox/base64.h>
-// %include <gloox/bookmarkhandler.h>
+%include <gloox/bookmarkhandler.h>
 // %include <gloox/bookmarkstorage.h>
 %include <gloox/bytestreamdatahandler.h>
 %include <gloox/bytestream.h>
