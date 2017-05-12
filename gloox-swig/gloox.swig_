@@ -185,7 +185,7 @@
 %include <gloox/uniquemucroom.h>
 %include <gloox/util.h>
 // %include <gloox/vcard.h>
-// %include <gloox/vcardhandler.h>
-// %include <gloox/vcardmanager.h>
-// %include <gloox/vcardupdate.h>
+%include <gloox/vcardhandler.h>
+%include <gloox/vcardmanager.h>
+%include <gloox/vcardupdate.h>
 %include <gloox/xhtmlim.h>
