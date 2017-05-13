@@ -1,0 +1,33 @@
+%module libstrophe
+
+%init %{ 
+  //printf("Initialization libstrophe done.\n");
+%}
+
+%define  G_GNUC_NULL_TERMINATED
+%enddef
+%define G_CONST_RETURN const
+%enddef
+%define G_GNUC_PRINTF(x, y)
+%enddef
+%define G_BEGIN_DECLS
+%enddef
+%define G_END_DECLS
+%enddef
+
+/*
+%define PURPLE_DISABLE_DEPRECATED
+%enddef
+*/
+
+/* Includes the header files in the wrapper code */
+%header %{
+  #include <stdarg.h>
+  #include <strophe.h>
+%}
+
+
+/* %include "/usr/include/libpurple/purple.h" */
+
+%include <strophe.h>
+
