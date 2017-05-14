@@ -52,6 +52,19 @@
 // %include <gloox/pubsubmanager.h>
 // %include <gloox/vcard.h>
 
+// minimal headers
+%include <gloox/gloox.h>
+%include <gloox/clientbase.h>
+%include <gloox/client.h>
+%include <gloox/connectionhandler.h>
+%include <gloox/message.h>
+%include <gloox/messagehandler.h>
+%include <gloox/jid.h>
+%include <gloox/loghandler.h>
+%include <gloox/logsink.h>
+
+
+/*
 // all headers
 %include <gloox/adhoccommandprovider.h>
 %include <gloox/adhoc.h>
@@ -202,3 +215,4 @@
 %include <gloox/vcardmanager.h>
 %include <gloox/vcardupdate.h>
 %include <gloox/xhtmlim.h>
+*/
