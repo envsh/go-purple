@@ -62,7 +62,14 @@
 %include <gloox/jid.h>
 %include <gloox/loghandler.h>
 %include <gloox/logsink.h>
-
+%include <gloox/mucinvitationhandler.h>
+%include <gloox/presence.h>
+%include <gloox/presencehandler.h>
+%include <gloox/statisticshandler.h>
+%include <gloox/subscriptionhandler.h>
+%include <gloox/subscription.h>
+%include <gloox/tag.h>
+%include <gloox/taghandler.h>
 
 /*
 // all headers

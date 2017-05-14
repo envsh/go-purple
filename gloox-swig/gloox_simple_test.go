@@ -22,7 +22,12 @@ func Test1(t *testing.T) {
 		log.Println()
 	}
 	conlsr.OnDisconnectX = func(error int) {
-		log.Println(error)
+		log.Println("Disconnect:", error,
+			cli.StreamErrorText(),
+			cli.StreamErrorCData(),
+			cli.StreamErrorAppCondition(),
+			"/")
+
 	}
 	conlsr.OnTLSConnectX = func() {
 		log.Println()
@@ -36,8 +41,40 @@ func Test1(t *testing.T) {
 		log.Println("log", level, area, l)
 	}
 	cli.LogInstance().RegisterLogHandler(LogLevelDebug, int(LogAreaAll), logh)
+	mucih := NewMUCInvitationHandlerX()
+	mucih.HandleMUCInvitationX = func(room, from, reason, body, password string, cont bool, thread string) {
 
-	retok := cli.Connect(true)
-	log.Println(retok)
-	select {}
+	}
+	cli.RegisterMUCInvitationHandler(mucih)
+
+	psh := NewPresenceHandlerX()
+	psh.HandlePresenceX = func(ptype int, from, to, status string) {
+		log.Println(ptype, from, to, status)
+	}
+	cli.RegisterPresenceHandler(psh)
+
+	subh := NewSubscriptionHandlerX()
+	subh.HandleSubscriptionX = func(ptype int, from, to, status string) {
+		log.Println(ptype, from, to, status)
+	}
+	cli.RegisterSubscriptionHandler(subh)
+
+	statsh := NewStatisticsHandlerX()
+	statsh.HandleStatisticsX = func(stats Statistics) {
+		log.Println("stats:", stats.Encryption)
+	}
+	cli.RegisterStatisticsHandler(statsh)
+
+	tagh := NewTagHandlerX()
+	tagh.HandleTagX = func() {
+		log.Println()
+	}
+	cli.RegisterTagHandler(tagh, "", "")
+
+	dryrun := false
+	if !dryrun {
+		retok := cli.Connect(true)
+		log.Println(retok, cli.AuthError(), cli.StreamErrorCData())
+		select {}
+	}
 }
