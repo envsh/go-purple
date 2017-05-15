@@ -6,6 +6,9 @@ all:
 	# sed -i -E 's/gloox::XMLNS_JABBER_RPC/gloox::XMLNS_NICKNAME/' gloox_wrap.cxx
 	go build -v -x
 
+install:
+	go install -v
+
 test:
 	go test -v -run 1
 

@@ -59,10 +59,15 @@
 %include <gloox/connectionhandler.h>
 %include <gloox/message.h>
 %include <gloox/messagehandler.h>
+%include <gloox/messagesession.h>
+%include <gloox/stanza.h>
 %include <gloox/jid.h>
 %include <gloox/loghandler.h>
 %include <gloox/logsink.h>
 %include <gloox/mucinvitationhandler.h>
+%include <gloox/mucroomconfighandler.h>
+%include <gloox/mucroom.h>
+%include <gloox/mucroomhandler.h>
 %include <gloox/presence.h>
 %include <gloox/presencehandler.h>
 %include <gloox/statisticshandler.h>
@@ -70,6 +75,9 @@
 %include <gloox/subscription.h>
 %include <gloox/tag.h>
 %include <gloox/taghandler.h>
+%include <gloox/gpgencrypted.h>
+%include <gloox/gpgsigned.h>
+%include <gloox/dataform.h>
 
 /*
 // all headers
