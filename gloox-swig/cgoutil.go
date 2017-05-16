@@ -29,3 +29,8 @@ func go2cbool(ok bool) C.int {
 func c2goboolx(ok interface{}) bool {
 	return false
 }
+
+func SwigEnum(gov uintptr) int {
+	r := int(*(*C.int)((unsafe.Pointer)(gov)))
+	return r
+}

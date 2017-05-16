@@ -53,6 +53,7 @@
 // %include <gloox/vcard.h>
 
 // minimal headers
+/*
 %include <gloox/gloox.h>
 %include <gloox/clientbase.h>
 %include <gloox/client.h>
@@ -78,8 +79,9 @@
 %include <gloox/gpgencrypted.h>
 %include <gloox/gpgsigned.h>
 %include <gloox/dataform.h>
+%include <gloox/attention.h>
+*/
 
-/*
 // all headers
 %include <gloox/adhoccommandprovider.h>
 %include <gloox/adhoc.h>
@@ -230,4 +232,4 @@
 %include <gloox/vcardmanager.h>
 %include <gloox/vcardupdate.h>
 %include <gloox/xhtmlim.h>
-*/
+

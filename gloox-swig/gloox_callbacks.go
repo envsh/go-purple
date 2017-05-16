@@ -25,15 +25,15 @@ func next_objno() uint64 {
 	return objno_current
 }
 
-type BaseHandlerX struct {
+type baseHandlerX struct {
 	cptr  uintptr
 	objno uint64
 }
 
-func (this *BaseHandlerX) Swigcptr() uintptr { return this.cptr }
+func (this *baseHandlerX) Swigcptr() uintptr { return this.cptr }
 
 type MessageHandlerX struct {
-	BaseHandlerX
+	baseHandlerX
 
 	HandlerMessageX func(msg Message, session MessageSession)
 }
@@ -65,21 +65,28 @@ func MessageHandlerRCB_handleMessage(gobjno C.uint64_t,
 }
 
 type ConnectionHandlerX struct {
-	BaseHandlerX
+	baseHandlerX
 }
 
-func (this *ConnectionHandlerX) SwigIsConnectionHandler() {}
-func (this *ConnectionHandlerX) HandleIncomingConnection(arg2 Gloox_ConnectionBase, arg3 Gloox_ConnectionBase) {
-
-}
+func (this *ConnectionHandlerX) SwigIsConnectionHandler()                                          {}
+func (this *ConnectionHandlerX) HandleIncomingConnection(arg2 ConnectionBase, arg3 ConnectionBase) {}
 
 type ConnectionListenerX struct {
-	BaseHandlerX
+	baseHandlerX
 
 	OnConnectX    func()
 	OnDisconnectX func(int)
 	OnTLSConnectX func(info CertInfo)
 }
+
+func (this *ConnectionListenerX) SwigIsConnectionListener()                   {}
+func (this *ConnectionListenerX) OnConnect()                                  {}
+func (this *ConnectionListenerX) OnDisconnect(arg2 ConnectionError)           {}
+func (this *ConnectionListenerX) OnResourceBind(arg2 string)                  {}
+func (this *ConnectionListenerX) OnResourceBindError(arg2 Error)              {}
+func (this *ConnectionListenerX) OnSessionCreateError(arg2 Error)             {}
+func (this *ConnectionListenerX) OnTLSConnect(arg2 CertInfo) (_swig_ret bool) { return true }
+func (this *ConnectionListenerX) OnStreamEvent(arg2 StreamEvent)              {}
 
 func NewConnectionListerX() *ConnectionListenerX {
 	this := &ConnectionListenerX{}
@@ -115,7 +122,7 @@ func ConnectionListenerRCB_onTLSConnect_go(gobjno C.uint64_t, infox C.uint64_t) 
 }
 
 type LogHandlerX struct {
-	BaseHandlerX
+	baseHandlerX
 	HandleLogX func(int, int, string)
 }
 
@@ -142,7 +149,7 @@ func LogHandlerRCB_handleLog(objno C.uint64_t, level C.int, area C.int, l *C.cha
 }
 
 type MUCInvitationHandlerX struct {
-	BaseHandlerX
+	baseHandlerX
 	HandleMUCInvitationX func(room, from, reason, body, password string, cont bool, thread string)
 }
 
@@ -173,7 +180,7 @@ func MUCInvitationHandlerRCB_handleMUCInvitation(objno C.uint64_t,
 }
 
 type PresenceHandlerX struct {
-	BaseHandlerX
+	baseHandlerX
 
 	HandlePresenceX func(ptype int, from, to, status string)
 }
@@ -206,7 +213,7 @@ func PresenceHandlerRCB_handlePresence(objno C.uint64_t,
 }
 
 type SubscriptionHandlerX struct {
-	BaseHandlerX
+	baseHandlerX
 
 	HandleSubscriptionX func(subtype int, from, to, status string)
 }
@@ -260,7 +267,7 @@ type Statistics struct {
 }
 
 type StatisticsHandlerX struct {
-	BaseHandlerX
+	baseHandlerX
 
 	HandleStatisticsX func(stats Statistics)
 }
@@ -327,7 +334,7 @@ func StatisticsHandlerRCB_handleStatistics(objno C.uint64_t,
 
 ////
 type TagHandlerX struct {
-	BaseHandlerX
+	baseHandlerX
 
 	HandleTagX func()
 }
@@ -356,7 +363,7 @@ func TagHandlerRCB_handleTag(objno C.uint64_t) {
 
 ////////
 type MUCRoomHandlerX struct {
-	BaseHandlerX
+	baseHandlerX
 
 	HandleMUCParticipantPresenceX func(room MUCRoom, part MUCRoomParticipant, presence Presence)
 	HandleMUCMessageX             func(room MUCRoom, msg Message, priv bool)
@@ -382,13 +389,13 @@ func (this *MUCRoomHandlerX) Delete() {
 func (this *MUCRoomHandlerX) SwigIsMUCRoomHandler() {}
 func (this *MUCRoomHandlerX) HandleMUCParticipantPresence(arg2 MUCRoom, arg3 MUCRoomParticipant, arg4 Presence) {
 }
-func (this *MUCRoomHandlerX) HandleMUCMessage(arg2 MUCRoom, arg3 Message, arg4 bool)           {}
-func (this *MUCRoomHandlerX) HandleMUCRoomCreation(arg2 MUCRoom) (_swig_ret bool)              { return false }
-func (this *MUCRoomHandlerX) HandleMUCSubject(arg2 MUCRoom, arg3 string, arg4 string)          {}
-func (this *MUCRoomHandlerX) HandleMUCInviteDecline(arg2 MUCRoom, arg3 JID, arg4 string)       {}
-func (this *MUCRoomHandlerX) HandleMUCError(arg2 MUCRoom, arg3 GlooxStanzaError)               {}
-func (this *MUCRoomHandlerX) HandleMUCInfo(arg2 MUCRoom, arg3 int, arg4 string, arg5 DataForm) {}
-func (this *MUCRoomHandlerX) HandleMUCItems(arg2 MUCRoom, arg3 Gloox_Disco_ItemList)           {}
+func (this *MUCRoomHandlerX) HandleMUCMessage(arg2 MUCRoom, arg3 Message, arg4 bool)                 {}
+func (this *MUCRoomHandlerX) HandleMUCRoomCreation(arg2 MUCRoom) (_swig_ret bool)                    { return false }
+func (this *MUCRoomHandlerX) HandleMUCSubject(arg2 MUCRoom, arg3 string, arg4 string)                {}
+func (this *MUCRoomHandlerX) HandleMUCInviteDecline(arg2 MUCRoom, arg3 JID, arg4 string)             {}
+func (this *MUCRoomHandlerX) HandleMUCError(arg2 MUCRoom, arg3 GlooxStanzaError)                     {}
+func (this *MUCRoomHandlerX) HandleMUCInfo(arg2 MUCRoom, arg3 int, arg4 string, arg5 DataForm)       {}
+func (this *MUCRoomHandlerX) HandleMUCItems(arg2 MUCRoom, arg3 Std_list_Sl_gloox_Disco_Item_Sm__Sg_) {}
 
 //export MUCRoomHandlerRCB_handleMUCParticipantPresence
 func MUCRoomHandlerRCB_handleMUCParticipantPresence(gobjno C.uint64_t,
@@ -400,10 +407,12 @@ func MUCRoomHandlerRCB_handleMUCParticipantPresence(gobjno C.uint64_t,
 	thisx, _ := cgobjs[uint64(gobjno)]
 	this := thisx.(*MUCRoomHandlerX)
 
-	this.HandleMUCParticipantPresenceX(room, part, presence)
+	if this.HandleMUCParticipantPresenceX != nil {
+		this.HandleMUCParticipantPresenceX(room, part, presence)
+	}
 	if true {
-		DeleteMUCRoomParticipant(part)
-		DeletePresence(presence)
+		// DeleteMUCRoomParticipant(part)
+		// DeletePresence(presence)
 		// DeleteMUCRoom(room)
 	}
 }
@@ -417,7 +426,9 @@ func MUCRoomHandlerRCB_handleMUCMessage(gobjno C.uint64_t,
 
 	thisx, _ := cgobjs[uint64(gobjno)]
 	this := thisx.(*MUCRoomHandlerX)
-	this.HandleMUCMessageX(room, msg, priv)
+	if this.HandleMUCMessageX != nil {
+		this.HandleMUCMessageX(room, msg, priv)
+	}
 	DeleteMessage(msg)
 }
 
@@ -428,7 +439,9 @@ func MUCRoomHandlerRCB_handleMUCRoomCreation(gobjno C.uint64_t,
 
 	thisx, _ := cgobjs[uint64(gobjno)]
 	this := thisx.(*MUCRoomHandlerX)
-	this.HandleMUCRoomCreationX(room)
+	if this.HandleMUCRoomCreationX != nil {
+		this.HandleMUCRoomCreationX(room)
+	}
 
 	return 0
 }
@@ -440,7 +453,9 @@ func MUCRoomHandlerRCB_handleMUCSubject(gobjno C.uint64_t,
 
 	thisx, _ := cgobjs[uint64(gobjno)]
 	this := thisx.(*MUCRoomHandlerX)
-	this.HandleMUCSubjectX(room, C.GoString(nick), C.GoString(subject))
+	if this.HandleMUCSubjectX != nil {
+		this.HandleMUCSubjectX(room, C.GoString(nick), C.GoString(subject))
+	}
 	freeAll([]*C.char{nick, subject})
 }
 
@@ -451,7 +466,9 @@ func MUCRoomHandlerRCB_handleMUCInviteDecline(gobjno C.uint64_t,
 
 	thisx, _ := cgobjs[uint64(gobjno)]
 	this := thisx.(*MUCRoomHandlerX)
-	this.HandleMUCInviteDeclineX(room, C.GoString(invitee), C.GoString(reason))
+	if this.HandleMUCInviteDeclineX != nil {
+		this.HandleMUCInviteDeclineX(room, C.GoString(invitee), C.GoString(reason))
+	}
 	freeAll([]*C.char{invitee, reason})
 }
 
@@ -462,7 +479,9 @@ func MUCRoomHandlerRCB_handleMUCError(gobjno C.uint64_t,
 
 	thisx, _ := cgobjs[uint64(gobjno)]
 	this := thisx.(*MUCRoomHandlerX)
-	this.HandleMUCErrorX(room, int(error))
+	if this.HandleMUCErrorX != nil {
+		this.HandleMUCErrorX(room, int(error))
+	}
 }
 
 //export MUCRoomHandlerRCB_handleMUCInfo
@@ -472,7 +491,9 @@ func MUCRoomHandlerRCB_handleMUCInfo(gobjno C.uint64_t,
 
 	thisx, _ := cgobjs[uint64(gobjno)]
 	this := thisx.(*MUCRoomHandlerX)
-	this.HandleMUCInfoX(room, int(features), C.GoString(name))
+	if this.HandleMUCInfoX != nil {
+		this.HandleMUCInfoX(room, int(features), C.GoString(name))
+	}
 	freeAll([]*C.char{name})
 }
 
@@ -483,12 +504,14 @@ func MUCRoomHandlerRCB_handleMUCItems(gobjno C.uint64_t,
 
 	thisx, _ := cgobjs[uint64(gobjno)]
 	this := thisx.(*MUCRoomHandlerX)
-	this.HandleMUCItemsX(room)
+	if this.HandleMUCItemsX != nil {
+		this.HandleMUCItemsX(room)
+	}
 }
 
 ////////////////
 type MUCRoomConfigHandlerX struct {
-	BaseHandlerX
+	baseHandlerX
 
 	HandleMUCConfigListX   func(arg2 MUCRoom, operation int /*, arg3 Std_list_Sl_gloox_MUCListItem_Sg_, arg4 GlooxMUCOperation*/)
 	HandleMUCConfigFormX   func(arg2 MUCRoom, form DataForm /*, arg3 DataForm*/)
@@ -525,7 +548,9 @@ func MUCRoomConfigHandlerRCB_handleMUCConfigList(gobjno C.uint64_t,
 
 	thisx, _ := cgobjs[uint64(gobjno)]
 	this := thisx.(*MUCRoomConfigHandlerX)
-	this.HandleMUCConfigListX(room, int(operation))
+	if this.HandleMUCConfigListX != nil {
+		this.HandleMUCConfigListX(room, int(operation))
+	}
 }
 
 //export MUCRoomConfigHandlerRCB_handleMUCConfigForm
@@ -536,7 +561,9 @@ func MUCRoomConfigHandlerRCB_handleMUCConfigForm(gobjno C.uint64_t,
 
 	thisx, _ := cgobjs[uint64(gobjno)]
 	this := thisx.(*MUCRoomConfigHandlerX)
-	this.HandleMUCConfigFormX(room, form)
+	if this.HandleMUCConfigFormX != nil {
+		this.HandleMUCConfigFormX(room, form)
+	}
 	DeleteDataForm(form)
 }
 
@@ -547,7 +574,9 @@ func MUCRoomConfigHandlerRCB_handleMUCConfigResult(gobjno C.uint64_t,
 
 	thisx, _ := cgobjs[uint64(gobjno)]
 	this := thisx.(*MUCRoomConfigHandlerX)
-	this.HandleMUCConfigResultX(room, c2gobool(successx), int(operation))
+	if this.HandleMUCConfigResultX != nil {
+		this.HandleMUCConfigResultX(room, c2gobool(successx), int(operation))
+	}
 }
 
 //export MUCRoomConfigHandlerRCB_handleMUCRequest
@@ -558,6 +587,14 @@ func MUCRoomConfigHandlerRCB_handleMUCRequest(gobjno C.uint64_t,
 
 	thisx, _ := cgobjs[uint64(gobjno)]
 	this := thisx.(*MUCRoomConfigHandlerX)
-	this.HandleMUCRequestX(room, form)
+	if this.HandleMUCRequestX != nil {
+		this.HandleMUCRequestX(room, form)
+	}
 	DeleteDataForm(form)
+}
+
+//
+func RefillDataForm(df uintptr) uint64 {
+	newForm := C.RefillDataForm(C.uint64_t(df))
+	return uint64(newForm)
 }

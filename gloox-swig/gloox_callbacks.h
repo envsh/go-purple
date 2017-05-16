@@ -98,6 +98,7 @@ extern "C"{
     (uint64_t gobjno, uint64_t room, uint64_t form);
 
 
+    extern uint64_t RefillDataForm(uint64_t df);
 #ifdef __cplusplus
 };
 #endif
