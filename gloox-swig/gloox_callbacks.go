@@ -593,8 +593,133 @@ func MUCRoomConfigHandlerRCB_handleMUCRequest(gobjno C.uint64_t,
 	DeleteDataForm(form)
 }
 
-//
-func RefillDataForm(df uintptr) uint64 {
-	newForm := C.RefillDataForm(C.uint64_t(df))
-	return uint64(newForm)
+////
+type MessageSessionHandlerX struct {
+	baseHandlerX
+
+	HandleMessageSessionX func(MessageSession)
+}
+
+func NewMessageSessionHandlerX() *MessageSessionHandlerX {
+	this := &MessageSessionHandlerX{}
+	this.objno = next_objno()
+	cgobjs[this.objno] = this
+	this.cptr = (uintptr)(C.MessageSessionHandlerRCB_new(C.uint64_t(this.objno)))
+
+	return this
+}
+func (this *MessageSessionHandlerX) delete() {
+	C.MessageSessionHandlerRCB_delete(C.uint64_t(this.cptr))
+}
+func (this *MessageSessionHandlerX) HandleMessageSession(MessageSession) {}
+func (this *MessageSessionHandlerX) SwigIsMessageSessionHandler()        {}
+
+//export MessageSessionHandlerRCB_handleMessageSession
+func MessageSessionHandlerRCB_handleMessageSession(gobjno C.uint64_t, sessionx C.uint64_t) {
+	session := SwigcptrMessageSession(sessionx)
+
+	thisx, _ := cgobjs[uint64(gobjno)]
+	this := thisx.(*MessageSessionHandlerX)
+	if this.HandleMessageSessionX != nil {
+		this.HandleMessageSessionX(session)
+	}
+}
+
+////
+type MessageEventHandlerX struct {
+	baseHandlerX
+
+	HandleMessageEventX func(JID, int)
+}
+
+func NewMessageEventHandlerX() *MessageEventHandlerX {
+	this := &MessageEventHandlerX{}
+	this.objno = next_objno()
+	cgobjs[this.objno] = this
+	this.cptr = (uintptr)(C.MessageEventHandlerRCB_new(C.uint64_t(this.objno)))
+
+	return this
+}
+func (this *MessageEventHandlerX) delete() {
+	C.MessageEventHandlerRCB_delete(C.uint64_t(this.cptr))
+}
+func (this *MessageEventHandlerX) HandleMessageEvent(JID, GlooxMessageEventType) {}
+func (this *MessageEventHandlerX) SwigIsMessageEventHandler()                    {}
+
+//export MessageEventHandlerRCB_handleMessageEvent
+func MessageEventHandlerRCB_handleMessageEvent(gobjno C.uint64_t, jidx C.uint64_t, event C.int) {
+	jid := SwigcptrJID(jidx)
+
+	thisx, _ := cgobjs[uint64(gobjno)]
+	this := thisx.(*MessageEventHandlerX)
+	if this.HandleMessageEventX != nil {
+		this.HandleMessageEventX(jid, int(event))
+	}
+	DeleteJID(jid)
+}
+
+////
+type ChatStateHandlerX struct {
+	baseHandlerX
+
+	HandleChatStateX func(JID, int)
+}
+
+func NewChatStateHandlerX() *ChatStateHandlerX {
+	this := &ChatStateHandlerX{}
+	this.objno = next_objno()
+	cgobjs[this.objno] = this
+	this.cptr = (uintptr)(C.ChatStateHandlerRCB_new(C.uint64_t(this.objno)))
+
+	return this
+}
+func (this *ChatStateHandlerX) delete() {
+	C.ChatStateHandlerRCB_delete(C.uint64_t(this.cptr))
+}
+func (this *ChatStateHandlerX) HandleChatState(JID, ChatStateType) {}
+func (this *ChatStateHandlerX) SwigIsChatStateHandler()            {}
+
+//export ChatStateHandlerRCB_handleChatState
+func ChatStateHandlerRCB_handleChatState(gobjno C.uint64_t, jidx C.uint64_t, state C.int) {
+	jid := SwigcptrJID(jidx)
+
+	thisx, _ := cgobjs[uint64(gobjno)]
+	this := thisx.(*ChatStateHandlerX)
+	if this.HandleChatStateX != nil {
+		this.HandleChatStateX(jid, int(state))
+	}
+	DeleteJID(jid)
+}
+
+////
+type EventHandlerX struct {
+	baseHandlerX
+
+	HandleEventX func(Event)
+}
+
+func NewEventHandlerX() *EventHandlerX {
+	this := &EventHandlerX{}
+	this.objno = next_objno()
+	cgobjs[this.objno] = this
+	this.cptr = (uintptr)(C.EventHandlerRCB_new(C.uint64_t(this.objno)))
+
+	return this
+}
+func (this *EventHandlerX) delete() {
+	C.EventHandlerRCB_delete(C.uint64_t(this.cptr))
+}
+func (this *EventHandlerX) HandleEvent(Event)   {}
+func (this *EventHandlerX) SwigIsEventHandler() {}
+
+//export EventHandlerRCB_handleEvent
+func EventHandlerRCB_handleEvent(gobjno C.uint64_t, eventx C.uint64_t) {
+	event := SwigcptrEvent(eventx)
+
+	thisx, _ := cgobjs[uint64(gobjno)]
+	this := thisx.(*EventHandlerX)
+	if this.HandleEventX != nil {
+		this.HandleEventX(event)
+	}
+	DeleteEvent(event)
 }

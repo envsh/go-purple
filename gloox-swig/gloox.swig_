@@ -35,6 +35,7 @@
   #include "gloox_combine.h"
 
   using namespace gloox;
+  using namespace gloox::Jingle;
 %}
 
 
@@ -88,13 +89,13 @@
 %include <gloox/adhochandler.h>
 // %include <gloox/adhocplugin.h>
 %include <gloox/amp.h>
-// %include <gloox/annotations.h>
+%include <gloox/annotations.h>
 %include <gloox/annotationshandler.h>
 %include <gloox/atomicrefcount.h>
 %include <gloox/attention.h>
 %include <gloox/base64.h>
 %include <gloox/bookmarkhandler.h>
-// %include <gloox/bookmarkstorage.h>
+%include <gloox/bookmarkstorage.h>
 %include <gloox/bytestreamdatahandler.h>
 %include <gloox/bytestream.h>
 %include <gloox/bytestreamhandler.h>
@@ -143,15 +144,15 @@
 %include <gloox/gpgencrypted.h>
 %include <gloox/gpgsigned.h>
 %include <gloox/inbandbytestream.h>
-// %include <gloox/instantmucroom.h>
+// %include <gloox/instantmucroom.h>  // swig crash
 %include <gloox/iodata.h>
 %include <gloox/iq.h>
 %include <gloox/iqhandler.h>
 %include <gloox/jid.h>
-// %include <gloox/jinglecontent.h>
-// %include <gloox/jinglefiletransfer.h>
-// %include <gloox/jingleiceudp.h>
-// %include <gloox/jinglepluginfactory.h>
+%include <gloox/jinglecontent.h>
+%include <gloox/jinglefiletransfer.h>
+%include <gloox/jingleiceudp.h>
+%include <gloox/jinglepluginfactory.h>
 %include <gloox/jingleplugin.h>
 %include <gloox/jinglesession.h>
 %include <gloox/jinglesessionhandler.h>

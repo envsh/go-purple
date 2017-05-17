@@ -4,6 +4,11 @@ all:
 	# sed -i -E  "s/arg([0-9]+) = \(va_list\)\*argp([0-9]+)/memcpy\(\&arg\1, argp\2, sizeof\(va_list)\\)/" gloox_wrap.c
 	# sed -i -E 's/func Purple_([a-z])/func \U\1/' gloox.go
 	# sed -i -E 's/gloox::XMLNS_JABBER_RPC/gloox::XMLNS_NICKNAME/' gloox_wrap.cxx
+	# fix inner type for swig
+	sed -i -E 's/\(PrivateXMLResult \*\)/\(PrivateXMLHandler::PrivateXMLResult \*\)/' gloox_wrap.cxx
+	sed -i -E 's/\(PrivateXMLResult\)/\(PrivateXMLHandler::PrivateXMLResult\)/' gloox_wrap.cxx
+	sed -i -E 's/ PrivateXMLResult/ PrivateXMLHandler::PrivateXMLResult/' gloox_wrap.cxx
+
 	go build -v -x
 
 build:

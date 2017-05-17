@@ -97,8 +97,26 @@ extern "C"{
     extern void MUCRoomConfigHandlerRCB_handleMUCRequest
     (uint64_t gobjno, uint64_t room, uint64_t form);
 
+    uint64_t MessageSessionHandlerRCB_new(uint64_t gobjno);
+    void MessageSessionHandlerRCB_delete(uint64_t cobjno);
+    void MessageSessionHandlerRCB_handleMessageSession
+    (uint64_t gobjno, uint64_t session);
 
-    extern uint64_t RefillDataForm(uint64_t df);
+    uint64_t MessageEventHandlerRCB_new(uint64_t gobjno);
+    void MessageEventHandlerRCB_delete(uint64_t cobjno);
+    void MessageEventHandlerRCB_handleMessageEvent
+    (uint64_t gobjno, uint64_t jid, int event);
+
+    uint64_t ChatStateHandlerRCB_new(uint64_t gobjno);
+    void ChatStateHandlerRCB_delete(uint64_t cobjno);
+    void ChatStateHandlerRCB_handleChatState
+    (uint64_t gobjno, uint64_t jid, int state);
+
+    uint64_t EventHandlerRCB_new(uint64_t gobjno);
+    void EventHandlerRCB_delete(uint64_t cobjno);
+    void EventHandlerRCB_handleEvent
+    (uint64_t gobjno, uint64_t event);
+
 #ifdef __cplusplus
 };
 #endif

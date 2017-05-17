@@ -313,28 +313,75 @@ void MUCRoomConfigHandlerRCB_delete(uint64_t cobjno){
     delete((MUCRoomConfigHandlerRCB*)cobjno);
 }
 
+///
+class MessageSessionHandlerRCB : public MessageSessionHandler, public BaseRCB {
+public:
+    virtual void 	handleMessageSession (MessageSession *session) {
+        MessageSessionHandlerRCB_handleMessageSession
+            (gobjno, (uint64_t)session);
+    }
+};
+
+uint64_t MessageSessionHandlerRCB_new(uint64_t gobjno) {
+    auto a = new MessageSessionHandlerRCB();
+    a->gobjno = gobjno;
+    return (uint64_t)a;
+}
+void MessageSessionHandlerRCB_delete(uint64_t cobjno) {
+    delete((MessageSessionHandlerRCB*)cobjno);
+}
 
 ///
-uint64_t RefillDataForm(uint64_t dfx) {
-    DataForm *form = (DataForm*)(dfx);
-    DataForm* pNewFm = new DataForm(TypeSubmit);
-    const DataForm::FieldList& fl = form->fields();
-    for (const DataFormField* pFld : fl) {
-        DataFormField* pNewFld = pNewFm->addField
-            (pFld->type(), pFld->name(), pFld->value());
-        if (pFld->name() == "muc#roomconfig_roomdesc")
-            pNewFld->setValue("RoomDesc_JinqTest");
-        else if (pFld->name() == "muc#roomconfig_publicroom")
-            pNewFld->setValue("0");
-        else if (pFld->name() == "muc#roomconfig_enablelogging")
-            pNewFld->setValue("0");
-        else if (pFld->name() == "muc#roomconfig_passwordprotectedroom")
-            pNewFld->setValue("1");
-        else if (pFld->name() == "muc#roomconfig_roomsecret")
-            pNewFld->setValue("123456");
-        else if (pFld->name() == "public_list")
-            pNewFld->setValue("0");
-        else {}
+class MessageEventHandlerRCB : public MessageEventHandler, public BaseRCB {
+public:
+    virtual void 	handleMessageEvent (const JID &from, MessageEventType event) {
+        MessageEventHandlerRCB_handleMessageEvent
+            (gobjno, (uint64_t)cloneJID(from), int(event));
     }
-    return (uint64_t)pNewFm;
+};
+
+uint64_t MessageEventHandlerRCB_new(uint64_t gobjno) {
+    auto a = new MessageEventHandlerRCB();
+    a->gobjno = gobjno;
+    return (uint64_t)a;
+}
+void MessageEventHandlerRCB_delete(uint64_t cobjno) {
+    delete((MessageEventHandlerRCB*)cobjno);
+}
+
+///
+class ChatStateHandlerRCB : public ChatStateHandler, public BaseRCB {
+public:
+    virtual void 	handleChatState (const JID &from, ChatStateType state) {
+        ChatStateHandlerRCB_handleChatState
+            (gobjno, (uint64_t)cloneJID(from), int(state));
+    }
+};
+
+uint64_t ChatStateHandlerRCB_new(uint64_t gobjno) {
+    auto a = new ChatStateHandlerRCB();
+    a->gobjno = gobjno;
+    return (uint64_t)a;
+}
+void ChatStateHandlerRCB_delete(uint64_t cobjno) {
+    delete((ChatStateHandlerRCB*)cobjno);
+}
+
+///
+class EventHandlerRCB : public EventHandler, public BaseRCB {
+public:
+    virtual void 	handleEvent (const Event& event) {
+        Event *nevent = cloneEvent(event);
+        EventHandlerRCB_handleEvent
+            (gobjno, (uint64_t)(nevent));
+    }
+};
+
+uint64_t EventHandlerRCB_new(uint64_t gobjno) {
+    auto a = new EventHandlerRCB();
+    a->gobjno = gobjno;
+    return (uint64_t)a;
+}
+void EventHandlerRCB_delete(uint64_t cobjno) {
+    delete((EventHandlerRCB*)cobjno);
 }

@@ -50,4 +50,9 @@ auto cloneCertInfo = [](const CertInfo&info) {
     return ninfo;
 };
 
+auto cloneEvent = [](const Event& event) {
+    Event *nevent = new Event(event.eventType(), *event.stanza());
+    return nevent;
+};
+
 #endif

@@ -36,4 +36,17 @@ func gloox_callbacks_interface_compile_check() {
 
 	var tagh TagHandler = NewTagHandlerX()
 	log.Println(tagh)
+
+	var msgsesh MessageSessionHandler = NewMessageSessionHandlerX()
+	log.Println(msgsesh)
+
+	var msgevth MessageEventHandler = NewMessageEventHandlerX()
+	log.Println(msgevth)
+
+	var chatstateh ChatStateHandler = NewChatStateHandlerX()
+	log.Println(chatstateh)
+
+	var evth EventHandler = NewEventHandlerX()
+	log.Println(evth)
+
 }
