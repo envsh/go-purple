@@ -23,6 +23,7 @@ Now implement most API function for write new IM protocol and simple client.
 * [yobot](yobot/) an IM robot that relay messages between different protocols, and build on raw protocol.
 * [yobot2](yobot2/) an IM robot that relay messages between different protocols, and build on go-purple.
 * [msgflt-prpl](msgflt-prpl/) pidign message filter/transform plugin.
+* [gloox-swig](gloox-swig/) gloox xmpp client library for golang binding.
 
 ### Notes
 
