@@ -1,4 +1,7 @@
 all:
+	@echo "too many target, make what: purple tox bot ..."
+
+purple:
 	go install -v go-purple/purple
 
 tox:

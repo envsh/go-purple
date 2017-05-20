@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	irc "github.com/fluffle/goirc/client"
+	"github.com/jmz331/gpinyin"
 )
 
 type IrcBackend2 struct {
@@ -22,15 +23,38 @@ func NewIrcBackend2(ctx *Context, name string) *IrcBackend2 {
 	this.conque = make(chan interface{}, MAX_BUS_QUEUE_LEN)
 	this.proto = PROTO_IRC
 	this.name = name
+	this.rname = this.fmtname(name)
 	this.rmers = make(map[string]irc.Remover, 0)
 
 	this.init()
 	return this
 }
 
+// $，+，！和空格
+// TODO 中文？
+func (this *IrcBackend2) fmtname(name string) string {
+	newname := ""
+	valid := true
+
+	for _, c := range name {
+		if c == '$' || c == '+' || c == ' ' || c == '!' ||
+			c == '.' {
+			newname += string("\\")
+		} else {
+			newname += string(c)
+		}
+		if c > 127 {
+			valid = false
+		}
+	}
+	if !valid {
+		newname = gpinyin.ConvertToPinyinString(newname, "", gpinyin.PINYIN_WITHOUT_TONE)
+	}
+	return newname
+}
+
 func (this *IrcBackend2) init() {
-	var name = this.name
-	ircfg := irc.NewConfig(name)
+	ircfg := irc.NewConfig(this.rname)
 	ircfg.SSL = true
 
 	ircfg.SSLConfig = &tls.Config{ServerName: strings.Split(serverssl, ":")[0]}
@@ -39,13 +63,13 @@ func (this *IrcBackend2) init() {
 	ircon := irc.Client(ircfg)
 	ircon.EnableStateTracking()
 
-	for _, name := range ircmds {
-		rmer := ircon.HandleFunc(name, this.onEvent)
-		this.rmers[name] = rmer
+	for _, cmdname := range ircmds {
+		rmer := ircon.HandleFunc(cmdname, this.onEvent)
+		this.rmers[cmdname] = rmer
 	}
-	for _, no := range []string{"353"} {
-		rmer := ircon.HandleFunc(no, this.onEvent)
-		this.rmers[name] = rmer
+	for _, cmdno := range []string{"353"} {
+		rmer := ircon.HandleFunc(cmdno, this.onEvent)
+		this.rmers[cmdno] = rmer
 	}
 
 	this.ircon = ircon
@@ -54,7 +78,8 @@ func (this *IrcBackend2) init() {
 
 func (this *IrcBackend2) setName(name string) {
 	this.name = name
-	this.ircon.Nick(name)
+	this.rname = this.fmtname(name)
+	this.ircon.Nick(this.rname)
 	// this.ircon.Config().Me.IsOn("#thehehe")
 }
 
@@ -64,12 +89,12 @@ func (this *IrcBackend2) getName() string {
 	// zuck07 // Powered by GoIRC // Nick: zuck07 // Hostmask: goirc@
 	// Real Name: Powered by GoIRC // Channels: #a #b #c
 	// log.Println(ircon.Me().Nick, ircon.Me().Name, ircon.Me().String())
-	if this.ircon != nil && this.ircon.Me().Nick != this.name {
+	if this.ircon != nil && this.ircon.Me().Nick != this.rname {
 		if this.ircon.Me().Nick != this.ircon.Config().NewNick(this.name) {
-			log.Println("wtf", this.ircon.Me().Nick, this.name)
+			log.Println("wtf", this.ircon.Me().Nick, this.name, this.rname)
 		}
 	}
-	return this.name
+	return this.rname // or this.name?
 }
 
 func (this *IrcBackend2) isOn(channel string) bool {
@@ -112,6 +137,11 @@ func (this *IrcBackend2) onEvent(ircon *irc.Conn, line *irc.Line) {
 }
 
 func (this *IrcBackend2) nonblockSendBusch(ce *Event) {
+	{
+		this.ctx.sendBusEvent(ce)
+		return
+	}
+
 	select {
 	case this.ctx.busch <- ce:
 	default:
@@ -121,7 +151,7 @@ func (this *IrcBackend2) nonblockSendBusch(ce *Event) {
 
 func (this *IrcBackend2) connect() {
 	//	go func() {
-	log.Println(this.name)
+	log.Println(this.name, this.rname)
 	err := this.ircon.Connect()
 	if err != nil {
 		log.Println(err)
@@ -130,7 +160,7 @@ func (this *IrcBackend2) connect() {
 		ce.Be = this
 		this.nonblockSendBusch(ce)
 	}
-	log.Println(this.name, "done")
+	log.Println(this.name, this.rname, "done")
 	//	}()
 }
 

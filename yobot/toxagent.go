@@ -1,31 +1,34 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"strconv"
 	"strings"
 	// "sync"
+	"runtime"
 	"time"
 
 	"github.com/kitech/go-toxcore"
-	"github.com/sasha-s/go-deadlock"
 )
 
 type ToxAgent struct {
 	RelaxCallObject
-	ctx    *Context
-	_tox   *tox.Tox
-	_toxmu deadlock.Mutex // sync.Mutex
+	ctx   *Context
+	_tox  *tox.Tox
+	stopC chan bool
 
 	groupMembers map[int]map[int][]string // leave group get peer name/pubkey
 	theirGroups  map[int]bool             // accepted group number => true
+
 }
 
 func NewToxAgent() *ToxAgent {
 	this := &ToxAgent{}
 	this.ctx = ctx
+	this.stopC = make(chan bool, 0)
 
 	this.groupMembers = make(map[int]map[int][]string)
 	this.theirGroups = make(map[int]bool)
@@ -41,20 +44,25 @@ func (this *ToxAgent) start() {
 }
 
 func (this *ToxAgent) stop() {
-
+	this.save_account()
+	this.stopC <- true
+	runtime.Gosched()
+	this._tox.Kill()
 }
 
 func (this *ToxAgent) setupCallbacks() {
 
 	this._tox.CallbackSelfConnectionStatus(func(t *tox.Tox, status int, d interface{}) {
 		log.Println(status)
-		fn, err := t.FriendByPublicKey(groupbot)
-		log.Println(fn, err)
-		if err != nil {
-			t.FriendAdd(groupbot, "me here")
+		friendNumber, err := t.FriendByPublicKey(groupbot)
+		if err != nil && status > tox.CONNECTION_NONE {
+			t.FriendAdd(groupbot, fmt.Sprintf("Hey %d, me here", friendNumber))
 		}
+		t.SelfSetName(t.SelfGetName()) // deadlock test
+		// TODO fixed enter groupbot group
+
 		this.save_account()
-		if status > 0 {
+		if status > tox.CONNECTION_NONE {
 			this.ctx.busch <- NewEvent(PROTO_TOX, EVT_CONNECTED, "", status)
 		} else {
 			this.ctx.busch <- NewEvent(PROTO_TOX, EVT_DISCONNECTED, "", status)
@@ -119,7 +127,7 @@ func (this *ToxAgent) onFriendConnectionStatus(t *tox.Tox, friendNumber uint32, 
 			}
 		}
 	}()
-	if status > 0 {
+	if status > tox.CONNECTION_NONE {
 		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_FRIEND_CONNECTED, "", friendNumber, status)
 	} else {
 		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_FRIEND_DISCONNECTED, "", friendNumber, status)
@@ -129,6 +137,8 @@ func (this *ToxAgent) onFriendConnectionStatus(t *tox.Tox, friendNumber uint32, 
 func (this *ToxAgent) onGroupMessage(t *tox.Tox, groupNumber int,
 	peerNumber int, message string, d interface{}) {
 	log.Println(groupNumber, peerNumber, message)
+	defer log.Println(groupNumber, peerNumber, message)
+
 	groupTitle, err := t.GroupGetTitle(groupNumber)
 	if err != nil {
 		log.Println(err, groupTitle)
@@ -300,6 +310,8 @@ func (this *ToxAgent) onGroupNameListChange(t *tox.Tox,
 			this.groupMembers[groupNumber] = make(map[int][]string)
 		}
 		this.groupMembers[groupNumber][peerNumber] = []string{peerName, peerPubkey}
+		// TODO change name event
+		log.Println(lwarningp, "TODO", "tox rename event")
 	}
 
 	// check only me left case
@@ -326,6 +338,7 @@ var groupbot = "56A1ADE4B65B86BCD51CC73E2CD4E542179F47959FE3E0E21B4B0ACDADE51855
 
 func (this *ToxAgent) setupTox() {
 	toxops := tox.NewToxOptions()
+	toxops.ThreadSafe = true
 	this._tox = tox.NewTox(toxops)
 
 	toxops.Udp_enabled = false
@@ -397,22 +410,26 @@ func (this *ToxAgent) getToxGroupNames() map[int]string {
 }
 
 func (this *ToxAgent) Iterate() {
-	stopped := false
+
 	tick := time.Tick(100 * time.Millisecond)
 	id := this._tox.SelfGetAddress()
-	for !stopped {
+	for {
 		select {
 		case <-tick:
 			// this.Call0(func() { this._tox.Iterate() })
-			this._toxmu.Lock()
+			// this._toxmu.Lock()
 			this._tox.Iterate()
-			this._toxmu.Unlock()
+			// this._toxmu.Unlock()
+		case <-this.stopC:
+			goto endfor
 		}
 	}
+
+endfor:
 	log.Println("stopped", id)
 }
 
-var tox_save_file = "./tox.save"
+var tox_save_file = "./tox.save.yobot"
 
 func (this *ToxAgent) load_account(toxops *tox.ToxOptions) {
 	data, err := ioutil.ReadFile(tox_save_file)

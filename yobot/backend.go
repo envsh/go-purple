@@ -10,5 +10,10 @@ type BackendBase struct {
 	conque chan interface{}
 	proto  string
 	name   string
+	rname  string // maybe invalid name for some backend
 	uid    string
+}
+
+func (this *BackendBase) fmtname() string {
+	return this.name
 }

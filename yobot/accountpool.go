@@ -10,6 +10,7 @@ import (
 
 const (
 	PROTO_NONE  = "none"
+	PROTO_SYS   = "sys"
 	PROTO_IRC   = "irc"
 	PROTO_TOX   = "tox"
 	PROTO_TABLE = "table"
@@ -94,7 +95,16 @@ func (this *AccountPool) remove(name string, uid string) {
 		}
 	*/
 }
-
+func (this *AccountPool) disconnectAll() {
+	uids := make([]string, 0)
+	for uid, _ := range this.acs {
+		uids = append(uids, uid)
+	}
+	for _, uid := range uids {
+		ac := this.acs[uid]
+		this.remove(ac.name, uid)
+	}
+}
 func (this *AccountPool) count() int {
 	this.mu.Lock()
 	defer this.mu.Unlock()

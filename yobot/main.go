@@ -4,6 +4,8 @@ import (
 	"flag"
 	"log"
 	// "strings"
+	"os"
+	"os/signal"
 	"runtime"
 	"time"
 
@@ -17,6 +19,15 @@ import (
 var debug bool
 var pxyurl string
 var pprof bool
+
+const (
+	ltracep   = "trace: "
+	ldebugp   = "debug: "
+	linfop    = "info: "
+	lwarningp = "warning: "
+	lerrorp   = "error: "
+	lalertp   = "alert: "
+)
 
 func init() {
 	flag.BoolVar(&debug, "debug", debug, "purple debug switch")
@@ -35,6 +46,23 @@ type Context struct {
 	acpool *AccountPool
 	rtab   *RoundTable
 	msgbus *MsgBusClient
+}
+
+func (this *Context) sendBusEvent(e *Event) bool {
+	sendok := true
+	defer func() {
+		if x := recover(); x != nil {
+			sendok = false
+			log.Printf("wow: %v", x)
+		}
+	}()
+
+	select {
+	case this.busch <- e:
+	default:
+		log.Println("send busch blocked")
+	}
+	return sendok
 }
 
 var ctx *Context
@@ -58,13 +86,50 @@ func main() {
 	ctx.rtab = NewRoundTable()
 	ctx.msgbus = newMsgBusClient()
 
-	ctx.rtab.run()
+	go ctx.rtab.run()
+
+	shutdownHandler := func() {
+		ctx.rtab.stop()
+		<-ctx.rtab.done()
+		ctx.acpool.disconnectAll()
+		ctx.toxagt.stop()
+		log.Println("shutdown done.")
+		os.Exit(0)
+	}
 
 	// TODO system signal, elegant shutdown
+	elegantShutdown := func(hfunc func()) {
+		var niceCloseC = make(chan os.Signal, 0)
+		signal.Notify(niceCloseC, os.Interrupt)
+		intrTimes := 0
+		for {
+			select {
+			case sig := <-niceCloseC:
+				log.Println("received sig:", sig.String())
+				switch sig {
+				case os.Interrupt:
+					intrTimes += 1
+					if intrTimes > 1 {
+						log.Println("force shutdown...")
+						os.Exit(0)
+						return
+					}
+					hfunc()
+					goto endfor
+				}
+			}
+		}
+
+	endfor:
+		return
+	}
+
+	elegantShutdown(shutdownHandler)
 }
 
 // TODO multiple servers,
-const serverssl = "weber.freenode.net:6697"
+//const serverssl = "weber.freenode.net:6697"
+const serverssl = "irc.freenode.net:6697"
 const toxname = "zuck05"
 const ircname = toxname
 const leaveChannelTimeout = 270 // seconds
