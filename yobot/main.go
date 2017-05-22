@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"syscall"
 	// "strings"
 	"os"
 	"os/signal"
@@ -60,7 +61,8 @@ func (this *Context) sendBusEvent(e *Event) bool {
 	select {
 	case this.busch <- e:
 	default:
-		log.Println("send busch blocked")
+		log.Println("send busch blocked:", len(this.busch))
+		// TODO 这种情况是为什么呢，应该怎么办呢？
 	}
 	return sendok
 }
@@ -100,7 +102,7 @@ func main() {
 	// TODO system signal, elegant shutdown
 	elegantShutdown := func(hfunc func()) {
 		var niceCloseC = make(chan os.Signal, 0)
-		signal.Notify(niceCloseC, os.Interrupt)
+		signal.Notify(niceCloseC, os.Interrupt, syscall.SIGPIPE)
 		intrTimes := 0
 		for {
 			select {
@@ -116,9 +118,13 @@ func main() {
 					}
 					hfunc()
 					goto endfor
+				case syscall.SIGPIPE:
+					// 为啥并没有捕捉到这个信号，程序依旧崩溃了，是因为在gdb中吗
+					// 果然是因为gdb的问题吗，测试SIGINT捕捉不到
+					log.Println("wow, SIGPIPE occurs. omit.")
 				}
-			}
-		}
+			} // end select
+		} //end for
 
 	endfor:
 		return
@@ -130,7 +136,7 @@ func main() {
 // TODO multiple servers,
 //const serverssl = "weber.freenode.net:6697"
 const serverssl = "irc.freenode.net:6697"
-const toxname = "zuck05"
+const toxname = "zuck05" // hlpbot
 const ircname = toxname
 const leaveChannelTimeout = 270 // seconds
 

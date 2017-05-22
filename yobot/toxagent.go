@@ -53,7 +53,7 @@ func (this *ToxAgent) stop() {
 func (this *ToxAgent) setupCallbacks() {
 
 	this._tox.CallbackSelfConnectionStatus(func(t *tox.Tox, status int, d interface{}) {
-		log.Println(status)
+		log.Println(status, tox.ConnStatusString(status))
 		friendNumber, err := t.FriendByPublicKey(groupbot)
 		if err != nil && status > tox.CONNECTION_NONE {
 			t.FriendAdd(groupbot, fmt.Sprintf("Hey %d, me here", friendNumber))
@@ -66,6 +66,9 @@ func (this *ToxAgent) setupCallbacks() {
 			this.ctx.busch <- NewEvent(PROTO_TOX, EVT_CONNECTED, "", status)
 		} else {
 			this.ctx.busch <- NewEvent(PROTO_TOX, EVT_DISCONNECTED, "", status)
+		}
+		if status == tox.CONNECTION_NONE {
+			this.tryReconnect(3 * time.Second)
 		}
 	}, nil)
 	this._tox.CallbackFriendRequest(func(t *tox.Tox, pubkey, msg string, d interface{}) {
@@ -134,6 +137,49 @@ func (this *ToxAgent) onFriendConnectionStatus(t *tox.Tox, friendNumber uint32, 
 	}
 }
 
+// TODO save invite data, test rejoin if leave
+func (this *ToxAgent) onGroupInvite(t *tox.Tox,
+	friendNumber uint32, itype uint8, data []byte, d interface{}) {
+	log.Println(friendNumber, len(data), itype)
+	pubkey, err := this._tox.FriendGetPublicKey(friendNumber)
+	if err != nil {
+		log.Println(err, pubkey)
+	}
+
+	acceptInvite := func(interface{}) {
+		var groupNumber int
+		var err error
+		switch itype {
+		case tox.GROUPCHAT_TYPE_AV:
+			groupNumber, err = t.JoinAVGroupChat(friendNumber, data)
+			if err != nil {
+				log.Println(err, groupNumber)
+			}
+		case tox.GROUPCHAT_TYPE_TEXT:
+			groupNumber, err = t.JoinGroupChat(friendNumber, data)
+			if err != nil {
+				log.Println(err, groupNumber)
+			}
+		default:
+			log.Panicln("wtf")
+		}
+		if err == nil {
+			// 立即取Title一般会失败的
+			groupTitle, err := t.GroupGetTitle(groupNumber)
+			if err != nil {
+				log.Println(err, groupTitle)
+			}
+			this.theirGroups[groupNumber] = true
+		}
+	}
+	if strings.HasPrefix(groupbot, pubkey) {
+		acceptInvite(nil)
+	} else if strings.HasPrefix(pubkey, "398C8") {
+		acceptInvite(nil)
+	}
+
+}
+
 func (this *ToxAgent) onGroupMessage(t *tox.Tox, groupNumber int,
 	peerNumber int, message string, d interface{}) {
 	log.Println(groupNumber, peerNumber, message)
@@ -183,48 +229,6 @@ func (this *ToxAgent) onGroupMessage(t *tox.Tox, groupNumber int,
 			this.acp.get(ircname).ircon.Privmsg(groupTitle, message)
 		}
 	*/
-}
-
-func (this *ToxAgent) onGroupInvite(t *tox.Tox,
-	friendNumber uint32, itype uint8, data []byte, d interface{}) {
-	log.Println(friendNumber, len(data), itype)
-	pubkey, err := this._tox.FriendGetPublicKey(friendNumber)
-	if err != nil {
-		log.Println(err, pubkey)
-	}
-
-	acceptInvite := func(interface{}) {
-		var groupNumber int
-		var err error
-		switch itype {
-		case tox.GROUPCHAT_TYPE_AV:
-			groupNumber, err = t.JoinAVGroupChat(friendNumber, data)
-			if err != nil {
-				log.Println(err, groupNumber)
-			}
-		case tox.GROUPCHAT_TYPE_TEXT:
-			groupNumber, err = t.JoinGroupChat(friendNumber, data)
-			if err != nil {
-				log.Println(err, groupNumber)
-			}
-		default:
-			log.Panicln("wtf")
-		}
-		if err == nil {
-			// 立即取Title一般会失败的
-			groupTitle, err := t.GroupGetTitle(groupNumber)
-			if err != nil {
-				log.Println(err, groupTitle)
-			}
-			this.theirGroups[groupNumber] = true
-		}
-	}
-	if strings.HasPrefix(groupbot, pubkey) {
-		acceptInvite(nil)
-	} else if strings.HasPrefix(pubkey, "398C8") {
-		acceptInvite(nil)
-	}
-
 }
 
 func (this *ToxAgent) onGroupAction(t *tox.Tox,
@@ -319,10 +323,22 @@ func (this *ToxAgent) onGroupNameListChange(t *tox.Tox,
 		if pn := this._tox.GroupNumberPeers(groupNumber); pn == 1 {
 			log.Println("oh, only me left:", groupNumber, groupTitle)
 			// check our create group or not
+			// 即使不是自己创建的群组，在只剩下自己之后，也可以不删除。因为这个群的所有人就是自己了。
+			// 这里找一下为什么程序会崩溃吧
 			if _, ok := this.theirGroups[groupNumber]; ok {
 				log.Println("their invite group matched, clean it", groupNumber, groupTitle)
 				delete(this.theirGroups, groupNumber)
-				this._tox.DelGroupChat(groupNumber)
+				grptype, err := this._tox.GroupGetType(uint32(groupNumber))
+				log.Println("before delete group chat", groupNumber, grptype, err)
+				switch uint8(grptype) {
+				case tox.GROUPCHAT_TYPE_AV:
+					log.Println("dont delete av groupchat for a try", groupNumber, ok, err)
+				case tox.GROUPCHAT_TYPE_TEXT:
+					ok, err := this._tox.DelGroupChat(groupNumber)
+					log.Println("after delete group chat", groupNumber, ok, err)
+				default:
+					log.Fatal("wtf")
+				}
 			}
 		}
 	}
@@ -361,6 +377,11 @@ func (this *ToxAgent) setupTox() {
 	this._tox.SelfSetName(toxname)
 	this._tox.SelfSetStatusMessage(statusMessage)
 
+	this.bootstrap()
+}
+
+// maybe block seconds
+func (this *ToxAgent) bootstrap() {
 	for i := 0; i < len(bsnodes); i += 3 {
 		port, _ := strconv.Atoi(bsnodes[i+1])
 		ok1, err1 := this._tox.Bootstrap(bsnodes[i], uint16(port), bsnodes[i+2])
@@ -369,7 +390,24 @@ func (this *ToxAgent) setupTox() {
 			log.Println(ok1, ok2, err1, err2)
 		}
 	}
+}
 
+func (this *ToxAgent) tryReconnect(d time.Duration) {
+	go func() {
+		for {
+			log.Println("try reconnect now")
+			status := this._tox.SelfGetConnectionStatus()
+			if status == tox.CONNECTION_NONE {
+				this.bootstrap()
+			}
+			log.Println("check connection after 3 seconds...")
+			time.Sleep(3 * time.Second)
+			if this._tox.SelfGetConnectionStatus() > tox.CONNECTION_NONE {
+				log.Println("reconnect ok")
+				break
+			}
+		}
+	}()
 }
 
 // TODO multiple result and reverse order search,

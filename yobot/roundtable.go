@@ -91,8 +91,12 @@ func (this *RoundTable) stop() {
 
 // 这个方法是可以阻塞运行的，只是把后续的事件延后处理，这样带来程序逻辑简洁。
 // 从另一个方面，并不会阻塞发送事件的线程
+var handledEventCount uint64
+
 func (this *RoundTable) handleEvent() {
 	for ie := range this.ctx.busch {
+		handledEventCount += 1
+		log.Println("begin handle event:", handledEventCount, len(this.ctx.busch))
 		// log.Println(ie)
 		this.ctx.msgbus.Publish(ie)
 		switch ie.Proto {
@@ -106,6 +110,7 @@ func (this *RoundTable) handleEvent() {
 		case PROTO_SYS:
 			goto endfunc
 		}
+		log.Println("end handle event:", handledEventCount, len(this.ctx.busch))
 	}
 endfunc:
 	log.Println("endup event handler")
@@ -282,12 +287,16 @@ func (this *RoundTable) handleEventTox(e *Event) {
 		case "info": // show friends count, groups count and group list info
 			this.processInfoCmd(friendNumber)
 		case "invite":
+			// TODO args check put in process function
 			if len(segs) > 1 {
 				this.processInviteCmd(segs[1:], friendNumber)
 			} else {
 				// this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.FriendSendMessage(friendNumber, "invite what?") })
 				this.ctx.toxagt._tox.FriendSendMessage(friendNumber, "invite what?")
 			}
+		case "leave": // TODO
+			log.Println("should leave")
+			// this.processLeaveCmd(segs, friendNumber)
 		case "id":
 			// this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.FriendSendMessage(friendNumber, this.ctx.toxagt._tox.SelfGetAddress()) })
 			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, this.ctx.toxagt._tox.SelfGetAddress())
@@ -705,7 +714,8 @@ func (this *RoundTable) handleEventTable(e *Event) {
 				}
 				title, mime, err := fetchtitle.FetchMeta(u, 7)
 				titleLine := fmtUrlMeta(title, mime, err, u)
-				this.ctx.busch <- NewEvent(PROTO_TABLE, EVT_GOT_URL_META, e.Chan, titleLine, e.Args[1])
+				this.ctx.sendBusEvent(NewEvent(PROTO_TABLE,
+					EVT_GOT_URL_META, e.Chan, titleLine, e.Args[1]))
 			}
 		}()
 	case EVT_GOT_URL_META:
@@ -725,12 +735,8 @@ func (this *RoundTable) handleEventTable(e *Event) {
 			}
 		}
 		found := isInBotResponseWhiteChannel(chname)
-		// 本群中有titlebot，或者不在白名单，则不响应此消息
-		if hasTitleBot || !found {
-			log.Println("got meta: ", message, hasTitleBot, found)
-			break
-		}
 
+		// 总是发到tox端上
 		if true {
 			// TODO move to ToxAgent.relaxSendMessage(chname)
 			groupNumber := this.ctx.toxagt.getToxGroupByName(chname)
@@ -750,6 +756,12 @@ func (this *RoundTable) handleEventTable(e *Event) {
 					log.Println(err, groupNumber, chname)
 				}
 			}
+		}
+
+		// 本群中有titlebot，或者不在白名单，则不响应此消息
+		if hasTitleBot || !found {
+			log.Println("got meta: ", message, hasTitleBot, found)
+			break
 		}
 		if true {
 			// TODO move to Account.relaxSendMessage(ircname)
