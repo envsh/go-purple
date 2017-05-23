@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
+	debug1 "runtime/debug"
 	"time"
 
 	"go-pprofui"
@@ -63,6 +64,7 @@ func (this *Context) sendBusEvent(e *Event) bool {
 	default:
 		log.Println("send busch blocked:", len(this.busch))
 		// TODO 这种情况是为什么呢，应该怎么办呢？
+		debug1.PrintStack()
 	}
 	return sendok
 }

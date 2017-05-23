@@ -94,12 +94,18 @@ func (this *ToxAgent) setupCallbacks() {
 	this._tox.CallbackGroupTitle(func(t *tox.Tox,
 		groupNumber int, peerNumber int, title string, d interface{}) {
 		log.Println(groupNumber, peerNumber, title)
-		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_JOIN_GROUP, title, groupNumber, peerNumber)
+		if strings.HasPrefix(title, DELETED_INVITED_GROUPCHAT_P) {
+			// TODO do what?
+			return
+		}
+		this.ctx.sendBusEvent(NewEvent(PROTO_TOX, EVT_JOIN_GROUP, title, groupNumber, peerNumber))
 	}, nil)
 
 	this._tox.CallbackGroupAction(this.onGroupAction, nil)
 	this._tox.CallbackGroupNameListChange(this.onGroupNameListChange, nil)
 }
+
+const DELETED_INVITED_GROUPCHAT_P = "#deleted_invited_groupchat_"
 
 func (this *ToxAgent) onFriendConnectionStatus(t *tox.Tox, friendNumber uint32, status int, d interface{}) {
 	log.Println(friendNumber, status)
@@ -332,13 +338,16 @@ func (this *ToxAgent) onGroupNameListChange(t *tox.Tox,
 				log.Println("before delete group chat", groupNumber, grptype, err)
 				switch uint8(grptype) {
 				case tox.GROUPCHAT_TYPE_AV:
-					log.Println("dont delete av groupchat for a try", groupNumber, ok, err)
+					// log.Println("dont delete av groupchat for a try", groupNumber, ok, err)
 				case tox.GROUPCHAT_TYPE_TEXT:
-					ok, err := this._tox.DelGroupChat(groupNumber)
-					log.Println("after delete group chat", groupNumber, ok, err)
+					// ok, err := this._tox.DelGroupChat(groupNumber)
+					// log.Println("after delete group chat", groupNumber, ok, err)
 				default:
 					log.Fatal("wtf")
 				}
+				log.Println("hehhe----------------------------")
+				this._tox.GroupSetTitle(groupNumber, fmt.Sprintf("#deleted_invited_groupchat_%s", time.Now().Format("20060102_150405")))
+				log.Println("dont delete invited groupchat for a try", groupNumber, ok, err)
 			}
 		}
 	}
