@@ -16,9 +16,11 @@ import (
 
 type ToxAgent struct {
 	RelaxCallObject
-	ctx   *Context
-	_tox  *tox.Tox
-	stopC chan bool
+	ctx       *Context
+	_tox      *tox.Tox
+	stopC     chan bool
+	reconnC   chan time.Duration
+	delGroupC chan int
 
 	groupMembers map[int]map[int][]string // leave group get peer name/pubkey
 	theirGroups  map[int]bool             // accepted group number => true
@@ -29,6 +31,8 @@ func NewToxAgent() *ToxAgent {
 	this := &ToxAgent{}
 	this.ctx = ctx
 	this.stopC = make(chan bool, 0)
+	this.reconnC = make(chan time.Duration, 1)
+	this.delGroupC = make(chan int, 16)
 
 	this.groupMembers = make(map[int]map[int][]string)
 	this.theirGroups = make(map[int]bool)
@@ -68,7 +72,8 @@ func (this *ToxAgent) setupCallbacks() {
 			this.ctx.busch <- NewEvent(PROTO_TOX, EVT_DISCONNECTED, "", status)
 		}
 		if status == tox.CONNECTION_NONE {
-			this.tryReconnect(3 * time.Second)
+			// this.tryReconnect(3 * time.Second)
+			this.reconnC <- (3 * time.Second)
 		}
 	}, nil)
 	this._tox.CallbackFriendRequest(func(t *tox.Tox, pubkey, msg string, d interface{}) {
@@ -325,6 +330,30 @@ func (this *ToxAgent) onGroupNameListChange(t *tox.Tox,
 	}
 
 	// check only me left case
+	this.checkOnlyMeLeftGroup(groupNumber, peerNumber, change)
+}
+
+// check only me left case
+func (this *ToxAgent) checkOnlyMeLeftGroup(groupNumber int, peerNumber int, change uint8) {
+	groupTitle, err := this._tox.GroupGetTitle(groupNumber)
+	if err != nil {
+		log.Println("wtf", err)
+	}
+	peerName, err := this._tox.GroupPeerName(groupNumber, peerNumber)
+	if err != nil {
+		if change != tox.CHAT_CHANGE_PEER_DEL {
+			log.Println("wtf", err, peerName)
+		}
+	}
+	// var peerPubkey string
+
+	switch change {
+	case tox.CHAT_CHANGE_PEER_DEL:
+	case tox.CHAT_CHANGE_PEER_ADD:
+	case tox.CHAT_CHANGE_PEER_NAME:
+	}
+
+	// check only me left case
 	if change == tox.CHAT_CHANGE_PEER_DEL {
 		if pn := this._tox.GroupNumberPeers(groupNumber); pn == 1 {
 			log.Println("oh, only me left:", groupNumber, groupTitle)
@@ -345,12 +374,16 @@ func (this *ToxAgent) onGroupNameListChange(t *tox.Tox,
 				default:
 					log.Fatal("wtf")
 				}
+				time.AfterFunc(1*time.Second, func() {
+					this.delGroupC <- groupNumber
+				})
 				log.Println("hehhe----------------------------")
 				this._tox.GroupSetTitle(groupNumber, fmt.Sprintf("#deleted_invited_groupchat_%s", time.Now().Format("20060102_150405")))
 				log.Println("dont delete invited groupchat for a try", groupNumber, ok, err)
 			}
 		}
 	}
+
 }
 
 var bsnodes = []string{
@@ -401,24 +434,6 @@ func (this *ToxAgent) bootstrap() {
 	}
 }
 
-func (this *ToxAgent) tryReconnect(d time.Duration) {
-	go func() {
-		for {
-			log.Println("try reconnect now")
-			status := this._tox.SelfGetConnectionStatus()
-			if status == tox.CONNECTION_NONE {
-				this.bootstrap()
-			}
-			log.Println("check connection after 3 seconds...")
-			time.Sleep(3 * time.Second)
-			if this._tox.SelfGetConnectionStatus() > tox.CONNECTION_NONE {
-				log.Println("reconnect ok")
-				break
-			}
-		}
-	}()
-}
-
 // TODO multiple result and reverse order search,
 // for use new group, but not old unsable group
 func (this *ToxAgent) getToxGroupByName(name string) int {
@@ -456,6 +471,40 @@ func (this *ToxAgent) getToxGroupNames() map[int]string {
 	return ret
 }
 
+func (this *ToxAgent) tryReconnect(d time.Duration) {
+	go func() {
+		for {
+			log.Println("try reconnect now")
+			status := this._tox.SelfGetConnectionStatus()
+			if status == tox.CONNECTION_NONE {
+				this.bootstrap()
+			}
+			log.Println("check connection after 3 seconds...")
+			time.Sleep(3 * time.Second)
+			if this._tox.SelfGetConnectionStatus() > tox.CONNECTION_NONE {
+				log.Println("reconnect ok")
+				break
+			}
+		}
+	}()
+}
+
+func (this *ToxAgent) tryReconnectBlock(d time.Duration) {
+	log.Println("try reconnect now")
+	status := this._tox.SelfGetConnectionStatus()
+	if status == tox.CONNECTION_NONE {
+		this.bootstrap()
+	}
+	log.Println("check connection after 3 seconds...")
+	time.AfterFunc(3*time.Second, func() {
+		if this._tox.SelfGetConnectionStatus() > tox.CONNECTION_NONE {
+			log.Println("reconnect ok")
+		} else {
+			this.reconnC <- d
+		}
+	})
+}
+
 func (this *ToxAgent) Iterate() {
 
 	tick := time.Tick(100 * time.Millisecond)
@@ -467,6 +516,13 @@ func (this *ToxAgent) Iterate() {
 			// this._toxmu.Lock()
 			this._tox.Iterate()
 			// this._toxmu.Unlock()
+		case dur := <-this.reconnC:
+			this.tryReconnectBlock(dur)
+		case groupNumber := <-this.delGroupC:
+			log.Println("before real delete group:", groupNumber)
+			r, ok := this._tox.DelGroupChat(groupNumber)
+			log.Println(r, ok)
+			log.Println("after real delete group:", groupNumber)
 		case <-this.stopC:
 			goto endfor
 		}
