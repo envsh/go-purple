@@ -388,7 +388,8 @@ func (this *ToxAgent) checkOnlyMeLeftGroup(groupNumber int, peerNumber int, chan
 
 var bsnodes = []string{
 	"biribiri.org", "33445", "F404ABAA1C99A9D37D61AB54898F56793E1DEF8BD46B1038B9D822E8460FAB67",
-	"178.62.250.138", "33445", "788236D34978D1D5BD822F0A5BEBD2C53C64CC31CD3149350EE27D4D9A2F9B6B",
+	// "178.62.250.138", "33445", "788236D34978D1D5BD822F0A5BEBD2C53C64CC31CD3149350EE27D4D9A2F9B6B",
+	"108.61.165.198", "33445", "8E7D0B859922EF569298B4D261A8CCB5FEA14FB91ED412A7603A585A25698832",
 	"205.185.116.116", "33445", "A179B09749AC826FF01F37A9613F6B57118AE014D4196A0E1105A98F93A54702",
 }
 
@@ -408,7 +409,7 @@ func (this *ToxAgent) setupTox() {
 		toxops.Tcp_port = uint16(rand.Uint32()%55536) + 10000
 		this._tox = tox.NewTox(toxops)
 		if this._tox != nil {
-			log.Println("TOXID:", this._tox.SelfGetAddress(), port)
+			log.Println("TOXID:", this._tox.SelfGetAddress(), port, toxops.Tcp_port)
 			break
 		}
 	}
@@ -432,6 +433,7 @@ func (this *ToxAgent) bootstrap() {
 			log.Println(ok1, ok2, err1, err2)
 		}
 	}
+	log.Println("bootstrap done:", len(bsnodes)/3)
 }
 
 // TODO multiple result and reverse order search,

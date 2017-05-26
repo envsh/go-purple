@@ -138,7 +138,7 @@ func main() {
 // TODO multiple servers,
 //const serverssl = "weber.freenode.net:6697"
 const serverssl = "irc.freenode.net:6697"
-const toxname = "zuck05" // hlpbot
+const toxname = "zuck05l" // hlpbot
 const ircname = toxname
 const leaveChannelTimeout = 270 // seconds
 

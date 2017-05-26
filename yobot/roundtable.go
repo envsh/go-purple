@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go-purple/fetchtitle"
+	"mkuse/hlpbot"
 
 	"github.com/fluffle/goirc/state"
 	"github.com/mvdan/xurls"
@@ -66,6 +67,7 @@ type RoundTable struct {
 	tracker              state.Tracker
 	masterReconnectTimes int
 	doneC                chan bool
+	assit                *helper.Assistant
 }
 
 func NewRoundTable() *RoundTable {
@@ -74,6 +76,7 @@ func NewRoundTable() *RoundTable {
 	this.mflt = NewMessageFilter()
 	this.tracker = state.NewTracker(ircname)
 	this.doneC = make(chan bool)
+	this.assit = helper.NewAssistant()
 
 	if pxyurl != "" {
 		fetchtitle.SetProxy(pxyurl)
@@ -82,6 +85,7 @@ func NewRoundTable() *RoundTable {
 }
 
 func (this *RoundTable) run() {
+	go this.handleHelperResponse()
 	go this.handleEvent()
 	select {}
 }
@@ -714,10 +718,14 @@ func (this *RoundTable) handleEventTable(e *Event) {
 				}
 				title, mime, err := fetchtitle.FetchMeta(u, 7)
 				titleLine := fmtUrlMeta(title, mime, err, u)
-				this.ctx.sendBusEvent(NewEvent(PROTO_TABLE,
-					EVT_GOT_URL_META, e.Chan, titleLine, e.Args[1]))
+				if false {
+					this.ctx.sendBusEvent(NewEvent(PROTO_TABLE,
+						EVT_GOT_URL_META, e.Chan, titleLine, e.Args[1]))
+				}
 			}
 		}()
+
+		this.assit.MaybeCmdAsync(msg, e)
 	case EVT_GOT_URL_META:
 		chname := e.Chan
 		message := e.Args[0].(string)
@@ -779,4 +787,16 @@ func (this *RoundTable) handleEventTable(e *Event) {
 		}
 	}
 
+}
+
+func (this *RoundTable) handleHelperResponse() {
+	for res := range this.assit.ResultC() {
+		log.Println(res.Result)
+		e := res.Extra.(*Event)
+		titleLine := res.Result
+
+		this.ctx.sendBusEvent(NewEvent(PROTO_TABLE,
+			EVT_GOT_URL_META, e.Chan, titleLine, e.Args[1]))
+	}
+	log.Println("done")
 }
