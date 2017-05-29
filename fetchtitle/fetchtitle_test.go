@@ -49,7 +49,9 @@ func TestFetchTitle(t *testing.T) {
 	urls = []string{
 		// "https://gist.github.com/4caa949091e80834c965156f0e3b493c", //empty title?
 		// "https://dn-fishroom.qbox.me/sticker/1370.png",
-		"http://fishroom.tuna.moe/log/linuxba/2016-12-18/553",
+		// "http://fishroom.tuna.moe/log/linuxba/2016-12-18/553",
+		// "https://github.com/kitech/go-toxcore",
+		"http://wuxia.qq.com/main.shtml",
 	}
 
 	titles := []string{}
@@ -62,8 +64,9 @@ func TestFetchTitle(t *testing.T) {
 				log.Println(err, title, mime, url)
 				t.Fail()
 			} else {
-				log.Printf("id:%d, mime:%s, title:%s, url:%s\n", idx, mime, title, url)
-				log.Println(len(title))
+				log.Printf("id:%d, mime:%s, title:%s, url: %s\n",
+					idx, mime, title, url)
+				log.Println("title len:", len(title), title)
 				if idx < len(titles) && title != titles[idx] {
 					log.Println(title, "!=", titles[idx], url)
 					t.Fail()

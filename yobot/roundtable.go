@@ -337,14 +337,8 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 		}
 
 		// 检查来源是否是我们自己的连接发的消息
-		for _, ac := range this.ctx.acpool.acs {
-			be := ac.becon.(*IrcBackend2)
-			beme := be.ircon.Me()
-			if nick == beme.Nick {
-				// if suffix with ^^^, the beme.Nick contains it, and nick contains it too.
-				// log.Printf("drop by my ourcon:%s, %s, %v\n", nick, be.getName(), beme)
-				return
-			}
+		if this.ctx.acpool.isOurs(nick) {
+			break
 		}
 
 		// TODO 两机器人消息转发循环问题，zuck07 and zuck05...
@@ -497,6 +491,11 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 		groupNumber := this.ctx.toxagt.getToxGroupByName(chname)
 		if groupNumber == -1 {
 			groupNumber = this.ctx.toxagt.getToxGroupByName(strings.ToLower(chname))
+		}
+		if groupNumber == -1 {
+			if nch, ok := chmap.Get(chname); ok {
+				groupNumber = this.ctx.toxagt.getToxGroupByName(nch.(string))
+			}
 		}
 		if groupNumber == -1 {
 			log.Println("group not exists:", chname, strings.ToLower(chname))
@@ -735,6 +734,21 @@ func (this *RoundTable) handleEventTable(e *Event) {
 		// check has bot，
 		hasTitleBot := false
 		ac := this.ctx.acpool.get(ircname, this.ctx.toxagt._tox.SelfGetPublicKey())
+		// check ac, test code
+		if ac == nil {
+			log.Println("account not found:", ircname, this.ctx.toxagt._tox.SelfGetPublicKey())
+		}
+		if ac != nil && ac.becon == nil {
+			log.Println("ac.becon is nil")
+		}
+		if ac != nil && ac.becon != nil && ac.becon.(*IrcBackend2).ircon == nil {
+			log.Println("ac ircon is nil")
+		}
+		if ac == nil || ac.becon == nil || ac.becon.(*IrcBackend2).ircon == nil {
+			time.AfterFunc(2*time.Second, func() { this.ctx.sendBusEvent(e) })
+			break
+		}
+
 		for _, bot := range []string{"smbot", "varia", "xmppbot", "anotitlebot", "TideBot", "ttlbot"} {
 			_, ok := ac.becon.(*IrcBackend2).ircon.StateTracker().IsOn(e.Chan, bot)
 			if ok {

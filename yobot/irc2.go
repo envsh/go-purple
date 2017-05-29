@@ -60,6 +60,8 @@ func (this *IrcBackend2) init() {
 	ircfg.SSLConfig = &tls.Config{ServerName: strings.Split(serverssl, ":")[0]}
 	ircfg.Server = serverssl
 	ircfg.NewNick = func(n string) string { return n + "^" }
+	ircfg.Me.Ident = strings.Replace(ircfg.Me.Ident, "goirc", "gooirc", -1)
+
 	ircon := irc.Client(ircfg)
 	ircon.EnableStateTracking()
 
@@ -93,6 +95,9 @@ func (this *IrcBackend2) getName() string {
 		if this.ircon.Me().Nick != this.ircon.Config().NewNick(this.name) {
 			log.Println("wtf", this.ircon.Me().Nick, this.name, this.rname)
 		}
+	}
+	if len(this.rname) > 16 {
+		return this.rname[0:16]
 	}
 	return this.rname // or this.name?
 }

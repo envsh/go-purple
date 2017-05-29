@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strings"
@@ -16,6 +17,11 @@ import (
 )
 
 const userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.76 Safari/537.36 Vivaldi/1.6.689.13"
+const userAgent2 = "curl/7.54.0"
+
+var userAgents = []string{userAgent, userAgent2}
+
+func getUA() string { return userAgents[rand.Int()%len(userAgents)] }
 
 var pxyurl string
 
@@ -83,7 +89,6 @@ func fetchWebMeta(u string, timeout int) (title string, mime string, err error) 
 	cli.Timeout = time.Duration(timeout) * time.Second
 
 	var resp *http.Response
-
 	for idx := 0; idx < 5; idx++ {
 		var req *http.Request
 		req, err = http.NewRequest(http.MethodGet, u, nil)
@@ -93,7 +98,10 @@ func fetchWebMeta(u string, timeout int) (title string, mime string, err error) 
 		}
 
 		req.Header.Set("User-Agent", userAgent)
-		req.Header.Set("Accept", "*.*")
+		req.Header.Set("User-Agent", getUA())
+		req.Header.Set("Accept", "*/*")
+		req.Header.Set("Host", "github.com")
+		req.Header.Set("Connection", "Close")
 		resp, err = cli.Do(req)
 		if err != nil {
 			// log.Println(err)
@@ -122,7 +130,7 @@ func fetchWebMeta(u string, timeout int) (title string, mime string, err error) 
 	}
 
 	switch resp.StatusCode {
-	case 300, 301, 302, 404:
+	case 300, 301, 302, 404, 406:
 		title = fmt.Sprintf("%s", resp.Status)
 		return
 	}
@@ -139,7 +147,8 @@ func fetchWebMeta(u string, timeout int) (title string, mime string, err error) 
 	}
 
 	var hmime string
-	title, hmime, err = parseTitle(resp)
+	var hcharset string
+	title, hmime, hcharset, err = parseTitle(resp)
 	if err != nil {
 		// log.Println(err)
 		return
@@ -148,15 +157,16 @@ func fetchWebMeta(u string, timeout int) (title string, mime string, err error) 
 		mime = hmime
 	}
 
-	// TODO 自动检测编码并尝试转码
-	if strings.Contains(strings.ToLower(mime), "charset=gbk") {
+	if strings.Contains(strings.ToLower(mime), "charset=gbk") ||
+		strings.ToLower(hcharset) == "gbk" {
 		ch, _ := iconv.Open("utf-8", "gbk")
 		ntitle := ch.ConvString(title)
 		if len(ntitle) > 0 {
 			title = ntitle
 		}
 		ch.Close()
-	} else if strings.Contains(strings.ToLower(mime), "charset=gb2312") {
+	} else if strings.Contains(strings.ToLower(mime), "charset=gb2312") ||
+		strings.ToLower(hcharset) == "gb2312" {
 		ch, _ := iconv.Open("utf-8", "gb2312")
 		ntitle := ch.ConvString(title)
 		if len(ntitle) > 0 {
@@ -168,7 +178,7 @@ func fetchWebMeta(u string, timeout int) (title string, mime string, err error) 
 	return
 }
 
-func parseTitle(resp *http.Response) (string, string, error) {
+func parseTitle(resp *http.Response) (string, string, string, error) {
 	if false {
 		buf := make([]byte, 8192)
 		n, err := resp.Body.Read(buf)
@@ -180,14 +190,21 @@ func parseTitle(resp *http.Response) (string, string, error) {
 	doc, err := goquery.NewDocumentFromResponse(resp)
 	if err != nil {
 		// log.Println(err)
-		return "", "", err
+		return "", "", "", err
 	}
 
 	sel := doc.Find("title")
 	title, err := sel.Html()
-	// log.Println(sel, title, err, sel.Length())
+	log.Println(sel, title, err, sel.Length())
+	if sel.Length() == 0 {
+		headhtml, err := doc.Find("head").Html()
+		headhtml, err = doc.Html()
+		log.Println(doc.Length(), err, headhtml)
+		log.Println(resp.StatusCode, resp.Status, resp.Header)
+	}
 
 	hmime := ""
+	hcharset := ""
 	sel = doc.Find("meta")
 	sel.Each(func(idx int, s *goquery.Selection) {
 		if _, ok := s.Attr("http-equiv"); ok {
@@ -195,12 +212,15 @@ func parseTitle(resp *http.Response) (string, string, error) {
 				hmime = mime
 			}
 		}
+		if cs, ok := s.Attr("charset"); ok {
+			hcharset = cs
+		}
 	})
 
 	log.Println(resp.Close)
 	resp.Body.Close()
 	resp = nil
-	return title, hmime, nil
+	return title, hmime, hcharset, nil
 }
 
 func sizeToHuman(sz int64) (hsz string) {

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	irc "github.com/fluffle/goirc/client"
+	"github.com/jmz331/gpinyin"
 )
 
 /*
@@ -57,4 +58,14 @@ func TestCrash(t *testing.T) {
 	err = ircon.Close()
 	log.Println(err, ircon.Connected())
 	select {}
+}
+
+func TestTopinyin(t *testing.T) {
+	name := "美味的百合仙子"
+	namepy := "meiweidebaihexianzi"
+	newname := gpinyin.ConvertToPinyinString(name, "", gpinyin.PINYIN_WITHOUT_TONE)
+	log.Println(name, "=>", newname)
+	if newname != namepy {
+		t.Error("topinyin failed")
+	}
 }

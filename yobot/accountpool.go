@@ -125,3 +125,20 @@ func (this *AccountPool) getNames(max int) []string {
 	}
 	return names
 }
+
+// 检测消息的nick是否是我们自己创建的
+func (this *AccountPool) isOurs(nick string) bool {
+	for _, ac := range this.acs {
+		be := ac.becon.(*IrcBackend2)
+		beme := be.ircon.Me()
+		if nick == beme.Nick {
+			// if suffix with ^^^, the beme.Nick contains it, and nick contains it too.
+			// log.Printf("drop by my ourcon:%s, %s, %v\n", nick, be.getName(), beme)
+			return true
+		}
+		if len(beme.Nick) > 16 && nick == beme.Nick[0:16] {
+			return true
+		}
+	}
+	return false
+}
