@@ -25,6 +25,7 @@ const (
 	EVT_LEAVE_GROUP         = "leave_group"
 	EVT_GROUP_MESSAGE       = "group_message"
 	EVT_GROUP_ACTION        = "group_action"
+	EVT_GROUP_NAMES         = "group_names"
 	EVT_FETCH_URL_META      = "fetch_url_meta"
 	EVT_GOT_URL_META        = "got_url_meta"
 )
@@ -40,6 +41,9 @@ type Event struct {
 	Be    Backend
 	Ident string
 	Host  string
+	// for some debug case
+	No  uint64
+	ttl int // 有时需要重新重理该event，重新进队。但某些逻辑需要单一处理，比如get url
 }
 
 func NewEvent(proto string, etype string, ch string, args ...interface{}) *Event {
@@ -68,6 +72,13 @@ type RoundTable struct {
 	masterReconnectTimes int
 	doneC                chan bool
 	assit                *helper.Assistant
+
+	// for debug case, event handle timeout check bus
+	echktoC chan eventCheckTimeout
+}
+type eventCheckTimeout struct {
+	no     uint64
+	action int // 1 begin, 2 end, 3 timeout
 }
 
 func NewRoundTable() *RoundTable {
@@ -77,6 +88,7 @@ func NewRoundTable() *RoundTable {
 	this.tracker = state.NewTracker(ircname)
 	this.doneC = make(chan bool)
 	this.assit = helper.NewAssistant()
+	this.echktoC = make(chan eventCheckTimeout)
 
 	if pxyurl != "" {
 		fetchtitle.SetProxy(pxyurl)
@@ -90,18 +102,27 @@ func (this *RoundTable) run() {
 	select {}
 }
 func (this *RoundTable) stop() {
-	this.ctx.busch <- NewEvent(PROTO_SYS, "shutdown", "")
+	this.ctx.sendBusEvent(NewEvent(PROTO_SYS, "shutdown", ""))
 }
 
 // 这个方法是可以阻塞运行的，只是把后续的事件延后处理，这样带来程序逻辑简洁。
 // 从另一个方面，并不会阻塞发送事件的线程
-var handledEventCount uint64
+var handledEventCount uint64 = 0
 
 func (this *RoundTable) handleEvent() {
 	for ie := range this.ctx.busch {
+		// log.Println(ie)
 		handledEventCount += 1
 		log.Println("begin handle event:", handledEventCount, len(this.ctx.busch))
-		// log.Println(ie)
+		ie.No = handledEventCount
+		ie.ttl += 1
+		nie := DupEvent(ie)
+		// 这个要是可以的话，可以算作一种新和程序模型
+		tmer := time.AfterFunc(handleEventTimeout, func() {
+			log.Println(nie.No, *nie)
+			panic("timeout event")
+		})
+
 		this.ctx.msgbus.Publish(ie)
 		switch ie.Proto {
 		case PROTO_IRC:
@@ -112,9 +133,12 @@ func (this *RoundTable) handleEvent() {
 		case PROTO_TABLE:
 			this.handleEventTable(ie)
 		case PROTO_SYS:
+			tmer.Stop()
 			goto endfunc
 		}
-		log.Println("end handle event:", handledEventCount, len(this.ctx.busch))
+
+		stopok := tmer.Stop()
+		log.Println("end handle event:", handledEventCount, len(this.ctx.busch), stopok)
 	}
 endfunc:
 	log.Println("endup event handler")
@@ -192,7 +216,7 @@ func (this *RoundTable) handleEventTox(e *Event) {
 					ac = rets[0].(*Account)
 				*/
 				ac = this.ctx.acpool.add(fromUser, peerPubkey)
-				ac.conque <- e
+				ac.conque <- e // 重复的消息处理，导致插件多次处理该消息
 			} else {
 				ac := this.ctx.acpool.get(fromUser, peerPubkey)
 				be := ac.becon.(*IrcBackend2)
@@ -216,13 +240,15 @@ func (this *RoundTable) handleEventTox(e *Event) {
 			}
 		}
 		// plugins process
-		this.ctx.busch <- NewEvent(PROTO_TABLE, EVT_FETCH_URL_META, chname, message, fromUser)
+		if e.ttl <= 1 {
+			this.ctx.sendBusEvent(NewEvent(PROTO_TABLE, EVT_FETCH_URL_META, chname, message, fromUser))
+		}
 
 	case EVT_GROUP_ACTION:
 		ne := DupEvent(e)
 		ne.EType = EVT_GROUP_MESSAGE
 		ne.Args[0] = PREFIX_ACTION + ne.Args[0].(string)
-		this.ctx.busch <- ne
+		this.ctx.sendBusEvent(ne)
 
 	case EVT_JOIN_GROUP:
 		rid := this.ctx.toxagt._tox.SelfGetPublicKey()
@@ -326,7 +352,7 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 		ac := this.ctx.acpool.get(be.getName(), be.uid)
 		for len(ac.conque) > 0 {
 			e := <-ac.conque
-			this.ctx.busch <- e
+			this.ctx.sendBusEvent(e)
 		}
 
 	case EVT_GROUP_MESSAGE:
@@ -398,12 +424,12 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 			}
 		}
 		// plugins process
-		this.ctx.busch <- NewEvent(PROTO_TABLE, EVT_FETCH_URL_META, chname, message, nick)
+		this.ctx.sendBusEvent(NewEvent(PROTO_TABLE, EVT_FETCH_URL_META, chname, message, nick))
 	case EVT_GROUP_ACTION:
 		ne := DupEvent(e)
 		ne.EType = EVT_GROUP_MESSAGE
 		ne.Args[2] = PREFIX_ACTION + ne.Args[2].(string)
-		this.ctx.busch <- ne
+		this.ctx.sendBusEvent(ne)
 
 	case EVT_FRIEND_MESSAGE:
 		log.Println("not impled", e.EType)
@@ -504,6 +530,18 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 			// this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message) })
 			this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message)
 		}
+	case EVT_GROUP_NAMES:
+		chname := e.Args[3].(string)
+		for _, nickx := range strings.Split(e.Args[4].(string), " ") {
+			nick := strings.TrimLeft(nickx, "@ ")
+			if this.tracker.GetNick(nick) == nil {
+				this.tracker.NewNick(nick)
+			}
+			this.tracker.Associate(chname, nick)
+			if _, ok := this.tracker.IsOn(chname, nick); !ok {
+				panic("wtf")
+			}
+		}
 	default:
 		switch e.EType {
 		case "PONG", "PING", "NOTICE": // omit, i known
@@ -549,7 +587,7 @@ func (this *RoundTable) processInviteCmd(channels []string, friendNumber uint32)
 			// 冗余（或者并不冗余）触发一下进群事件，帮助确认成功进入 irc群
 			var peerNumber int = 0
 			var title = chname
-			this.ctx.busch <- NewEvent(PROTO_TOX, EVT_JOIN_GROUP, title, groupNumber, peerNumber)
+			this.ctx.sendBusEvent(NewEvent(PROTO_TOX, EVT_JOIN_GROUP, title, groupNumber, peerNumber))
 			continue // 这个continue会导致不正确的join问题，所以要手工触发一下事件
 		}
 
@@ -599,7 +637,7 @@ func (this *RoundTable) processInviteCmd(channels []string, friendNumber uint32)
 				// 这个逻辑不会自动触发groupTitle事件，手工触发一下
 				var peerNumber int = 0
 				var title = chname
-				this.ctx.busch <- NewEvent(PROTO_TOX, EVT_JOIN_GROUP, title, groupNumber, peerNumber)
+				this.ctx.sendBusEvent(NewEvent(PROTO_TOX, EVT_JOIN_GROUP, title, groupNumber, peerNumber))
 			}
 		}
 		// ac := this.ctx.acpool.get(chname)

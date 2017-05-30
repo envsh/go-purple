@@ -51,7 +51,8 @@ func TestFetchTitle(t *testing.T) {
 		// "https://dn-fishroom.qbox.me/sticker/1370.png",
 		// "http://fishroom.tuna.moe/log/linuxba/2016-12-18/553",
 		// "https://github.com/kitech/go-toxcore",
-		"http://wuxia.qq.com/main.shtml",
+		// "http://wuxia.qq.com/main.shtml",
+		"https://codesandbox.io/s/5KDDGYvA",
 	}
 
 	titles := []string{}

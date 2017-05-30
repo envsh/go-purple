@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"runtime"
-	debug1 "runtime/debug"
 	"time"
 
 	"go-pprofui"
@@ -52,20 +51,31 @@ type Context struct {
 
 func (this *Context) sendBusEvent(e *Event) bool {
 	sendok := true
-	defer func() {
-		if x := recover(); x != nil {
-			sendok = false
-			log.Printf("wow: %v", x)
-		}
-	}()
+	timeoutSend := func() {
+		defer func() {
+			if x := recover(); x != nil {
+				sendok = false
+				log.Printf("wow should be closed channel: %v", x)
+			}
+		}()
 
-	select {
-	case this.busch <- e:
-	default:
-		log.Println("send busch blocked:", len(this.busch))
-		// TODO 这种情况是为什么呢，应该怎么办呢？
-		debug1.PrintStack()
+		select {
+		case this.busch <- e:
+		default:
+			log.Println("send busch blocked:", len(this.busch))
+			// TODO 这种情况是为什么呢，应该怎么办呢？
+			// debug1.PrintStack()
+			tmer := time.AfterFunc(sendChanTimeout, func() {
+				panic("send busch timeout")
+			})
+			this.busch <- e
+			stopok := tmer.Stop()
+			if !stopok {
+				panic("stop timer failed")
+			}
+		}
 	}
+	go timeoutSend()
 	return sendok
 }
 
@@ -83,7 +93,8 @@ func main() {
 	}
 
 	ctx = &Context{}
-	ctx.busch = make(chan *Event, MAX_BUS_QUEUE_LEN)
+	// ctx.busch = make(chan *Event, MAX_BUS_QUEUE_LEN)
+	ctx.busch = make(chan *Event, 0)
 	ctx.acpool = NewAccountPool()
 	ctx.toxagt = NewToxAgent()
 	ctx.toxagt.start()
@@ -141,6 +152,8 @@ const serverssl = "irc.freenode.net:6697"
 const toxname = "zuck05l" // hlpbot
 const ircname = toxname
 const leaveChannelTimeout = 270 // seconds
+const sendChanTimeout = 15 * time.Second
+const handleEventTimeout = 15 * time.Second
 
 var chmap = hashbidimap.New()
 

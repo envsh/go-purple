@@ -122,7 +122,8 @@ func (this *IrcBackend2) onEvent(ircon *irc.Conn, line *irc.Line) {
 	// filter logout
 	switch line.Cmd {
 	case "332": // channel title
-	case "353": // channel users
+	// case "353": // channel users
+	//	log.Printf("%s<- %+v, %v", ircon.Me().Nick, line.Raw, line.Args)
 	case "372":
 		// case "376":
 		// log.Printf("%s<- %+v", e.Connection.GetNick(), e)
@@ -154,6 +155,7 @@ func (this *IrcBackend2) nonblockSendBusch(ce *Event) {
 	}
 }
 
+// should block
 func (this *IrcBackend2) connect() {
 	//	go func() {
 	log.Println(this.name, this.rname)
@@ -244,6 +246,8 @@ func NewEventFromIrcEvent2(ircon *irc.Conn, line *irc.Line) *Event {
 		} else {
 			ne.EType = EVT_FRIEND_DISCONNECTED
 		}
+	case "353":
+		ne.EType = EVT_GROUP_NAMES
 	default:
 		ne.EType = line.Cmd
 	}

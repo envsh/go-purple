@@ -67,9 +67,9 @@ func (this *ToxAgent) setupCallbacks() {
 
 		this.save_account()
 		if status > tox.CONNECTION_NONE {
-			this.ctx.busch <- NewEvent(PROTO_TOX, EVT_CONNECTED, "", status)
+			this.ctx.sendBusEvent(NewEvent(PROTO_TOX, EVT_CONNECTED, "", status))
 		} else {
-			this.ctx.busch <- NewEvent(PROTO_TOX, EVT_DISCONNECTED, "", status)
+			this.ctx.sendBusEvent(NewEvent(PROTO_TOX, EVT_DISCONNECTED, "", status))
 		}
 		if status == tox.CONNECTION_NONE {
 			// this.tryReconnect(3 * time.Second)
@@ -91,7 +91,7 @@ func (this *ToxAgent) setupCallbacks() {
 		if this.isGroupbot(friendNumber) {
 			// maybe need skip the message here
 		}
-		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_FRIEND_MESSAGE, "", msg, friendNumber)
+		this.ctx.sendBusEvent(NewEvent(PROTO_TOX, EVT_FRIEND_MESSAGE, "", msg, friendNumber))
 	}, nil)
 	this._tox.CallbackGroupMessage(this.onGroupMessage, nil)
 	this._tox.CallbackGroupInvite(this.onGroupInvite, nil)
@@ -142,9 +142,9 @@ func (this *ToxAgent) onFriendConnectionStatus(t *tox.Tox, friendNumber uint32, 
 		}
 	}()
 	if status > tox.CONNECTION_NONE {
-		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_FRIEND_CONNECTED, "", friendNumber, status)
+		this.ctx.sendBusEvent(NewEvent(PROTO_TOX, EVT_FRIEND_CONNECTED, "", friendNumber, status))
 	} else {
-		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_FRIEND_DISCONNECTED, "", friendNumber, status)
+		this.ctx.sendBusEvent(NewEvent(PROTO_TOX, EVT_FRIEND_DISCONNECTED, "", friendNumber, status))
 	}
 }
 
@@ -216,11 +216,8 @@ func (this *ToxAgent) onGroupMessage(t *tox.Tox, groupNumber int,
 		// log.Println("omit self message forward", groupTitle)
 		return
 	}
-	if len(this.ctx.busch) >= MAX_BUS_QUEUE_LEN {
-		log.Println("busch full, will blocked")
-	}
-	this.ctx.busch <- NewEvent(PROTO_TOX, EVT_GROUP_MESSAGE, groupTitle,
-		message, groupNumber, peerNumber)
+	this.ctx.sendBusEvent(NewEvent(PROTO_TOX, EVT_GROUP_MESSAGE, groupTitle,
+		message, groupNumber, peerNumber))
 
 	// should be
 	if groupbotIn {
@@ -265,11 +262,8 @@ func (this *ToxAgent) onGroupAction(t *tox.Tox,
 		// log.Println("omit self message forward", groupTitle)
 		return
 	}
-	if len(this.ctx.busch) >= MAX_BUS_QUEUE_LEN {
-		log.Println("busch full, will blocked")
-	}
-	this.ctx.busch <- NewEvent(PROTO_TOX, EVT_GROUP_ACTION, groupTitle,
-		message, groupNumber, peerNumber)
+	this.ctx.sendBusEvent(NewEvent(PROTO_TOX, EVT_GROUP_ACTION, groupTitle,
+		message, groupNumber, peerNumber))
 
 	// should be
 	if groupbotIn {
@@ -301,8 +295,7 @@ func (this *ToxAgent) onGroupNameListChange(t *tox.Tox,
 			break
 		}
 		peerName, peerPubkey = peerInfo[0], peerInfo[1]
-		this.ctx.busch <- NewEvent(PROTO_TOX, EVT_LEAVE_GROUP,
-			groupTitle, peerName, peerPubkey, groupNumber, peerNumber, change)
+		this.ctx.sendBusEvent(NewEvent(PROTO_TOX, EVT_LEAVE_GROUP, groupTitle, peerName, peerPubkey, groupNumber, peerNumber, change))
 
 		delete(this.groupMembers[groupNumber], peerNumber)
 
@@ -326,7 +319,7 @@ func (this *ToxAgent) onGroupNameListChange(t *tox.Tox,
 		}
 		this.groupMembers[groupNumber][peerNumber] = []string{peerName, peerPubkey}
 		// TODO change name event
-		log.Println(lwarningp, "TODO", "tox rename event")
+		log.Println(lwarningp, "TODO", "tox rename event", peerName)
 	}
 
 	// check only me left case

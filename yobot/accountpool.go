@@ -5,7 +5,6 @@ import (
 	// "sync"
 
 	"github.com/sasha-s/go-deadlock"
-	// "github.com/thoj/go-ircevent"
 )
 
 const (
@@ -16,6 +15,14 @@ const (
 	PROTO_TABLE = "table"
 )
 
+type AccountBase struct {
+	Account
+}
+
+type AccountI interface {
+}
+
+// TODO Account 与 BackendBase 功能重叠
 type Account struct {
 	proto int
 	// ircon  *irc.Connection
@@ -28,7 +35,7 @@ type Account struct {
 type AccountPool struct {
 	RelaxCallObject
 	ctx *Context
-	mu  deadlock.Mutex // sync.Mutex
+	mu  deadlock.RWMutex // sync.Mutex
 	acs map[string]*Account
 }
 
@@ -40,8 +47,8 @@ func NewAccountPool() *AccountPool {
 }
 
 func (this *AccountPool) has(name string, id string) bool {
-	this.mu.Lock()
-	defer this.mu.Unlock()
+	this.mu.RLock()
+	defer this.mu.RUnlock()
 	if _, ok := this.acs[id]; ok {
 		return true
 	}
@@ -49,8 +56,8 @@ func (this *AccountPool) has(name string, id string) bool {
 }
 
 func (this *AccountPool) get(name string, uid string) *Account {
-	this.mu.Lock()
-	defer this.mu.Unlock()
+	this.mu.RLock()
+	defer this.mu.RUnlock()
 
 	if ac, ok := this.acs[uid]; ok {
 		return ac
@@ -71,7 +78,7 @@ func (this *AccountPool) add(name string, uid string) *Account {
 	ac.conque = make(chan *Event, MAX_BUS_QUEUE_LEN)
 	this.acs[uid] = ac
 
-	be.connect()
+	be.connect() // maybe block
 
 	return ac
 }
@@ -96,25 +103,28 @@ func (this *AccountPool) remove(name string, uid string) {
 	*/
 }
 func (this *AccountPool) disconnectAll() {
+	this.mu.RLock()
 	uids := make([]string, 0)
 	for uid, _ := range this.acs {
 		uids = append(uids, uid)
 	}
+	this.mu.RUnlock()
+
 	for _, uid := range uids {
 		ac := this.acs[uid]
 		this.remove(ac.name, uid)
 	}
 }
 func (this *AccountPool) count() int {
-	this.mu.Lock()
-	defer this.mu.Unlock()
+	this.mu.RLock()
+	defer this.mu.RUnlock()
 
 	return len(this.acs)
 }
 
 func (this *AccountPool) getNames(max int) []string {
-	this.mu.Lock()
-	defer this.mu.Unlock()
+	this.mu.RLock()
+	defer this.mu.RUnlock()
 
 	names := make([]string, 0)
 	for _, ac := range this.acs {
