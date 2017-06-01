@@ -151,7 +151,7 @@ func (this *RoundTable) done() <-chan bool {
 func (this *RoundTable) handleEventTox(e *Event) {
 	log.Printf("%+v", e)
 	switch e.EType {
-	case EVT_GROUP_MESSAGE:
+	case EVT_GROUP_MESSAGE: // TODO 这个逻辑有点复杂了
 		if this.processGroupCmd(e.Args[0].(string), e.Args[1].(int), e.Args[2].(int)) {
 			break
 		}
@@ -173,7 +173,12 @@ func (this *RoundTable) handleEventTox(e *Event) {
 			chname = key.(string)
 		}
 
-		// root user
+		// plugins process
+		if e.ttl <= 1 {
+			defer this.ctx.sendBusEvent(NewEvent(PROTO_TABLE, EVT_FETCH_URL_META, chname, message, fromUser))
+		}
+
+		// root user, 确保root connection存在
 		uid := this.ctx.toxagt._tox.SelfGetPublicKey()
 		if !this.ctx.acpool.has(ircname, uid) {
 			log.Println("wtf, try fix")
@@ -181,8 +186,10 @@ func (this *RoundTable) handleEventTox(e *Event) {
 				rets := this.ctx.acpool.Call1(func() Any { return this.ctx.acpool.add(ircname, uid) })
 				rac := rets[0].(*Account)
 			*/
+			// 原来阻塞的connect调用，有助于简化后续的批量处理逻辑
 			rac := this.ctx.acpool.add(ircname, uid)
 			rac.conque <- e
+			break // nonblock-connect后添加的逻辑
 		} else {
 			rac := this.ctx.acpool.get(ircname, uid)
 			rbe := rac.becon.(*IrcBackend2)
@@ -196,7 +203,8 @@ func (this *RoundTable) handleEventTox(e *Event) {
 					})
 					rac := rets[0].(*Account)
 				*/
-				rac := this.ctx.acpool.add(ircname, uid)
+				// rac := this.ctx.acpool.add(ircname, uid)
+				rac.becon.connect() // fix readd problem
 				rac.conque <- e
 				break
 			}
@@ -223,7 +231,8 @@ func (this *RoundTable) handleEventTox(e *Event) {
 				if !be.isconnected() {
 					log.Println("Oh, connection broken, ", chname, be.getName(), fromUser, peerPubkey)
 					// this.ctx.acpool.Call0(func() { this.ctx.acpool.remove(fromUser, peerPubkey) })
-					this.ctx.acpool.remove(fromUser, peerPubkey)
+					// this.ctx.acpool.remove(fromUser, peerPubkey)
+					ac.becon.connect()
 					ac.conque <- e
 				} else {
 					if !be.isOn(chname) {
@@ -238,10 +247,6 @@ func (this *RoundTable) handleEventTox(e *Event) {
 					}
 				}
 			}
-		}
-		// plugins process
-		if e.ttl <= 1 {
-			this.ctx.sendBusEvent(NewEvent(PROTO_TABLE, EVT_FETCH_URL_META, chname, message, fromUser))
 		}
 
 	case EVT_GROUP_ACTION:
@@ -270,6 +275,11 @@ func (this *RoundTable) handleEventTox(e *Event) {
 			}
 			ac := this.ctx.acpool.get(ircname, rid)
 			be := ac.becon.(*IrcBackend2)
+			if !be.isconnected() {
+				ac.becon.connect()
+				ac.conque <- e
+				break
+			}
 			// be.Call0(func() { be.join(chname) })
 			be.join(chname)
 			this.tracker.NewChannel(chname)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"syscall"
 	// "strings"
@@ -34,6 +35,7 @@ func init() {
 	flag.BoolVar(&debug, "debug", debug, "purple debug switch")
 	flag.StringVar(&pxyurl, "proxy", pxyurl, "proxy, http://")
 	flag.BoolVar(&pprof, "pprof", pprof, "enable net/http/pprof: *:6060")
+	flag.StringVar(&toxname, "name", toxname, "bot name")
 
 	colog.Register()
 	colog.SetFlags(log.Flags() | log.Lshortfile | log.LstdFlags)
@@ -52,12 +54,14 @@ type Context struct {
 func (this *Context) sendBusEvent(e *Event) bool {
 	sendok := true
 	timeoutSend := func() {
-		defer func() {
-			if x := recover(); x != nil {
-				sendok = false
-				log.Printf("wow should be closed channel: %v", x)
-			}
-		}()
+		/*
+			defer func() {
+				if x := recover(); x != nil {
+					sendok = false
+					log.Printf("wow should be closed channel: %v", x)
+				}
+			}()
+		*/
 
 		select {
 		case this.busch <- e:
@@ -66,7 +70,7 @@ func (this *Context) sendBusEvent(e *Event) bool {
 			// TODO 这种情况是为什么呢，应该怎么办呢？
 			// debug1.PrintStack()
 			tmer := time.AfterFunc(sendChanTimeout, func() {
-				panic("send busch timeout")
+				panic(fmt.Sprintf("send busch timeout: %d", len(this.busch)))
 			})
 			this.busch <- e
 			stopok := tmer.Stop()
@@ -85,6 +89,7 @@ var ctx *Context
 func main() {
 	flag.Parse()
 	glog.Init()
+	ircname = toxname
 
 	log.Println("GOMAXPROCS:", runtime.GOMAXPROCS(0))
 	if true {
@@ -149,12 +154,12 @@ func main() {
 // TODO multiple servers,
 //const serverssl = "weber.freenode.net:6697"
 const serverssl = "irc.freenode.net:6697"
-const toxname = "zuck05l" // hlpbot
-const ircname = toxname
 const leaveChannelTimeout = 270 // seconds
 const sendChanTimeout = 15 * time.Second
 const handleEventTimeout = 15 * time.Second
 
+var toxname = "zuck05l" // hlpbot
+var ircname = toxname
 var chmap = hashbidimap.New()
 
 func init() {

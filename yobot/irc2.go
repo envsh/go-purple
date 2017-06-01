@@ -14,7 +14,8 @@ type IrcBackend2 struct {
 	BackendBase
 	ircon *irc.Conn
 	// ircfg *irc.Config
-	rmers map[string]irc.Remover
+	rmers      map[string]irc.Remover
+	connecting bool
 }
 
 func NewIrcBackend2(ctx *Context, name string) *IrcBackend2 {
@@ -156,19 +157,28 @@ func (this *IrcBackend2) nonblockSendBusch(ce *Event) {
 }
 
 // should block
-func (this *IrcBackend2) connect() {
-	//	go func() {
-	log.Println(this.name, this.rname)
-	err := this.ircon.Connect()
-	if err != nil {
-		log.Println(err)
-		// 并不会触发disconnect事件，需要手动触发
-		ce := NewEvent(PROTO_IRC, EVT_DISCONNECTED, "unknown", err.Error())
-		ce.Be = this
-		this.nonblockSendBusch(ce)
+func (this *IrcBackend2) connect() error {
+	// 这里假设调用从rtab主线程，没有使用锁
+	if this.connecting {
+		return nil
 	}
-	log.Println(this.name, this.rname, "done")
-	//	}()
+	this.connecting = true
+	aconnect := func() error {
+		log.Println(this.name, this.rname)
+		err := this.ircon.Connect()
+		if err != nil {
+			log.Println(err)
+			// 并不会触发disconnect事件，需要手动触发
+			ce := NewEvent(PROTO_IRC, EVT_DISCONNECTED, "unknown", err.Error())
+			ce.Be = this
+			this.nonblockSendBusch(ce)
+		}
+		log.Println(this.name, this.rname, "done")
+		this.connecting = false
+		return err
+	}
+	go aconnect()
+	return nil
 }
 
 func (this *IrcBackend2) reconnect() error {

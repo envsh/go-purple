@@ -68,13 +68,14 @@ func (this *IrcBackend) onEvent(e *irc.Event) {
 	}
 }
 
-func (this *IrcBackend) connect() {
+func (this *IrcBackend) connect() error {
 	go func() {
 		err := this.ircon.Connect(serverssl)
 		if err != nil {
 			log.Println(err)
 		}
 	}()
+	return nil
 }
 
 func (this *IrcBackend) reconnect() error {

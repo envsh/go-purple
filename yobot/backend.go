@@ -1,6 +1,7 @@
 package main
 
 type Backend interface {
+	connect() error
 	isconnected() bool
 	disconnect()
 }
