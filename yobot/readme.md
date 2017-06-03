@@ -28,6 +28,7 @@ a tox to irc channel bridge.
 - [ ] 错过的消息的处理。短暂离开tox群，在超时前再次进入时的情况。
 - [ ] 记录被invite时的data信息
 
+
 ### 运行
 
 ### 自动邀请进群功能
@@ -35,3 +36,7 @@ a tox to irc channel bridge.
 在好友上线事件，但没有在指定的群组时，主动inivite进该群。
 这个群应包含接通的irc群和tox官方bot的群。
 这个功能，主要还是需要存储状态数据，存储好友指定自动进入哪些群。
+
+### welcome功能
+用户分类，
+

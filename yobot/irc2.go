@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"log"
 	"strings"
+	"time"
 
 	irc "github.com/fluffle/goirc/client"
 	"github.com/jmz331/gpinyin"
@@ -165,7 +166,11 @@ func (this *IrcBackend2) connect() error {
 	this.connecting = true
 	aconnect := func() error {
 		log.Println(this.name, this.rname)
+		tmer := time.AfterFunc(30*time.Second, func() {
+			this.ircon.Close()
+		})
 		err := this.ircon.Connect()
+		tmer.Stop()
 		if err != nil {
 			log.Println(err)
 			// 并不会触发disconnect事件，需要手动触发
