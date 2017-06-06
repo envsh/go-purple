@@ -40,8 +40,9 @@ func (this *IrcBackend2) fmtname(name string) string {
 
 	for _, c := range name {
 		if c == '$' || c == '+' || c == ' ' || c == '!' ||
-			c == '.' {
-			newname += string("\\")
+			c == '.' || c == '\'' || c == '%' || c == '?' {
+			// newname += string("\\")
+			newname += string("`")
 		} else {
 			newname += string(c)
 		}
@@ -167,7 +168,9 @@ func (this *IrcBackend2) connect() error {
 	aconnect := func() error {
 		log.Println(this.name, this.rname)
 		tmer := time.AfterFunc(30*time.Second, func() {
+			log.Println("connect irc timeout")
 			this.ircon.Close()
+			this.ctx.rstats.ircConnTimeout()
 		})
 		err := this.ircon.Connect()
 		tmer.Stop()
@@ -182,7 +185,11 @@ func (this *IrcBackend2) connect() error {
 		this.connecting = false
 		return err
 	}
-	go aconnect()
+	go func() {
+		btime := time.Now()
+		defer this.ctx.rstats.ircConnTime(btime)
+		aconnect()
+	}()
 	return nil
 }
 

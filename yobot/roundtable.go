@@ -112,14 +112,15 @@ var handledEventCount uint64 = 0
 func (this *RoundTable) handleEvent() {
 	for ie := range this.ctx.busch {
 		// log.Println(ie)
+		btime := time.Now()
 		handledEventCount += 1
 		log.Println("begin handle event:", handledEventCount, len(this.ctx.busch))
 		ie.No = handledEventCount
 		ie.ttl += 1
 		nie := DupEvent(ie)
 		// 这个要是可以的话，可以算作一种新和程序模型
-		tmer := time.AfterFunc(handleEventTimeout, func() {
-			log.Println(nie.No, *nie)
+		tmer := time.AfterFunc(3*handleEventTimeout, func() {
+			log.Println(nie.No, *nie, 3*handleEventTimeout)
 			panic("timeout event")
 		})
 
@@ -138,6 +139,7 @@ func (this *RoundTable) handleEvent() {
 		}
 
 		stopok := tmer.Stop()
+		this.ctx.rstats.handleEventTime(btime)
 		log.Println("end handle event:", handledEventCount, len(this.ctx.busch), stopok)
 	}
 endfunc:
@@ -172,6 +174,10 @@ func (this *RoundTable) handleEventTox(e *Event) {
 			// forward message to...
 			chname = key.(string)
 		}
+		if err := this.assit.MaybeFilter(helper.PROTO_TOX, peerName, message); err != nil {
+			log.Println(lwarningp, "filtered message:", err)
+		}
+		_, message, _ = this.assit.MaybeTransform(helper.PROTO_TOX, peerName, message)
 
 		// plugins process
 		if e.ttl <= 1 {
@@ -340,6 +346,8 @@ func (this *RoundTable) handleEventTox(e *Event) {
 		case "id":
 			// this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.FriendSendMessage(friendNumber, this.ctx.toxagt._tox.SelfGetAddress()) })
 			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, this.ctx.toxagt._tox.SelfGetAddress())
+		case "runstats":
+			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, this.ctx.rstats.collect())
 		case "help":
 			this.ctx.toxagt._tox.FriendSendMessage(friendNumber, cmdhelp)
 			// this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.FriendSendMessage(friendNumber, cmdhelp) })
@@ -357,12 +365,11 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 	switch e.EType {
 	case EVT_CONNECTED: // MOTD end
 		log.Printf("%+v", e)
-
 		// ircon.Join("#tox-cn123")
 		ac := this.ctx.acpool.get(be.getName(), be.uid)
 		for len(ac.conque) > 0 {
-			e := <-ac.conque
-			this.ctx.sendBusEvent(e)
+			ne := <-ac.conque
+			this.ctx.sendBusEvent(ne)
 		}
 
 	case EVT_GROUP_MESSAGE:
@@ -371,16 +378,25 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 		if be.uid != this.ctx.toxagt._tox.SelfGetPublicKey() {
 			break // forward message only by root user
 		}
-
 		// 检查来源是否是我们自己的连接发的消息
 		if this.ctx.acpool.isOurs(nick) {
 			break
 		}
-
 		// TODO 两机器人消息转发循环问题，zuck07 and zuck05...
+		if strings.HasPrefix(nick, ircname[0:5]) {
+			break
+		}
 
 		chname := e.Args[1].(string)
 		message := e.Args[2].(string)
+
+		// filter and transform message
+		if err := this.assit.MaybeFilter(helper.PROTO_IRC, nick, message); err != nil {
+			log.Println(lwarningp, "filtered message:", err)
+		}
+		nick, message, _ = this.assit.MaybeTransform(helper.PROTO_IRC, nick, message)
+		rmessage := message //save for MaybeCmd call
+
 		if strings.HasPrefix(message, PREFIX_ACTION) {
 			message = fmt.Sprintf("%s[%s] %s", PREFIX_ACTION, nick, message[len(PREFIX_ACTION):])
 		} else {
@@ -399,6 +415,7 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 		if groupNumber == -1 {
 			log.Println("group not exists:", chname, strings.ToLower(chname))
 		} else {
+			// TODO convert to helper.Filter
 			message = this.mflt.Filter(message)
 			var err error // Any
 			if strings.HasPrefix(message, PREFIX_ACTION) {
@@ -434,10 +451,15 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 			}
 		}
 		// plugins process
-		this.ctx.sendBusEvent(NewEvent(PROTO_TABLE, EVT_FETCH_URL_META, chname, message, nick))
+		this.ctx.sendBusEvent(NewEvent(PROTO_TABLE, EVT_FETCH_URL_META, chname, rmessage, nick))
+
 	case EVT_GROUP_ACTION:
 		ne := DupEvent(e)
 		ne.EType = EVT_GROUP_MESSAGE
+		// only do transform here, filter and cmd do later
+		nick, message, _ := this.assit.MaybeTransform(helper.PROTO_IRC, ne.Args[0].(string), ne.Args[2].(string))
+		ne.Args[0] = nick
+		ne.Args[2] = message
 		ne.Args[2] = PREFIX_ACTION + ne.Args[2].(string)
 		this.ctx.sendBusEvent(ne)
 
@@ -773,10 +795,14 @@ func (this *RoundTable) handleEventTable(e *Event) {
 		}()
 
 		this.assit.MaybeCmdAsync(msg, e)
+
 	case EVT_GOT_URL_META:
 		chname := e.Chan
 		message := e.Args[0].(string)
 		nick := e.Args[1].(string)
+		if strings.HasSuffix(nick, "[t]") {
+			//	nick = nick[0 : len(nick)-3]
+		}
 		message = fmt.Sprintf("%s: %s", nick, message)
 
 		// check has bot，

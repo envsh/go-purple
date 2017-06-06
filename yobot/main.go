@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -49,6 +50,7 @@ type Context struct {
 	acpool *AccountPool
 	rtab   *RoundTable
 	msgbus *MsgBusClient
+	rstats *RunStats
 }
 
 func (this *Context) sendBusEvent(e *Event) bool {
@@ -69,14 +71,19 @@ func (this *Context) sendBusEvent(e *Event) bool {
 			log.Println("send busch blocked:", len(this.busch))
 			// TODO 这种情况是为什么呢，应该怎么办呢？
 			// debug1.PrintStack()
-			tmer := time.AfterFunc(sendChanTimeout, func() {
-				panic(fmt.Sprintf("send busch timeout: %d", len(this.busch)))
-			})
-			this.busch <- e
-			stopok := tmer.Stop()
-			if !stopok {
-				panic("stop timer failed")
-			}
+			ctx, ccfn := context.WithTimeout(context.Background(), 10*sendChanTimeout)
+			defer ccfn()
+			func(ctx context.Context) {
+				select {
+				case this.busch <- e:
+				case <-ctx.Done():
+					log.Println(ctx.Err())
+					msg := fmt.Sprintf("send busch timeout: %d, dropped",
+						len(this.busch))
+					log.Println(msg)
+					this.rstats.sendbusTimeout()
+				}
+			}(ctx) // 使用一个函数，明确ctx的使用
 		}
 	}
 	go timeoutSend()
@@ -98,6 +105,7 @@ func main() {
 	}
 
 	ctx = &Context{}
+	ctx.rstats = NewRunStats()
 	// ctx.busch = make(chan *Event, MAX_BUS_QUEUE_LEN)
 	ctx.busch = make(chan *Event, 0)
 	ctx.acpool = NewAccountPool()

@@ -14,6 +14,10 @@ func TestFF(t *testing.T) {
 		`(GTalk) niconiconi: 无误`,                            // OrzGTalk
 		`[FsckGoF] 群主女装吼不吼啊？`,                               // OrzIrc2P
 		`[Lisa] \h: Lisa is here :-)`,                       // xmppbot
+		`7[Miyamizu_Mitsuha] 厉害了`,                           // teleboto?
+		`4[Abel_Abel] 这算不算父进程？`,                             //??
+		`13[Universebenzene] 缺poppler-data？`,                //??
+		`6[KireinaHoro_] 15「Re farseerfc: wow 麗狼加油...」謝謝`,   //??
 	}
 	for _, m := range msgs {
 		nu, nm, color := ExtractRealUser("", m)
