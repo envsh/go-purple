@@ -110,13 +110,8 @@ func (this *RoundTable) stop() {
 var handledEventCount uint64 = 0
 
 func (this *RoundTable) handleEvent() {
-	for ie := range this.ctx.busch {
-		// log.Println(ie)
-		btime := time.Now()
-		handledEventCount += 1
-		log.Println("begin handle event:", handledEventCount, len(this.ctx.busch))
-		ie.No = handledEventCount
-		ie.ttl += 1
+
+	dispEvent := func(ie *Event) bool {
 		nie := DupEvent(ie)
 		// 这个要是可以的话，可以算作一种新和程序模型
 		tmer := time.AfterFunc(3*handleEventTimeout, func() {
@@ -124,7 +119,6 @@ func (this *RoundTable) handleEvent() {
 			panic("timeout event")
 		})
 
-		this.ctx.msgbus.Publish(ie)
 		switch ie.Proto {
 		case PROTO_IRC:
 			// this.handleEventIrc(ie.RawEvent.(*irc.Event))
@@ -135,14 +129,34 @@ func (this *RoundTable) handleEvent() {
 			this.handleEventTable(ie)
 		case PROTO_SYS:
 			tmer.Stop()
-			goto endfunc
+			return true
 		}
 
-		stopok := tmer.Stop()
-		this.ctx.rstats.handleEventTime(btime)
-		log.Println("end handle event:", handledEventCount, len(this.ctx.busch), stopok)
+		if !tmer.Stop() {
+			log.Println(lerrorp, "wtf")
+		}
+		return false
 	}
-endfunc:
+
+	for ie := range this.ctx.busch {
+		// log.Println(ie)
+		btime := time.Now()
+		handledEventCount += 1
+		log.Println("begin handle event:", handledEventCount, len(this.ctx.busch))
+
+		ie.No = handledEventCount
+		ie.ttl += 1
+		breakit := dispEvent(ie)
+
+		log.Println("end handle event:", handledEventCount, len(this.ctx.busch))
+		this.ctx.rstats.handleEventTime(btime)
+		this.ctx.msgbus.Publish(ie)
+
+		if breakit {
+			break
+		}
+	}
+
 	log.Println("endup event handler")
 	this.doneC <- true
 }
@@ -151,7 +165,7 @@ func (this *RoundTable) done() <-chan bool {
 }
 
 func (this *RoundTable) handleEventTox(e *Event) {
-	log.Printf("%+v", e)
+	log.Printf("%+v, %d", e, len(e.Args))
 	switch e.EType {
 	case EVT_GROUP_MESSAGE: // TODO 这个逻辑有点复杂了
 		if this.processGroupCmd(e.Args[0].(string), e.Args[1].(int), e.Args[2].(int)) {
@@ -262,6 +276,13 @@ func (this *RoundTable) handleEventTox(e *Event) {
 		this.ctx.sendBusEvent(ne)
 
 	case EVT_JOIN_GROUP:
+		if e.ttl <= 1 {
+			peerName := e.Args[2].(string)
+			if false {
+				defer this.assit.MaybeCmdAsync(
+					fmt.Sprintf("welcome %s", peerName), e)
+			}
+		}
 		rid := this.ctx.toxagt._tox.SelfGetPublicKey()
 		if !this.ctx.acpool.has(ircname, rid) {
 			/*
@@ -319,6 +340,11 @@ func (this *RoundTable) handleEventTox(e *Event) {
 			}
 		})
 
+		if e.ttl <= 1 {
+			defer this.assit.MaybeCmdAsync(
+				fmt.Sprintf("welleave %s", peerName), e)
+		}
+
 	case EVT_FRIEND_MESSAGE:
 		friendNumber := e.Args[1].(uint32)
 		cmd := e.Args[0].(string)
@@ -365,12 +391,13 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 	switch e.EType {
 	case EVT_CONNECTED: // MOTD end
 		log.Printf("%+v", e)
-		// ircon.Join("#tox-cn123")
 		ac := this.ctx.acpool.get(be.getName(), be.uid)
 		for len(ac.conque) > 0 {
 			ne := <-ac.conque
 			this.ctx.sendBusEvent(ne)
 		}
+		// TODO rejoin. 现在的方式是需要用户触发一条消息才能rejoin
+		// 怎么能判断是二次重连接呢？需要判断吗？
 
 	case EVT_GROUP_MESSAGE:
 		nick := e.Args[0].(string)
@@ -384,6 +411,11 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 		}
 		// TODO 两机器人消息转发循环问题，zuck07 and zuck05...
 		if strings.HasPrefix(nick, ircname[0:5]) {
+			log.Println("maybe partizan...", nick)
+		}
+		// Ident == ircIdent && nick != ircname, 这应该是同类
+		if e.Ident == ircIdent && nick != ircname {
+			log.Println("must be partizan, omit.", nick, e.Ident)
 			break
 		}
 
@@ -797,6 +829,7 @@ func (this *RoundTable) handleEventTable(e *Event) {
 		this.assit.MaybeCmdAsync(msg, e)
 
 	case EVT_GOT_URL_META:
+		log.Printf("%+v\n", e)
 		chname := e.Chan
 		message := e.Args[0].(string)
 		nick := e.Args[1].(string)

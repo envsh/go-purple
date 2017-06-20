@@ -7,6 +7,7 @@ import (
 	"github.com/nats-io/go-nats"
 )
 
+// publish all messages to nats message bus
 type MsgBusClient struct {
 	nc  *nats.Conn
 	bus chan *Event
@@ -42,6 +43,7 @@ func (this *MsgBusClient) polling() {
 			jso.Set("EType", e.EType)
 			jso.Set("Proto", e.Proto)
 			jso.Set("Args", e.Args)
+			jso.Set("Ident", e.Ident)
 
 			jsb, err := jso.Encode()
 			if err != nil {

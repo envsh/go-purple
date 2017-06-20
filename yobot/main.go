@@ -165,6 +165,7 @@ const serverssl = "irc.freenode.net:6697"
 const leaveChannelTimeout = 270 // seconds
 const sendChanTimeout = 15 * time.Second
 const handleEventTimeout = 15 * time.Second
+const ircIdent = "~gooirc"
 
 var toxname = "zuck05l" // hlpbot
 var ircname = toxname

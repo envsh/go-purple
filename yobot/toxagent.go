@@ -103,7 +103,11 @@ func (this *ToxAgent) setupCallbacks() {
 			// TODO do what?
 			return
 		}
-		this.ctx.sendBusEvent(NewEvent(PROTO_TOX, EVT_JOIN_GROUP, title, groupNumber, peerNumber))
+		peerName, err := this._tox.GroupPeerName(groupNumber, peerNumber)
+		if err != nil {
+			log.Println(lerrorp, err)
+		}
+		this.ctx.sendBusEvent(NewEvent(PROTO_TOX, EVT_JOIN_GROUP, title, groupNumber, peerNumber, peerName))
 	}, nil)
 
 	this._tox.CallbackGroupAction(this.onGroupAction, nil)
@@ -308,7 +312,7 @@ func (this *ToxAgent) onGroupNameListChange(t *tox.Tox,
 			this.groupMembers[groupNumber] = make(map[int][]string)
 		}
 		this.groupMembers[groupNumber][peerNumber] = []string{peerName, peerPubkey}
-
+		this.ctx.sendBusEvent(NewEvent(PROTO_TOX, EVT_JOIN_GROUP, groupTitle, groupNumber, peerNumber, peerName))
 	case tox.CHAT_CHANGE_PEER_NAME:
 		peerPubkey, err := this._tox.GroupPeerPubkey(groupNumber, peerNumber)
 		if err != nil {
@@ -318,6 +322,8 @@ func (this *ToxAgent) onGroupNameListChange(t *tox.Tox,
 			this.groupMembers[groupNumber] = make(map[int][]string)
 		}
 		this.groupMembers[groupNumber][peerNumber] = []string{peerName, peerPubkey}
+		this.ctx.sendBusEvent(NewEvent(PROTO_TOX, EVT_JOIN_GROUP, groupTitle, groupNumber, peerNumber, peerName))
+
 		// TODO change name event
 		log.Println(lwarningp, "TODO", "tox rename event", peerName)
 	}
