@@ -276,11 +276,14 @@ func (this *RoundTable) handleEventTox(e *Event) {
 		this.ctx.sendBusEvent(ne)
 
 	case EVT_JOIN_GROUP:
-		if e.ttl <= 1 {
+		if e.ttl <= 1 && len(e.Args) > 2 {
 			peerName := e.Args[2].(string)
-			if false {
+			if true && peerName != "" && peerName != ircname &&
+				peerName != "Tox User" {
+				ne := DupEvent(e)
+				ne.Args[1] = ""
 				defer this.assit.MaybeCmdAsync(
-					fmt.Sprintf("welcome %s", peerName), e)
+					fmt.Sprintf("welcome %s", peerName), ne)
 			}
 		}
 		rid := this.ctx.toxagt._tox.SelfGetPublicKey()
@@ -341,8 +344,10 @@ func (this *RoundTable) handleEventTox(e *Event) {
 		})
 
 		if e.ttl <= 1 {
+			ne := DupEvent(e)
+			ne.Args[1] = ""
 			defer this.assit.MaybeCmdAsync(
-				fmt.Sprintf("welleave %s", peerName), e)
+				fmt.Sprintf("welleave %s", peerName), ne)
 		}
 
 	case EVT_FRIEND_MESSAGE:
@@ -836,7 +841,11 @@ func (this *RoundTable) handleEventTable(e *Event) {
 		if strings.HasSuffix(nick, "[t]") {
 			//	nick = nick[0 : len(nick)-3]
 		}
-		message = fmt.Sprintf("%s: %s", nick, message)
+		if nick == "" { // 通知消息，無需暱稱
+			message = fmt.Sprintf("      %s", message)
+		} else {
+			message = fmt.Sprintf("%s: %s", nick, message)
+		}
 
 		// check has bot，
 		hasTitleBot := false
