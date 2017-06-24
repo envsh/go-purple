@@ -162,7 +162,6 @@ func (this *IrcBackend2) stopSubProc() {
 
 // should block
 func (this *IrcBackend2) checkPong() {
-	tick := time.NewTicker(30 * time.Second)
 	stop := false
 	for !stop {
 		select {
@@ -172,7 +171,7 @@ func (this *IrcBackend2) checkPong() {
 			} else {
 				stop = true
 			}
-		case <-tick.C:
+		case <-time.After(30 * time.Second):
 			if !this.lastPong.IsZero() {
 				now := time.Now()
 				if now.Sub(this.lastPong) >
@@ -184,7 +183,6 @@ func (this *IrcBackend2) checkPong() {
 					this.nonblockSendBusch(ce)
 					// log.Println(this.ircon.Close())
 					// log.Println(this.disconnect())
-					tick.Stop()
 					stop = true
 				}
 			}
