@@ -5,6 +5,7 @@ import (
 	"time"
 
 	simplejson "github.com/bitly/go-simplejson"
+	"github.com/chrislusf/glow/flow"
 	"github.com/comail/colog"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
@@ -12,6 +13,59 @@ import (
 	"github.com/seiflotfy/cuckoofilter"
 	"github.com/willf/bloom"
 )
+
+type AnaContext struct {
+	fctx    *flow.FlowContext
+	mbcli   *MsgBusClient
+	dbh     *gorm.DB
+	ana     *Analizer
+	blmflt  *bloom.BloomFilter
+	cuckflt *cuckoofilter.CuckooFilter
+	fch     chan *EventR
+}
+
+func NewAnaContext() *AnaContext {
+	this := &AnaContext{}
+
+	this.fctx = flow.New()
+	this.blmflt = bloom.New(100000, 5)
+	this.cuckflt = cuckoofilter.NewDefaultCuckooFilter()
+	this.fch = make(chan *EventR, 0)
+	this.ana = NewAnalizer()
+
+	return this
+}
+
+var actx = NewAnaContext()
+
+type Analizer struct {
+	fctx *flow.FlowContext
+}
+
+func NewAnalizer() *Analizer {
+	this := &Analizer{}
+	this.fctx = flow.New()
+	return this
+}
+func (this *Analizer) run() {
+	fds := this.fctx.Channel(actx.fch)
+	fds.Filter(func(line *EventR) bool {
+		log.Println(line)
+		return true
+	}).Map(func(line *EventR, ch chan rune) {
+		log.Println()
+		for _, r := range line.Message {
+			ch <- r
+		}
+	}).Map(func(r rune) (int, int8) {
+		return 1, 2
+	}).Reduce(func(x flow.KeyValue, y flow.KeyValue) flow.KeyValue {
+		log.Println(x, y)
+		return flow.KeyValue{Key: 5, Value: 6}
+	})
+
+	fds.Run()
+}
 
 // publish all messages to nats message bus
 type MsgBusClient struct {
@@ -73,8 +127,10 @@ func messageHandler(m *nats.Msg) {
 	}
 
 	log.Printf("Received a message: %s\n", string(m.Data))
-	nlp := NewSnowNLP(string(m.Data))
-	log.Println(nlp.Sentiments(), nlp.Words())
+	if false { // use too much memory, about 1G
+		nlp := NewSnowNLP(string(m.Data))
+		log.Println(nlp.Sentiments(), nlp.Words())
+	}
 
 	evtrec := &EventR{}
 	evtrec.EType = jso.Get("EType").MustString()
@@ -90,6 +146,8 @@ func messageHandler(m *nats.Msg) {
 		evtrec.Message = jso.Get("Args").GetIndex(2).MustString()
 	}
 
+	actx.fch <- evtrec
+
 	dbh.Create(evtrec)
 	if dbh.Error != nil {
 		log.Println(dbh.Error)
@@ -102,10 +160,13 @@ func main() {
 		log.Println(err)
 		return
 	}
+	log.Printf("%+v\n", db.DB().Driver())
 	dbh = db
+	actx.dbh = db
 	defer db.Close()
 
 	db.AutoMigrate(&EventR{})
+	go actx.ana.run()
 
 	mbc := newMsgBusClient()
 	sc, err := mbc.nc.Subscribe("yobotmsg", messageHandler)

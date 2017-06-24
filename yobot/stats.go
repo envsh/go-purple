@@ -2,24 +2,26 @@ package main
 
 import (
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	deadlock "github.com/sasha-s/go-deadlock"
 )
 
 type RunStats struct {
-	ircConnTimeoutCount int
-	ircReconnCount      int
-	ircConnMaxTime      time.Duration
-	ircConnMinTime      time.Duration
-	ircConnCount        int
-	ircConnAvgTime      time.Duration
-	sendbusTimeoutCount int
-	handleEventMaxTime  time.Duration
-	handleEventMinTime  time.Duration
-	handleEventCount    int
-	handleEventAvgTime  time.Duration
-	mu                  deadlock.RWMutex
+	masterReconnectTimes int32
+	ircConnTimeoutCount  int32
+	ircReconnCount       int32
+	ircConnMaxTime       time.Duration
+	ircConnMinTime       time.Duration
+	ircConnCount         int32
+	ircConnAvgTime       time.Duration
+	sendbusTimeoutCount  int32
+	handleEventMaxTime   time.Duration
+	handleEventMinTime   time.Duration
+	handleEventCount     int32
+	handleEventAvgTime   time.Duration
+	mu                   deadlock.RWMutex
 }
 
 func (this *RunStats) collect() string {
@@ -51,18 +53,18 @@ func NewRunStats() *RunStats {
 
 	return this
 }
-
+func (this *RunStats) masterIrcReconnect() {
+	atomic.AddInt32(&this.masterReconnectTimes, 1)
+}
 func (this *RunStats) ircReconnect() {
-	this.mu.Lock()
-	defer this.mu.Unlock()
-	this.ircReconnCount += 1
+	atomic.AddInt32(&this.ircReconnCount, 1)
 }
 func (this *RunStats) ircConnTimeout() {
-	this.mu.Lock()
-	defer this.mu.Unlock()
-	this.ircConnTimeoutCount += 1
+	atomic.AddInt32(&this.ircConnTimeoutCount, 1)
 }
 func (this *RunStats) ircConnTime(btime time.Time) {
+	atomic.AddInt32(&this.ircConnCount, 1)
+
 	this.mu.Lock()
 	defer this.mu.Unlock()
 	etime := time.Now()
@@ -73,7 +75,7 @@ func (this *RunStats) ircConnTime(btime time.Time) {
 	if dtime < this.ircConnMinTime {
 		this.ircConnMinTime = dtime
 	}
-	this.ircConnCount += 1
+
 	if this.ircConnCount == 1 {
 		this.ircConnAvgTime = dtime
 	} else {
@@ -82,12 +84,13 @@ func (this *RunStats) ircConnTime(btime time.Time) {
 }
 
 func (this *RunStats) sendbusTimeout() {
-	this.mu.Lock()
-	defer this.mu.Unlock()
 	this.sendbusTimeoutCount += 1
+	atomic.AddInt32(&this.sendbusTimeoutCount, 1)
 }
 
 func (this *RunStats) handleEventTime(btime time.Time) {
+	atomic.AddInt32(&this.handleEventCount, 1)
+
 	this.mu.Lock()
 	defer this.mu.Unlock()
 	etime := time.Now()
@@ -98,7 +101,7 @@ func (this *RunStats) handleEventTime(btime time.Time) {
 	if dtime < this.handleEventMinTime {
 		this.handleEventMinTime = dtime
 	}
-	this.handleEventCount += 1
+
 	if this.handleEventCount == 1 {
 		this.handleEventAvgTime = dtime
 	} else {

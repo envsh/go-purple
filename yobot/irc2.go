@@ -13,10 +13,12 @@ import (
 type IrcBackend2 struct {
 	RelaxCallObject
 	BackendBase
-	ircon *irc.Conn
-	// ircfg *irc.Config
+	ircon      *irc.Conn
+	ircfg      *irc.Config
 	rmers      map[string]irc.Remover
 	connecting bool
+	lastPong   time.Time
+	pongChan   chan bool
 }
 
 func NewIrcBackend2(ctx *Context, name string) *IrcBackend2 {
@@ -27,8 +29,10 @@ func NewIrcBackend2(ctx *Context, name string) *IrcBackend2 {
 	this.name = name
 	this.rname = this.fmtname(name)
 	this.rmers = make(map[string]irc.Remover, 0)
+	this.pongChan = make(chan bool, 1)
 
 	this.init()
+	go this.checkPong()
 	return this
 }
 
@@ -59,11 +63,14 @@ func (this *IrcBackend2) fmtname(name string) string {
 func (this *IrcBackend2) init() {
 	ircfg := irc.NewConfig(this.rname)
 	ircfg.SSL = true
+	// ircfg.PingFreq = 0 // try custom ping
+	ircfg.PingFreq = 1 * time.Minute
 
 	ircfg.SSLConfig = &tls.Config{ServerName: strings.Split(serverssl, ":")[0]}
 	ircfg.Server = serverssl
 	ircfg.NewNick = func(n string) string { return n + "^" }
 	ircfg.Me.Ident = strings.Replace(ircfg.Me.Ident, "goirc", "gooirc", -1)
+	this.ircfg = ircfg
 
 	ircon := irc.Client(ircfg)
 	ircon.EnableStateTracking()
@@ -121,7 +128,7 @@ func (this *IrcBackend2) clearEvents() {
 }
 
 func (this *IrcBackend2) onEvent(ircon *irc.Conn, line *irc.Line) {
-	// log.Printf("%+v\n", e)
+	// log.Printf("%+v\n", line)
 	// filter logout
 	switch line.Cmd {
 	case "332": // channel title
@@ -129,8 +136,11 @@ func (this *IrcBackend2) onEvent(ircon *irc.Conn, line *irc.Line) {
 	//	log.Printf("%s<- %+v, %v", ircon.Me().Nick, line.Raw, line.Args)
 	case "372":
 		// case "376":
-		// log.Printf("%s<- %+v", e.Connection.GetNick(), e)
-	case "PONG", "PING", "NOTICE": // omit, i known
+		// log.Printf("%s<- %+v", line.Connection.GetNick(), line)
+	case "PONG": //
+		// log.Printf("%+v\n", line)
+		this.pongChan <- true
+	case "PING", "NOTICE": // omit, i known
 	default:
 		log.Printf("%s<- %+v", ircon.Me().Nick, line.Raw)
 
@@ -140,22 +150,52 @@ func (this *IrcBackend2) onEvent(ircon *irc.Conn, line *irc.Line) {
 	}
 
 	switch line.Cmd {
-	case "353":
+	case "353": // NAMES command?
 
 	}
 }
 
-func (this *IrcBackend2) nonblockSendBusch(ce *Event) {
-	{
-		this.ctx.sendBusEvent(ce)
-		return
-	}
+// TODO
+func (this *IrcBackend2) stopSubProc() {
+	this.pongChan <- false
+}
 
-	select {
-	case this.ctx.busch <- ce:
-	default:
-		log.Println("send busch blocked")
+// should block
+func (this *IrcBackend2) checkPong() {
+	tick := time.NewTicker(30 * time.Second)
+	stop := false
+	for !stop {
+		select {
+		case ispong := <-this.pongChan:
+			if ispong {
+				this.lastPong = time.Now()
+			} else {
+				stop = true
+			}
+		case <-tick.C:
+			if !this.lastPong.IsZero() {
+				now := time.Now()
+				if now.Sub(this.lastPong) >
+					(this.ircfg.PingFreq + 5*time.Second) {
+					log.Println("No PONG too long, must broken") // got
+					this.lastPong = time.Time{}
+					ce := NewEvent(PROTO_IRC, EVT_DISCONNECTED, "unknown", "Client PING timeout")
+					ce.Be = this
+					this.nonblockSendBusch(ce)
+					// log.Println(this.ircon.Close())
+					// log.Println(this.disconnect())
+					tick.Stop()
+					stop = true
+				}
+			}
+		}
 	}
+	log.Println("end")
+}
+
+func (this *IrcBackend2) nonblockSendBusch(ce *Event) {
+	this.ctx.sendBusEvent(ce)
+	return
 }
 
 // should block

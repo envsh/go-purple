@@ -1,9 +1,7 @@
 package main
 
 import (
-	"context"
 	"flag"
-	"fmt"
 	"log"
 	"syscall"
 	// "strings"
@@ -55,38 +53,10 @@ type Context struct {
 
 func (this *Context) sendBusEvent(e *Event) bool {
 	sendok := true
-	timeoutSend := func() {
-		/*
-			defer func() {
-				if x := recover(); x != nil {
-					sendok = false
-					log.Printf("wow should be closed channel: %v", x)
-				}
-			}()
-		*/
-
-		select {
-		case this.busch <- e:
-		default:
-			log.Println("send busch blocked:", len(this.busch))
-			// TODO 这种情况是为什么呢，应该怎么办呢？
-			// debug1.PrintStack()
-			ctx, ccfn := context.WithTimeout(context.Background(), 10*sendChanTimeout)
-			defer ccfn()
-			func(ctx context.Context) {
-				select {
-				case this.busch <- e:
-				case <-ctx.Done():
-					log.Println(ctx.Err())
-					msg := fmt.Sprintf("send busch timeout: %d, dropped",
-						len(this.busch))
-					log.Println(msg)
-					this.rstats.sendbusTimeout()
-				}
-			}(ctx) // 使用一个函数，明确ctx的使用
-		}
-	}
-	go timeoutSend()
+	go func() bool {
+		sendok := sendChanTimeouted(this.busch, e, 10*sendChanTimeout)
+		return sendok
+	}()
 	return sendok
 }
 

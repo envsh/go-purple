@@ -55,6 +55,9 @@ func NewEvent(proto string, etype string, ch string, args ...interface{}) *Event
 	return this
 }
 
+func (e *Event) Dup() *Event {
+	return DupEvent(e)
+}
 func DupEvent(e *Event) *Event {
 	this := &Event{}
 	*this = *e
@@ -66,12 +69,11 @@ func DupEvent(e *Event) *Event {
 }
 
 type RoundTable struct {
-	ctx                  *Context
-	mflt                 *MessageFilter
-	tracker              state.Tracker
-	masterReconnectTimes int
-	doneC                chan bool
-	assit                *helper.Assistant
+	ctx     *Context
+	mflt    *MessageFilter
+	tracker state.Tracker
+	doneC   chan bool
+	assit   *helper.Assistant
 
 	// for debug case, event handle timeout check bus
 	echktoC chan eventCheckTimeout
@@ -541,6 +543,7 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 		for _, groupNumber := range groupNumbers {
 			groupTitle, err := this.ctx.toxagt._tox.GroupGetTitle(int(groupNumber))
 			if err != nil {
+				log.Println(err)
 			}
 			// TODO 确定是否在该群里
 			// _, ok := ac.becon.(*IrcBackend2).ircon.StateTracker().IsOn(groupTitle, nick)
@@ -548,7 +551,10 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 			if ok {
 				message := fmt.Sprintf("        **%s 离开了聊天室 (quit: %s)**", nick, quitmsg)
 				// this.ctx.toxagt.Call0(func() { this.ctx.toxagt._tox.GroupMessageSend(int(groupNumber), message) })
-				this.ctx.toxagt._tox.GroupMessageSend(int(groupNumber), message)
+				_, err := this.ctx.toxagt._tox.GroupMessageSend(int(groupNumber), message)
+				if err != nil {
+					log.Println(err)
+				}
 				this.tracker.Dissociate(groupTitle, nick)
 			}
 		}
@@ -573,7 +579,7 @@ func (this *RoundTable) handleEventIrc(e *Event) {
 				for groupNumber, groupTitle := range groupNames {
 					ac.conque <- NewEvent(PROTO_TOX, EVT_JOIN_GROUP, groupTitle, groupNumber, 0)
 				}
-				this.masterReconnectTimes += 1
+				this.ctx.rstats.masterIrcReconnect()
 			})
 		}
 
