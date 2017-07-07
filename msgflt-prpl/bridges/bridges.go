@@ -3,7 +3,20 @@ package bridges
 import (
 	"log"
 	"regexp"
+	"strings"
 )
+
+func IsBotUser(senderc string) bool {
+	sender := &senderc
+	botUsers := []string{"teleboto", "Orizon",
+		"OrzGTalk", "OrzIrc2P", "xmppbot"}
+	for _, u := range botUsers {
+		if *sender == u || strings.TrimRight(*sender, "_^") == u {
+			return true
+		}
+	}
+	return false
+}
 
 // color: 名字的颜色
 func ExtractRealUser(sender, message string) (

@@ -2,10 +2,12 @@ package main
 
 import (
 	"crypto/tls"
+	"fmt"
 	"log"
 	"strings"
 	"testing"
 	"time"
+	"unicode"
 
 	irc "github.com/fluffle/goirc/client"
 	"github.com/jmz331/gpinyin"
@@ -67,5 +69,40 @@ func TestTopinyin(t *testing.T) {
 	log.Println(name, "=>", newname)
 	if newname != namepy {
 		t.Error("topinyin failed")
+	}
+}
+
+func TestEmojiTopinyin(t *testing.T) {
+	name := "a🌀b"
+	namepy := "ab"
+	// TODO 这个转拼音有问题啊，会把emoji转丢失
+	newname := gpinyin.ConvertToPinyinString(name, "", gpinyin.PINYIN_WITHOUT_TONE)
+	log.Println(name, "=>", newname)
+	if newname != namepy {
+		t.Error("topinyin failed")
+	}
+}
+
+func TestToEmoji(t *testing.T) {
+	s := "a哈k🌀b"
+	ns := ""
+	emojiCodeBegin := 0x1F476
+	for _, r := range s {
+		log.Println(r, string(r), unicode.IsGraphic(r), emojiCodeBegin)
+		log.Println(isEmojiChar(r))
+		if r > 127 {
+			log.Printf("\\u%X\n", r)
+			ns += fmt.Sprintf("\\u%X", r)
+		} else {
+			ns += string(r)
+		}
+	}
+	log.Println(ns)
+
+	ircbe := &IrcBackend2{}
+	fname := ircbe.fmtname("🌀")
+	log.Println(fname)
+	if fname != "\\U1F300" {
+		t.Error(fname)
 	}
 }

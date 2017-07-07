@@ -79,9 +79,7 @@ func (this *MsgFltPlugin) load_msgflt(p *purple.Plugin) bool {
 	}
 	purple.Signals.ReceivingChatMsg = func(ac *purple.Account, sender, message *string, conv *purple.Conversation, flags *int) bool {
 		// log.Println(sender, message)
-		if *sender == "teleboto" ||
-			*sender == "Orizon" || *sender == "OrzGTalk" ||
-			*sender == "OrzIrc2P" || *sender == "xmppbot" {
+		if bridges.IsBotUser(*sender) {
 			new_sender, new_message := extractRealUser(*sender, *message)
 			if false {
 				log.Println(new_sender, new_message)

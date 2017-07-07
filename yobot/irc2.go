@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -37,7 +38,7 @@ func NewIrcBackend2(ctx *Context, name string) *IrcBackend2 {
 }
 
 // $，+，！和空格
-// TODO 中文？
+// TODO 中文？Emoji？
 func (this *IrcBackend2) fmtname(name string) string {
 	newname := ""
 	valid := true
@@ -51,12 +52,29 @@ func (this *IrcBackend2) fmtname(name string) string {
 			newname += string(c)
 		}
 		if c > 127 {
-			valid = false
+			// valid = false
 		}
 	}
-	if !valid {
-		newname = gpinyin.ConvertToPinyinString(newname, "", gpinyin.PINYIN_WITHOUT_TONE)
+
+	// other unicode like emoji chars
+	// to pinyin has some problem, so first handle emoji
+	newname2 := ""
+	for _, c := range newname {
+		if isEmojiChar(c) {
+			newname2 += fmt.Sprintf("\\U%X", c)
+		} else {
+			newname2 += string(c)
+			if c > 127 {
+				valid = false
+			}
+		}
 	}
+
+	newname = newname2
+	if !valid {
+		newname = gpinyin.ConvertToPinyinString(newname2, "", gpinyin.PINYIN_WITHOUT_TONE)
+	}
+
 	return newname
 }
 

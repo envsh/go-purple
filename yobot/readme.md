@@ -21,7 +21,7 @@ a tox to irc channel bridge.
 - [x] action同步处理
 - [x] 消息颜色格式过滤
 - [ ] features collection for channels
-- [ ] 发送错误的消息重发
+- [ ] 发送失败的消息重发
 - [x] 快速掉线检测与重连(目前有时要15分钟才能检测到，虽然irc实现自带了ping功能？)
 - [x] 进出群事件通知
 - [ ] 运行时配置修改。PART某群。
@@ -29,6 +29,11 @@ a tox to irc channel bridge.
 - [ ] 记录被invite时的data信息
 - [x] 消息的变换。替换掉转发bot信息。
 - [ ] 主bot账号的私信消息处理。
+- [ ] info 中显示群人数
+- [x] welcome
+- [ ] 两个bot进同一群的冲突，循环转发同一条消息。
+- [ ] tox 端进群账号立即分配一个irc连接。
+- [ ] hlp响应消息到不同协议对应的真实用户名。
 
 
 ### 运行
