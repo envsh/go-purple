@@ -45,7 +45,8 @@ func (this *IrcBackend2) fmtname(name string) string {
 
 	for _, c := range name {
 		if c == '$' || c == '+' || c == ' ' || c == '!' ||
-			c == '.' || c == '\'' || c == '%' || c == '?' {
+			c == '.' || c == '\'' || c == '%' || c == '?' ||
+			c == '@' {
 			// newname += string("\\")
 			newname += string("`")
 		} else {

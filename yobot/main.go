@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"go-pprofui"
+	"mkuse/hlpbot"
 
-	"github.com/emirpasic/gods/maps/hashbidimap"
 	"github.com/fluffle/goirc/logging/glog"
 	"github.com/kitech/colog"
 )
@@ -139,14 +139,10 @@ const ircIdent = "~gooirc"
 
 var toxname = "zuck05l" // hlpbot
 var ircname = toxname
-var chmap = hashbidimap.New()
+var chmap = helper.GetChmap()
 
 func init() {
 	// irc <=> tox
-	chmap.Put("#tox-cn123", "testks")
-	chmap.Put("#tox-cn", "Chinese 中文")
-	chmap.Put("#tox-en", "#tox")
-	chmap.Put("#tox-ru", "Russian Tox Chat (Use Kalina: kalina@toxme.io or 12EDB939AA529641CE53830B518D6EB30241868EE0E5023C46A372363CAEC91C2C948AEFE4EB)")
 }
 
 var PREFIX_ACTION = "/me "

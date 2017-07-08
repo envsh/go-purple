@@ -284,7 +284,7 @@ func (this *RoundTable) handleEventTox(e *Event) {
 				peerName != "Tox User" {
 				ne := DupEvent(e)
 				ne.Args[1] = ""
-				defer this.assit.MaybeCmdAsync(
+				defer this.assit.MaybeCmdAsync(e.Chan,
 					fmt.Sprintf("welcome %s", peerName), ne)
 			}
 		}
@@ -348,7 +348,7 @@ func (this *RoundTable) handleEventTox(e *Event) {
 		if e.ttl <= 1 {
 			ne := DupEvent(e)
 			ne.Args[1] = ""
-			defer this.assit.MaybeCmdAsync(
+			defer this.assit.MaybeCmdAsync(ne.Chan,
 				fmt.Sprintf("welleave %s", peerName), ne)
 		}
 
@@ -837,7 +837,7 @@ func (this *RoundTable) handleEventTable(e *Event) {
 			}
 		}()
 
-		this.assit.MaybeCmdAsync(msg, e)
+		this.assit.MaybeCmdAsync(e.Chan, msg, e)
 
 	case EVT_GOT_URL_META:
 		log.Printf("%+v\n", e)
@@ -878,7 +878,7 @@ func (this *RoundTable) handleEventTable(e *Event) {
 				// break
 			}
 		}
-		found := isInBotResponseWhiteChannel(chname)
+		found := helper.IsInBotResponseWhiteChannel(chname)
 
 		// 总是发到tox端上
 		if true {
