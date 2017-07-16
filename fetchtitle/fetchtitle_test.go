@@ -2,6 +2,7 @@ package fetchtitle
 
 import (
 	"fmt"
+	"gopp"
 	"log"
 	"testing"
 )
@@ -52,7 +53,11 @@ func TestFetchTitle(t *testing.T) {
 		// "http://fishroom.tuna.moe/log/linuxba/2016-12-18/553",
 		// "https://github.com/kitech/go-toxcore",
 		// "http://wuxia.qq.com/main.shtml",
-		"https://codesandbox.io/s/5KDDGYvA",
+		// "https://codesandbox.io/s/5KDDGYvA",
+		// "http://www.dareway.com.cn/modules/sddw/docs/solution/hrss/yblwjs.shtml",
+		// "http://history.eastday.com/h/20140225/u1a7948401.html",
+		// "http://www.solidot.org/story?sid=53101",
+		"https://www.oschina.net/news/86045/all-debian9-live-images-are-broken",
 	}
 
 	titles := []string{}
@@ -65,9 +70,9 @@ func TestFetchTitle(t *testing.T) {
 				log.Println(err, title, mime, url)
 				t.Fail()
 			} else {
-				log.Printf("id:%d, mime:%s, title:%s, url: %s\n",
-					idx, mime, title, url)
-				log.Println("title len:", len(title), title)
+				log.Printf("id:%d, mime:%s, title:%v, url: %s\n",
+					idx, mime, len(title), url)
+				log.Println("title len:", len(title), gopp.SubStr(title, 60))
 				if idx < len(titles) && title != titles[idx] {
 					log.Println(title, "!=", titles[idx], url)
 					t.Fail()
@@ -75,5 +80,9 @@ func TestFetchTitle(t *testing.T) {
 			}
 		})
 	}
+
+}
+
+func TestIssue32(t *testing.T) {
 
 }

@@ -1,6 +1,7 @@
 package fetchtitle
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -11,9 +12,13 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/net/html/charset"
+	"golang.org/x/text/encoding"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/kitech/colog"
 	"gopkg.in/iconv.v1"
+	// iconv2 "github.com/djimenez/iconv-go"
 )
 
 const userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.76 Safari/537.36 Vivaldi/1.6.689.13"
@@ -144,10 +149,14 @@ func fetchWebMeta(u string, timeout int) (title string, mime string, err error) 
 		title = fmt.Sprintf("Size: %s", sizeToHuman(int64(sz)))
 		return
 	}
+	defer resp.Body.Close()
+	bcc, _ := ioutil.ReadAll(resp.Body)
+
+	_, xcharset, _ := getCharset(bcc, mime)
 
 	var hmime string
 	var hcharset string
-	title, hmime, hcharset, err = parseTitle(resp)
+	title, hmime, hcharset, err = parseTitle(resp, bcc)
 	if err != nil {
 		// log.Println(err)
 		return
@@ -155,59 +164,78 @@ func fetchWebMeta(u string, timeout int) (title string, mime string, err error) 
 	if len(hmime) > len(mime) {
 		mime = hmime
 	}
-
-	if strings.Contains(strings.ToLower(mime), "charset=gbk") ||
-		strings.ToLower(hcharset) == "gbk" {
-		ch, _ := iconv.Open("utf-8", "gbk")
-		ntitle := ch.ConvString(title)
-		if len(ntitle) > 0 {
-			title = ntitle
-		}
-		ch.Close()
-	} else if strings.Contains(strings.ToLower(mime), "charset=gb2312") ||
-		strings.ToLower(hcharset) == "gb2312" {
-		ch, _ := iconv.Open("utf-8", "gb2312")
-		ntitle := ch.ConvString(title)
-		if len(ntitle) > 0 {
-			title = ntitle
-		}
-		ch.Close()
+	if hcharset == "" {
+		hcharset = strings.ToLower(xcharset)
 	}
 
+	reparsetitle := false
+	rebcc := []byte{}
+
+	iconvif := func(cs string) bool {
+		cseq1 := fmt.Sprintf("charset=%s", cs)
+		cseq2 := fmt.Sprintf("; charset=\"%s\"", cs)
+
+		if strings.Contains(strings.ToLower(mime), cseq1) ||
+			strings.ToLower(hcharset) == cs ||
+			bytes.Contains(bytes.ToLower(bcc), []byte(cseq2)) {
+			ch, _ := iconv.Open("utf-8", cs)
+			ntitle := ch.ConvString(title)
+			if len(ntitle) > 0 {
+				title = ntitle
+			}
+			ch.Close()
+			reparsetitle = true
+			ch, _ = iconv.Open("utf-8", cs)
+			rebcc = make([]byte, len(bcc)*3)
+			ch.Conv(bcc, rebcc)
+			ch.Close()
+			return true
+		}
+		return false
+	}
+
+	if iconvif("gbk") {
+	} else if iconvif("gb2312") {
+	} else {
+	}
+
+	log.Println(reparsetitle)
+	// goquery需要utf-8的
+	if reparsetitle {
+		ntitle, nmime, nhcharset, nerr := parseTitle(resp, rebcc)
+		if nerr == nil && title != ntitle {
+			title, mime, hcharset = ntitle, nmime, nhcharset
+		}
+	}
 	return
 }
 
-func parseTitle(resp *http.Response) (string, string, string, error) {
-	if false {
-		buf := make([]byte, 8192)
-		n, err := resp.Body.Read(buf)
-		if err != nil {
-			log.Println(err, n)
-		}
-	}
+func parseTitle(resp *http.Response, bcc []byte) (
+	title string, hmime string, hcharset string, err error) {
 
-	doc, err := goquery.NewDocumentFromResponse(resp)
+	reader := bytes.NewBuffer(bcc)
+	doc, err := goquery.NewDocumentFromReader(reader)
+	// doc, err := goquery.NewDocumentFromResponse(resp)
 	if err != nil {
 		// log.Println(err)
 		return "", "", "", err
 	}
 
 	sel := doc.Find("title")
-	title, err := sel.Html()
-	log.Println(sel, title, err, sel.Length())
-	if sel.Length() == 0 {
+	title, err = sel.Html()
+	// log.Println(sel, title, err, sel.Length())
+	if sel.Length() >= 0 {
 		headhtml, err := doc.Find("head").Html()
 		headhtml, err = doc.Html()
 		log.Println(doc.Length(), err, headhtml)
 		log.Println(resp.StatusCode, resp.Status, resp.Header)
+		// ioutil.WriteFile("hehhe.html", []byte(headhtml), 0755)
 	}
 
-	hmime := ""
-	hcharset := ""
 	sel = doc.Find("meta")
 	sel.Each(func(idx int, s *goquery.Selection) {
 		if _, ok := s.Attr("http-equiv"); ok {
-			if mime, ok := sel.Attr("content"); ok {
+			if mime, ok := s.Attr("content"); ok {
 				hmime = mime
 			}
 		}
@@ -216,10 +244,14 @@ func parseTitle(resp *http.Response) (string, string, string, error) {
 		}
 	})
 
-	log.Println(resp.Close)
-	resp.Body.Close()
-	resp = nil
 	return title, hmime, hcharset, nil
+}
+
+func getCharset(content []byte, contentType string) (
+	e encoding.Encoding, name string, certain bool) {
+	e, name, certain = charset.DetermineEncoding(content, contentType)
+	log.Println(e, name, certain)
+	return
 }
 
 func sizeToHuman(sz int64) (hsz string) {

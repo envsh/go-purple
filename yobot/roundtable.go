@@ -897,7 +897,7 @@ func (this *RoundTable) handleEventTable(e *Event) {
 			} else {
 				_, err := this.ctx.toxagt._tox.GroupMessageSend(groupNumber, message)
 				if err != nil {
-					log.Println(err, groupNumber, chname)
+					log.Println(err, groupNumber, chname, len(message))
 				}
 			}
 		}
