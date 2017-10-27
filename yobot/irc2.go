@@ -22,11 +22,12 @@ type IrcBackend2 struct {
 	pongChan   chan bool
 }
 
-func NewIrcBackend2(ctx *Context, name string) *IrcBackend2 {
+func NewIrcBackend2(ctx *Context, name, uid string) *IrcBackend2 {
 	this := &IrcBackend2{}
 	this.ctx = ctx
 	this.conque = make(chan interface{}, MAX_BUS_QUEUE_LEN)
 	this.proto = PROTO_IRC
+	this.uid = uid
 	this.name = name
 	this.rname = this.fmtname(name)
 	this.rmers = make(map[string]irc.Remover, 0)
@@ -89,6 +90,8 @@ func (this *IrcBackend2) init() {
 	ircfg.Server = serverssl
 	ircfg.NewNick = func(n string) string { return n + "^" }
 	ircfg.Me.Ident = strings.Replace(ircfg.Me.Ident, "goirc", "gooirc", -1)
+	ircfg.Me.Name += fmt.Sprintf(" ftid %s", this.uid)
+	log.Println(len(this.uid), this.uid, ircfg.Me.Name)
 	this.ircfg = ircfg
 
 	ircon := irc.Client(ircfg)

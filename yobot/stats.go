@@ -6,6 +6,7 @@ import (
 	"time"
 
 	deadlock "github.com/sasha-s/go-deadlock"
+	// "sync"
 )
 
 type RunStats struct {
@@ -22,6 +23,7 @@ type RunStats struct {
 	handleEventCount     int32
 	handleEventAvgTime   time.Duration
 	mu                   deadlock.RWMutex
+	// mu sync.RWMutex
 }
 
 func (this *RunStats) collect() string {

@@ -182,6 +182,7 @@ func (this *RoundTable) handleEventTox(e *Event) {
 		if err != nil {
 			log.Println(err)
 		}
+
 		var fromUser = fmt.Sprintf("%s[t]", peerName)
 		groupTitle := e.Chan
 		message := e.Args[0].(string)

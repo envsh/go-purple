@@ -69,7 +69,7 @@ func (this *AccountPool) add(name string, uid string) *Account {
 	this.mu.Lock()
 	defer this.mu.Unlock()
 
-	be := NewIrcBackend2(this.ctx, name)
+	be := NewIrcBackend2(this.ctx, name, uid)
 	be.uid = uid
 
 	ac := &Account{name: name, uid: uid}
