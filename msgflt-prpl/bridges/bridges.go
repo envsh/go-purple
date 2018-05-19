@@ -19,6 +19,17 @@ func IsBotUser(senderc string) bool {
 }
 
 // color: 名字的颜色
+// multiple depth
+func ExtractRealUserMD(sender, message string) (
+	new_sender, new_message string, color string) {
+	new_sender, new_message, color = ExtractRealUser(sender, message)
+	if new_sender == sender && new_message == message {
+		return
+	} else {
+		return ExtractRealUserMD(new_sender, new_message)
+	}
+}
+
 func ExtractRealUser(sender, message string) (
 	new_sender, new_message string, color string) {
 	// teleboto <FONT COLOR="teal">[ngkaho1234] </FONT>後來修復了 2
@@ -30,11 +41,11 @@ func ExtractRealUser(sender, message string) (
 
 	// 带FONT的，可能已经是pidgin转换过了的。
 	msgregs := []string{
-		`^<FONT COLOR="([\w ]+)">\[(.+)\] </FONT>`, // teleboto
-		`^\[<FONT COLOR="([\w ]+)">(.+)</FONT>\]`,  // Orizon
-		`^(.[0-9]+)\[(.+)\] `,                      // teleboto? with 1st unprintable char
-		`^()\(GTalk\) (.+):`,                       // OrzGTalk
-		`^()\[(.+)\] `,                             // OrzIrc2P/tg2offtopic
+		`^<FONT COLOR="([\w ]+)">\[([^\[]+)\] </FONT>`, // teleboto
+		`^\[<FONT COLOR="([\w ]+)">([^\[]+)</FONT>\]`,  // Orizon
+		`^(.[0-9]+)\[([^\[]+)\] `,                      // teleboto? with 1st unprintable char
+		`^()\(GTalk\) ([^[]+):`,                        // OrzGTalk
+		`^()\[([^\[]+)\] `,                             // OrzIrc2P/tg2offtopic
 	}
 
 	for idx, msgreg := range msgregs {

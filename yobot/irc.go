@@ -117,7 +117,7 @@ func NewEventFromIrcEvent(e *irc.Event) *Event {
 	}
 
 	switch e.Code {
-	case "376":
+	case "376": // or 422
 		ne.EType = EVT_CONNECTED
 	case "PRIVMSG":
 		// TODO 如何区分好友消息和群组消息
