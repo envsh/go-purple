@@ -18,9 +18,15 @@ func TestFF(t *testing.T) {
 		`4[Abel_Abel] 这算不算父进程？`,                             //??
 		`13[Universebenzene] 缺poppler-data？`,                //??
 		`6[KireinaHoro_] 15「Re farseerfc: wow 麗狼加油...」謝謝`,   //??
+		`[tg2offtopic@irc] [FQEgg] loop`,
+		`[erhandsoME[m]@irc] 。。。`, // riot.im
 	}
 	for _, m := range msgs {
 		nu, nm, color := ExtractRealUser("", m)
-		log.Println(nu, "--", nm, "--", color)
+		log.Println("color:", color, "realuser:", nu, "realmsg:", nm)
+		if true {
+			nu, nm, color := ExtractRealUserMD("", m)
+			log.Println("color:", color, "realuser:", nu, "realmsg:", nm)
+		}
 	}
 }

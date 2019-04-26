@@ -1,15 +1,14 @@
 package bridges
 
 import (
-	"log"
 	"regexp"
 	"strings"
 )
 
 func IsBotUser(senderc string) bool {
 	sender := &senderc
-	botUsers := []string{"teleboto", "Orizon",
-		"OrzGTalk", "OrzIrc2P", "xmppbot"}
+	botUsers := []string{"teleboto", "Orizon", "OrzGTalk", "OrzIrc2P",
+		"xmppbot", "tg2offtopic", "tg2arch", "toxync"}
 	for _, u := range botUsers {
 		if *sender == u || strings.TrimRight(*sender, "_^") == u {
 			return true
@@ -43,18 +42,19 @@ func ExtractRealUser(sender, message string) (
 	msgregs := []string{
 		`^<FONT COLOR="([\w ]+)">\[([^\[]+)\] </FONT>`, // teleboto
 		`^\[<FONT COLOR="([\w ]+)">([^\[]+)</FONT>\]`,  // Orizon
-		`^(.[0-9]+)\[([^\[]+)\] `,                      // teleboto? with 1st unprintable char
-		`^()\(GTalk\) ([^[]+):`,                        // OrzGTalk
+		`^(.?[0-9]+)\[([^\[]+)\] `,                     // teleboto? with 1st unprintable char
+		`^()\(GTalk\) ([^\[]+):`,                       // OrzGTalk
+		`^()\[(.+\[m\].+)\] `,                          // riot.im
 		`^()\[([^\[]+)\] `,                             // OrzIrc2P/tg2offtopic
 	}
 
 	for idx, msgreg := range msgregs {
+		_ = idx
 		exp := regexp.MustCompile(msgreg)
 
 		mats := exp.FindAllStringSubmatch(message, -1)
 		if len(mats) > 0 {
-			log.Println("match reg:", idx, len(mats), msgreg,
-				len(message), "\""+message+"\"")
+			// log.Println("match reg:", idx, len(mats), msgreg, len(message), "\""+message+"\"")
 		}
 		if len(mats) == 1 {
 			new_sender = mats[0][0] // with color style
